@@ -1,0 +1,38 @@
+name: Notify Discord
+
+on:
+  # 1. Automatic trigger when you publish a new release
+  release:
+    types: [published]
+  
+  # 2. Manual trigger for custom messages
+  workflow_dispatch:
+    inputs:
+      message:
+        description: 'The custom message to send to Discord'
+        required: true
+        default: 'A new update for ChimeraClient has been released!'
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Discord Notification
+        env:
+          # This comes from your GitHub Secrets
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          # Determine which message to send based on the trigger
+          if [ "${{ github.event_name }}" == "release" ]; then
+            # Message for automatic release notifications
+            MESSAGE="🚀 **A new ChimeraClient update has been released!**\n\n**Version:** ${{ github.event.release.tag_name }}\n**Changelog:** [Read the full notes here](${{ github.event.release.html_url }})"
+          else
+            # Message for manual workflow_dispatch
+            MESSAGE="${{ github.event.inputs.message }}"
+          fi
+
+          # Send the message to Discord
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "{\"content\": \"$MESSAGE\"}" \
+               $DISCORD_WEBHOOK_U RL
