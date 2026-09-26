@@ -347,3 +347,22 @@ only, like the other overlays.
   attack either way, and the timing must be the real input timing.
 - Honest scope: it reads your own attack input and never clicks for you; the server still decides
   whether a hit lands. `hit_timing_scope_note` says so in the dialog.
+
+## In-game Mod Menu navigation & overlay visibility
+- The Mod Menu nav is a **top bar** inside `overlay_mod_menu.xml`, not a side rail (landscape-only app; a rail only gets the short edge). Entries live in a `HorizontalScrollView` so compact mode's narrow window still fits every destination and the close button.
+- **An unresolved native HUD hook must not hide a mod's UI.** `OverlayVisibility.showGameOverlays` treats `hudScreenOpen == false` as authoritative only once the hook has fired (`gameWorldSeen`); before that it falls back to `sessionActive`. Without the fallback, an overlay appeared only while the Mod Menu was open and vanished the instant it closed. The fallback signals are part of `tick()`'s state hash — a session starting must re-evaluate visibility even when every native flag is unchanged.
+- **`gameWorldSeen` is never set false.** The HUD hook only *ever* reports true once installed; a false is indistinguishable from "not installed", so treating it as "left the world" would re-hide overlays after the first menu.
+- Compact mode **narrows** the window (`applyCompactModeLayout`); it must never hide the navigation. The old sidebar/compact-icon swap was the bug.
+
+## Controller input latency (StickDriftGate + ControllerInputProcessor)
+- The anti-drift gate must release on **elapsed time** (`SUSTAIN_MS`), not only on event count. Many pads deliver a motion event only when an axis *changes*, so a stick held at a steady deflection across the threshold produces one crossing and no second event; an event-count-only rule held that deflection back indefinitely, which the player feels as input delay.
+- `ControllerInputProcessor.transformMotionEvent` uses pooled scratch arrays so the hot path allocates nothing. Keep it that way — it runs per controller event on the input-to-photon path.
+- Controller illustration realism comes from **hard-edged moulding**, not soft washes: a domed cap is two concentric circles of decreasing radius, a recess is a directional inner shadow arc, a highlight is one tight off-centre circle. A large translucent oval across the shell reads as a smeared "spilled water" highlight. Never allocate a `Paint` inside a draw method (the old stick/d-pad code did); the view caches one per role.
+
+## Cosmetics preview scope
+- `CosmeticsPanel` + `CapePreviewView` + `SkinModel` / `PlayerSkinProvider` / `CapeSimulator` (in `core/cosmetics`) render the player's character with their applied skin and the equipped cape, animated. The catalogue and selection are pure and unit-tested.
+- **This is a preview, not an in-game mod, and the UI must keep saying so.** Bedrock has no third-party custom-cape slot — the cape belongs to the skin-pack system — so nothing here can appear in the running game or to other players. `cosmetics_scope_note` states it; do not soften it into an implied feature.
+
+## Combat module empty states
+- A module that needs a native feed (Crystal Optimizer's `WorldSource`, Armor HUD's `DataSource`, Hitboxes' `EntitySource`) must distinguish **"no data source"** from **"data source says nothing is there"**. Crystal Optimizer's `isAwaitingGameData()` renders "waiting for game data"; without it the readout said "no safe spot", blaming the player's aim for a feed that does not exist. `HitboxOverlay` shows an equivalent "awaiting data" state.
+- `TouchTapDetector` classifies a touch attack for the Select Hit metronome. A `POINTER_UP` for a *different* pointer must not end the gesture — ending there dropped the real tap the moment a jump/sneak button was released. Fixed and pinned by `TouchTapDetectorTest`.

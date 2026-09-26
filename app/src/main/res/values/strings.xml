@@ -792,8 +792,13 @@ Migration must complete before Chimera Client can continue.</string>
     <string name="cosmetics_accessories">Accessories</string>
     <string name="cosmetics_none">None</string>
     <string name="cosmetics_equipped">Equipped %1$s</string>
-    <string name="cosmetics_scope_note">ChimeraClient cosmetics render in this preview and are saved for this device. Bedrock does not expose a general custom-cape slot to third-party clients, so other players will not see these.</string>
+    <string name="cosmetics_scope_note">Capes and accessories preview here, on your character with your own skin, and are saved on this device. Bedrock gives a third-party launcher no way to inject a custom cape into the running game — the cape slot belongs to the skin-pack system — so these do not appear in-game or to other players. This section is a preview, not a game mod.</string>
     <string name="cosmetics_preview_description">Preview of your character wearing the selected cape and accessory</string>
+    <string name="cosmetics_skin_source">Skin: %1$s</string>
+    <string name="cosmetics_skin_fallback">Showing the default character — no skin pack is applied for this instance yet. Apply one in Customize → Skins and it will appear here.</string>
+    <string name="cosmetics_skin_note">Only the base layer and the head overlay of a skin are drawn. Skins that depend on full second-layer geometry may look simplified.</string>
+    <string name="cosmetics_rotate_hint">Drag to rotate your character</string>
+    <string name="cosmetics_second_layer_limited">Base layer + head overlay only</string>
     <string name="mod_menu_version">v1.0</string>
     <string name="mod_menu_enabled">Mod Menu enabled</string>
     <string name="mod_menu_disabled">Mod Menu disabled</string>
@@ -1364,6 +1369,7 @@ Migration must complete before Chimera Client can continue.</string>
     <string name="mod_config_crystal_keybind_desc">Key that switches the module on and off mid-fight</string>
     <string name="crystal_optimizer_status_off">Crystal Optimizer: off</string>
     <string name="crystal_optimizer_status_no_spot">Crystal Optimizer: no safe spot</string>
+    <string name="crystal_optimizer_status_no_data">Crystal Optimizer: waiting for game data</string>
     <string name="crystal_optimizer_status_manual" formatted="false">Assist · %.1f blocks · ~%d dmg · place it yourself</string>
     <string name="crystal_optimizer_status_auto" formatted="false">Auto · %.1f blocks · ~%d dmg</string>
     <string name="crystal_optimizer_fairness_note">Automating crystal placement is treated as cheating on many servers and can get you banned. Manual Assist only highlights the spot; it never acts for you. Check your server rules before enabling automatic placement.</string>
@@ -1403,7 +1409,9 @@ Migration must complete before Chimera Client can continue.</string>
     <string name="mod_config_hitbox_show_items">Show Dropped Items</string>
     <string name="mod_config_hitbox_show_items_desc">Boxes for items lying on the ground</string>
     <string name="mod_config_hitbox_show_projectiles">Show Projectiles</string>
-    <string name="mod_config_hitbox_show_projectiles_desc">Boxes for arrows and thrown items in flight</string>
+    <string name="mod_config_hitbox_show_projectiles_desc">Boxes for arrows, fireballs and other fired projectiles</string>
+    <string name="mod_config_hitbox_show_thrown_items">Show Thrown Items</string>
+    <string name="mod_config_hitbox_show_thrown_items_desc">Boxes for ender pearls, wind charges, snowballs and eggs in flight</string>
     <string name="mod_config_hitbox_show_look_line">Show Aim Direction</string>
     <string name="mod_config_hitbox_show_look_line_desc">Line marking where you are looking</string>
     <string name="mod_config_hitbox_show_crit_line">Show Critical Hit Line</string>

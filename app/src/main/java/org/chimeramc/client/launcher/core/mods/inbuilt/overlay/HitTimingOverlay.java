@@ -3,9 +3,11 @@ package org.chimeramc.client.core.mods.inbuilt.overlay;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -211,72 +213,149 @@ public final class HitTimingOverlay {
     }
 
     private final class HitTimingView extends View {
+        private static final int COLOR_READY = 0xFFF2F2F2;
+        private static final int COLOR_HIT = 0xFF35D07F;
+        private static final int COLOR_WAIT = 0xFFFF5A5F;
+
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF pill = new RectF();
         private final RectF bar = new RectF();
+        private final RectF comboPill = new RectF();
         private final float density;
+
+        /** Smoothed 0..1 fill so the bar tracks the window instead of snapping per frame. */
+        private float shownProgress = 1f;
+        private int lastColor;
+        private boolean pulseRunning;
 
         HitTimingView(Context context) {
             super(context);
             density = getResources().getDisplayMetrics().density;
             textPaint.setTextAlign(Paint.Align.CENTER);
             textPaint.setFakeBoldText(true);
-            textPaint.setTextSize(11f * density);
-            setAlpha(0.95f);
+            textPaint.setTextSize(12f * density);
+            labelPaint.setTextAlign(Paint.Align.CENTER);
+            labelPaint.setFakeBoldText(true);
+            labelPaint.setTextSize(9f * density);
+            labelPaint.setLetterSpacing(0.12f);
+            setAlpha(0.96f);
         }
 
         @Override
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            float w = 96f * density;
-            float h = 26f * density;
-            setMeasuredDimension((int) w, (int) h);
+            int w = (int) (104f * density);
+            int h = (int) (30f * density);
+            setMeasuredDimension(w, h);
         }
 
         @Override
         protected void onDraw(Canvas canvas) {
             HitTimingSolver.Decision decision =
                     HitTimingMod.evaluate(SystemClock.uptimeMillis());
-            boolean green = decision.isGreen();
-            int color = green ? 0xFF2ECC71 : 0xFFE74C3C;
+
+            boolean idle = decision.isIdle();
+            int color = idle ? COLOR_READY : (decision.isGreen() ? COLOR_HIT : COLOR_WAIT);
 
             float w = getWidth();
             float h = getHeight();
             float radius = h / 2f;
 
+            // Smooth the bar rather than letting it reset between refresh ticks; the window is
+            // a continuous countdown, so a stepped bar reads as a stutter.
+            float target = decision.progress;
+            shownProgress += (target - shownProgress) * 0.35f;
+
+            // An idle indicator is deliberate: it fades rather than shouting a status it does
+            // not have, so "not in combat yet" cannot be misread as "hit now".
+            paint.setAlpha(idle ? 150 : 255);
+
+            // Soft drop shadow so the pill stays legible over bright terrain.
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(0x99000000);
-            pill.set(0f, 0f, w, h);
+            paint.setColor(0x55000000);
+            pill.set(0f, 1.5f * density, w, h + 1.5f * density);
             canvas.drawRoundRect(pill, radius, radius, paint);
 
+            // Body: a dark translucent fill with a subtle top-lit gradient.
+            paint.setShader(new LinearGradient(0f, 0f, 0f, h,
+                    0xE61A1D24, 0xE60E1015, Shader.TileMode.CLAMP));
+            pill.set(0f, 0f, w, h);
+            canvas.drawRoundRect(pill, radius, radius, paint);
+            paint.setShader(null);
+
+            // Progress bar hugging the inside of the pill, growing with the elapsed window.
+            if (HitTimingMod.isShowTimingBar()) {
+                float inset = 3f * density;
+                float trackH = h - inset * 2f;
+                paint.setColor(0x26FFFFFF);
+                bar.set(inset, inset, w - inset, h - inset);
+                canvas.drawRoundRect(bar, trackH / 2f, trackH / 2f, paint);
+                paint.setColor(color);
+                paint.setAlpha(idle ? 90 : 255);
+                bar.set(inset, inset, inset + (w - inset * 2f) * Math.max(0f, Math.min(1f, shownProgress)),
+                        h - inset);
+                canvas.drawRoundRect(bar, trackH / 2f, trackH / 2f, paint);
+                paint.setAlpha(idle ? 150 : 255);
+            }
+
+            // Crisp 2dp border in the state colour, drawn inside the pill.
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(2f * density);
             paint.setColor(color);
-            canvas.drawRoundRect(pill, radius, radius, paint);
+            RectF border = new RectF(density, density, w - density, h - density);
+            canvas.drawRoundRect(border, radius - density, radius - density, paint);
+            paint.setStyle(Paint.Style.FILL);
 
-            // A slim progress bar along the bottom edge shows how much of the window has
-            // elapsed, so the player can see the rhythm rather than only the binary state.
-            if (HitTimingMod.isShowTimingBar()) {
-                paint.setStyle(Paint.Style.FILL);
-                paint.setColor(color);
-                float barInset = 3f * density;
-                float barHeight = 3f * density;
-                bar.set(barInset, h - barInset - barHeight, barInset + (w - barInset * 2) * decision.progress,
-                        h - barInset);
-                canvas.drawRoundRect(bar, barHeight / 2f, barHeight / 2f, paint);
-            }
-
-            String label;
-            if (green) {
-                label = HitTimingMod.isShowCombo() && decision.combo > 0
-                        ? "HIT  ·  " + decision.combo + "x"
-                        : "HIT";
-            } else {
-                label = "WAIT " + decision.remainingMs;
-            }
+            // Label: a short verb in the state colour. The remaining time is drawn as a
+            // separate dim caption so the two do not compete for the same line.
+            String label = idle ? "READY" : (decision.isGreen() ? "HIT" : "WAIT");
             textPaint.setColor(color);
-            float baseline = h / 2f - (textPaint.descent() + textPaint.ascent()) / 2f;
-            canvas.drawText(label, w / 2f, baseline, textPaint);
+            float textCenterY = h / 2f - (textPaint.descent() + textPaint.ascent()) / 2f;
+            float labelX = w / 2f;
+            if (!idle && !decision.isGreen() && HitTimingMod.isShowCombo()) {
+                // Shift the verb left to leave room for the countdown caption on the right.
+                labelX = w * 0.38f;
+            }
+            canvas.drawText(label, labelX, textCenterY, textPaint);
+
+            if (!idle && !decision.isGreen()) {
+                labelPaint.setColor(0xCCFFFFFF);
+                String ms = decision.remainingMs + "ms";
+                float capCenterY = h / 2f - (labelPaint.descent() + labelPaint.ascent()) / 2f;
+                canvas.drawText(ms, w * 0.72f, capCenterY, labelPaint);
+            }
+
+            // Combo badge, drawn as a small pill on the leading edge so a streak is readable
+            // at a glance without widening the main indicator.
+            if (HitTimingMod.isShowCombo() && decision.combo > 1) {
+                String comboText = decision.combo + "x";
+                labelPaint.setColor(0xFF0E1015);
+                float cw = labelPaint.measureText(comboText) + 8f * density;
+                float ch = 14f * density;
+                comboPill.set(w - cw - 3f * density, (h - ch) / 2f, w - 3f * density, (h + ch) / 2f);
+                paint.setColor(color);
+                canvas.drawRoundRect(comboPill, ch / 2f, ch / 2f, paint);
+                float comboCenterY = (h / 2f) - (labelPaint.descent() + labelPaint.ascent()) / 2f;
+                canvas.drawText(comboText, comboPill.centerX(), comboCenterY, labelPaint);
+            }
+
+            colorPulseIfChanged(color);
+        }
+
+        /**
+         * A single short scale pulse when the state flips, so the change registers in peripheral
+         * vision. Only ever one animator at a time, and never when animations are off.
+         */
+        private void colorPulseIfChanged(int color) {
+            if (color == lastColor) return;
+            lastColor = color;
+            if (pulseRunning) return;
+            if (!org.chimeramc.client.ui.animation.DynamicAnim.areAnimationsEnabled()) return;
+            pulseRunning = true;
+            animate().scaleX(1.06f).scaleY(1.06f).setDuration(70).withEndAction(() -> {
+                animate().scaleX(1f).scaleY(1f).setDuration(110).withEndAction(() -> pulseRunning = false).start();
+            }).start();
         }
     }
 }

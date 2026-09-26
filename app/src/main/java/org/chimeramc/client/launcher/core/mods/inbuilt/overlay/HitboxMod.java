@@ -23,6 +23,7 @@ public final class HitboxMod {
     private static volatile boolean showMobs = true;
     private static volatile boolean showItems = true;
     private static volatile boolean showProjectiles = true;
+    private static volatile boolean showThrownItems = true;
     private static volatile boolean showLookLine = true;
     private static volatile boolean showCritLine = true;
     private static volatile boolean showComboBox = true;
@@ -48,6 +49,7 @@ public final class HitboxMod {
         if (enabled && manager != null) {
             applyConfig(manager.isHitboxShowPlayers(), manager.isHitboxShowMobs(),
                     manager.isHitboxShowItems(), manager.isHitboxShowProjectiles(),
+                    manager.isHitboxShowThrownItems(),
                     manager.isHitboxShowLookLine(), manager.isHitboxShowCritLine(),
                     manager.isHitboxShowComboBox());
         }
@@ -57,17 +59,20 @@ public final class HitboxMod {
         if (manager == null) return;
         applyConfig(manager.isHitboxShowPlayers(), manager.isHitboxShowMobs(),
                 manager.isHitboxShowItems(), manager.isHitboxShowProjectiles(),
+                manager.isHitboxShowThrownItems(),
                 manager.isHitboxShowLookLine(), manager.isHitboxShowCritLine(),
                 manager.isHitboxShowComboBox());
     }
 
     /** Separate from the manager overload so the filters are testable without a Context. */
-    public static void applyConfig(boolean players, boolean mobs, boolean items, boolean projectiles,
+    public static void applyConfig(boolean players, boolean mobs, boolean items,
+                                   boolean projectiles, boolean thrownItems,
                                    boolean lookLine, boolean critLine, boolean comboBox) {
         showPlayers = players;
         showMobs = mobs;
         showItems = items;
         showProjectiles = projectiles;
+        showThrownItems = thrownItems;
         showLookLine = lookLine;
         showCritLine = critLine;
         showComboBox = comboBox;
@@ -98,11 +103,25 @@ public final class HitboxMod {
                 return showMobs;
             case DROPPED_ITEM:
                 return showItems;
+            case THROWN_ITEM:
+                return showThrownItems;
             case PROJECTILE:
                 return showProjectiles;
             default:
                 return false;
         }
+    }
+
+    /**
+     * True when the module is on but no entity feed is installed, so nothing can be drawn.
+     *
+     * <p>The overlay shows that as an explicit "waiting for game data" line. A module that is
+     * enabled and silently draws nothing is indistinguishable from a broken one, and the whole
+     * reason this seam exists is that the absence of a feed is a real, explainable state rather
+     * than a failure — so it is surfaced instead of hidden.
+     */
+    public static boolean isAwaitingGameData() {
+        return active && entitySource == null;
     }
 
     /** The projected frame to draw, or null when there is nothing to show. */

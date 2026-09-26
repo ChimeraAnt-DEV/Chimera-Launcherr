@@ -107,6 +107,17 @@ public final class CrystalOptimizerMod {
     }
 
     /**
+     * True when the module is on but no world feed is installed, so no spot can ever be found.
+     *
+     * <p>Without this the readout said "no safe spot", which blames the aimed position for a
+     * state that is really "the data source does not exist yet". Those are different failures,
+     * and only one of them is the player's to fix.
+     */
+    public static boolean isAwaitingGameData() {
+        return active && worldSource == null;
+    }
+
+    /**
      * Evaluates the current world and returns the best placement, or {@code null} when there is
      * no usable spot (no data, no target, out of range, or the trade would cost too much health).
      */

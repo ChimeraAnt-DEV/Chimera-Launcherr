@@ -815,6 +815,46 @@ public class InbuiltOverlayManager {
         HitTimingMod.onAttack(android.os.SystemClock.uptimeMillis());
     }
 
+    private final TouchTapDetector touchTapDetector = new TouchTapDetector();
+
+    /**
+     * Observes a raw touch event for the Select Hit metronome.
+     *
+     * <p>With the on-screen controls disabled, a tap on the world is an attack and there is no
+     * other funnel to observe it through, so the gesture is classified here. A drag is the look
+     * gesture and must not count, otherwise moving the camera would forge a swing and reset the
+     * window the module is trying to teach.
+     */
+    public void notifyTouchForAttack(MotionEvent event, int slopPx) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                touchTapDetector.onDown(event.getPointerId(0), event.getX(), event.getY(),
+                        android.os.SystemClock.uptimeMillis());
+                break;
+            case MotionEvent.ACTION_MOVE:
+                touchTapDetector.onMove(event.getPointerId(0), event.getX(), event.getY(), slopPx);
+                break;
+            case MotionEvent.ACTION_POINTER_UP: {
+                int index = event.getActionIndex();
+                if (event.getPointerId(index) == 0) {
+                    if (touchTapDetector.onUp(0, android.os.SystemClock.uptimeMillis())) notifyAttack();
+                }
+                break;
+            }
+            case MotionEvent.ACTION_UP:
+                if (touchTapDetector.onUp(event.getPointerId(0),
+                        android.os.SystemClock.uptimeMillis())) {
+                    notifyAttack();
+                }
+                break;
+            case MotionEvent.ACTION_CANCEL:
+                touchTapDetector.onCancel();
+                break;
+            default:
+                break;
+        }
+    }
+
     public void applyConfigurationChanges(String modId) {
         BaseOverlayButton overlay = modOverlayMap.get(modId);
         if (overlay != null) {

@@ -23,6 +23,9 @@ public final class HitboxProjector {
         PLAYER,
         MOB,
         DROPPED_ITEM,
+        /** A thrown item in flight: an ender pearl, a wind charge, a snowball, an egg. */
+        THROWN_ITEM,
+        /** A projectile fired by a weapon: an arrow, a fireball, a trident. */
         PROJECTILE
     }
 
@@ -71,6 +74,17 @@ public final class HitboxProjector {
 
         public static Entity projectile(float x, float y, float z) {
             return new Entity(Kind.PROJECTILE, x, y, z, 0.5f, 0.5f, 0.5f);
+        }
+
+        /**
+         * A thrown item: an ender pearl, a wind charge, a snowball, an egg.
+         *
+         * <p>Kept separate from {@link #projectile} because these are thrown by hand and share a
+         * distinct, slightly smaller hitbox, and a player trying to hit one mid-air benefits from
+         * seeing that they are the same class of target.
+         */
+        public static Entity thrownItem(float x, float y, float z) {
+            return new Entity(Kind.THROWN_ITEM, x, y, z, 0.25f, 0.25f, 0.25f);
         }
 
         public float minX() { return x - width / 2f; }
