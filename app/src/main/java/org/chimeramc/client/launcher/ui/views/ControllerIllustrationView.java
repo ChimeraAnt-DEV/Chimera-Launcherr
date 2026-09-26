@@ -53,6 +53,11 @@ public class ControllerIllustrationView extends View {
     private final Paint detailPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint edgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint platePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint shadePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint knurlPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint letterPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint groovePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private final RectF scratch = new RectF();
     private final Path shellPath = new Path();
@@ -424,7 +429,8 @@ public class ControllerIllustrationView extends View {
      * shadow and the cap's off-centre highlight are what stop it reading as a flat disc.
      */
     private void drawStick(Canvas canvas, float px, float py, float pr, boolean glowMode) {
-        float well = pr * 1.26f;
+        float well = pr * 1.30f;
+        wellPaint.setShader(null);
         wellPaint.setColor(wellColor);
         canvas.drawCircle(px, py, well, wellPaint);
         if (glowMode) {
@@ -435,30 +441,49 @@ public class ControllerIllustrationView extends View {
         canvas.drawCircle(px, py, well, outlinePaint);
         outlinePaint.setStrokeWidth(2.5f);
 
-        // Inner shadow arc across the top inside wall sells the depth of the recess.
-        Paint shade = new Paint(Paint.ANTI_ALIAS_FLAG);
-        shade.setStyle(Paint.Style.STROKE);
-        shade.setStrokeWidth(pr * 0.22f);
-        shade.setColor(dark ? 0x88000000 : 0x33000000);
-        canvas.drawArc(new RectF(px - well, py - well, px + well, py + well), 200f, 140f, false, shade);
+        // Inner shadow: only the upper inside wall is in shade, because the opening faces the
+        // viewer and the light comes from above. Drawing the whole rim dark is what made the
+        // well read as a smeared oval instead of a recess.
+        shadePaint.setStyle(Paint.Style.STROKE);
+        shadePaint.setStrokeWidth(pr * 0.26f);
+        shadePaint.setColor(dark ? 0x77000000 : 0x2E000000);
+        canvas.drawArc(new RectF(px - well * 0.92f, py - well * 0.92f,
+                px + well * 0.92f, py + well * 0.92f), 195f, 150f, false, shadePaint);
+        // A thin light arc on the lower inside wall completes the concave read.
+        shadePaint.setColor(dark ? 0x18FFFFFF : 0x45FFFFFF);
+        canvas.drawArc(new RectF(px - well * 0.92f, py - well * 0.92f,
+                px + well * 0.92f, py + well * 0.92f), 15f, 150f, false, shadePaint);
 
-        capPaint.setColor(dark ? 0xFF4E5560 : 0xFFE3E6EA);
+        // Cap: a gently domed disc. The dome is two stacked circles of decreasing radius,
+        // which gives a hard edge between them that reads as a moulded surface.
+        capPaint.setShader(null);
+        capPaint.setColor(dark ? 0xFF525A66 : 0xFFE7EAEE);
         canvas.drawCircle(px, py, pr, capPaint);
-        buttonDarkPaint.setColor(dark ? 0xFF2C313A : 0xFFB2B8C1);
-        canvas.drawCircle(px, py, pr * 0.84f, buttonDarkPaint);
+        platePaint.setColor(dark ? 0xFF3E454F : 0xFFD2D7DE);
+        canvas.drawCircle(px, py, pr * 0.90f, platePaint);
+        platePaint.setColor(dark ? 0xFF4A525D : 0xFFDFE3E8);
+        canvas.drawCircle(px, py, pr * 0.78f, platePaint);
 
-        // Grip knurl: a ring of short ticks around the cap edge.
-        Paint knurl = new Paint(Paint.ANTI_ALIAS_FLAG);
-        knurl.setStyle(Paint.Style.STROKE);
-        knurl.setStrokeWidth(pr * 0.08f);
-        knurl.setColor(dark ? 0x2EFFFFFF : 0x55FFFFFF);
-        for (int i = 0; i < 24; i++) {
-            double a = Math.toRadians(i * 15);
-            canvas.drawLine(px + (float) Math.cos(a) * pr * 0.80f, py + (float) Math.sin(a) * pr * 0.80f,
-                    px + (float) Math.cos(a) * pr * 0.96f, py + (float) Math.sin(a) * pr * 0.96f, knurl);
+        // Rubber grip ring with a fine knurl, drawn as ticks so it stays crisp at any size.
+        knurlPaint.setStyle(Paint.Style.STROKE);
+        knurlPaint.setStrokeWidth(pr * 0.07f);
+        knurlPaint.setColor(dark ? 0x33FFFFFF : 0x4DFFFFFF);
+        for (int i = 0; i < 28; i++) {
+            double a = Math.toRadians(i * (360.0 / 28.0));
+            canvas.drawLine(px + (float) Math.cos(a) * pr * 0.83f, py + (float) Math.sin(a) * pr * 0.83f,
+                    px + (float) Math.cos(a) * pr * 0.99f, py + (float) Math.sin(a) * pr * 0.99f, knurlPaint);
         }
-        highlightPaint.setColor(dark ? 0x33FFFFFF : 0xA6FFFFFF);
-        canvas.drawCircle(px - pr * 0.24f, py - pr * 0.28f, pr * 0.40f, highlightPaint);
+
+        // Concave dish in the middle of the cap.
+        groovePaint.setStyle(Paint.Style.STROKE);
+        groovePaint.setStrokeWidth(pr * 0.10f);
+        groovePaint.setColor(dark ? 0x5A000000 : 0x33000000);
+        canvas.drawCircle(px, py, pr * 0.62f, groovePaint);
+
+        // A single specular highlight, tight and offset, not a broad wash.
+        highlightPaint.setShader(null);
+        highlightPaint.setColor(dark ? 0x40FFFFFF : 0x99FFFFFF);
+        canvas.drawCircle(px - pr * 0.30f, py - pr * 0.34f, pr * 0.26f, highlightPaint);
     }
 
     private void drawRing(Canvas canvas, float px, float py, float pr, boolean glowMode) {
@@ -491,12 +516,20 @@ public class ControllerIllustrationView extends View {
 
         detailPaint.setColor(dark ? 0xFF20242B : 0xFFA6ACB5);
         canvas.drawCircle(px, py, pr * 0.17f, detailPaint);
+        // Directional dimples: small dished circles on each arm, with a crisp dark edge and a
+        // tight highlight, which is what a moulded d-pad actually looks like.
         float d = pr * 0.58f;
-        highlightPaint.setColor(dark ? 0x22FFFFFF : 0x66FFFFFF);
         for (int i = 0; i < 4; i++) {
             double a = Math.toRadians(45 + i * 90);
-            canvas.drawCircle(px + (float) Math.cos(a) * d, py + (float) Math.sin(a) * d,
-                    pr * 0.13f, highlightPaint);
+            float dx = px + (float) Math.cos(a) * d;
+            float dy = py + (float) Math.sin(a) * d;
+            groovePaint.setStyle(Paint.Style.STROKE);
+            groovePaint.setStrokeWidth(pr * 0.06f);
+            groovePaint.setColor(dark ? 0x66000000 : 0x33000000);
+            canvas.drawCircle(dx, dy, pr * 0.13f, groovePaint);
+            highlightPaint.setShader(null);
+            highlightPaint.setColor(dark ? 0x2EFFFFFF : 0x66FFFFFF);
+            canvas.drawCircle(dx - pr * 0.03f, dy - pr * 0.03f, pr * 0.07f, highlightPaint);
         }
     }
 
@@ -505,19 +538,34 @@ public class ControllerIllustrationView extends View {
             canvas.drawCircle(px, py, pr, glowPaint);
             return;
         }
+        // Recessed socket the button sits in, then the domed cap on top of it.
+        shadePaint.setStyle(Paint.Style.STROKE);
+        shadePaint.setStrokeWidth(pr * 0.16f);
+        shadePaint.setColor(dark ? 0x66000000 : 0x30000000);
+        canvas.drawCircle(px, py, pr * 1.06f, shadePaint);
+
+        buttonPaint.setShader(null);
         buttonPaint.setColor(dark ? 0xFF23272F : 0xFFE4E7EB);
         canvas.drawCircle(px, py, pr, buttonPaint);
-        outlinePaint.setStrokeWidth(1.8f);
+        // A smaller concentric disc gives the cap its dome; the hard step between them reads
+        // as a moulded shoulder rather than a blur.
+        platePaint.setColor(dark ? 0xFF2C313A : 0xFFD6DAE0);
+        canvas.drawCircle(px, py, pr * 0.86f, platePaint);
+        outlinePaint.setStrokeWidth(1.6f);
         canvas.drawCircle(px, py, pr, outlinePaint);
         outlinePaint.setStrokeWidth(2.5f);
 
-        Paint letter = new Paint(Paint.ANTI_ALIAS_FLAG);
-        letter.setColor(faceColor(r.id));
-        letter.setTextAlign(Paint.Align.CENTER);
-        letter.setFakeBoldText(true);
-        letter.setTextSize(pr * 1.20f);
-        Paint.FontMetrics fm = letter.getFontMetrics();
-        canvas.drawText(r.label, px, py - (fm.ascent + fm.descent) / 2f, letter);
+        letterPaint.setTextAlign(Paint.Align.CENTER);
+        letterPaint.setFakeBoldText(true);
+        letterPaint.setTextSize(pr * 1.24f);
+        letterPaint.setColor(faceColor(r.id));
+        Paint.FontMetrics fm = letterPaint.getFontMetrics();
+        canvas.drawText(r.label, px, py - (fm.ascent + fm.descent) / 2f, letterPaint);
+
+        // Gloss: a tight crescent across the top-left of the cap.
+        highlightPaint.setShader(null);
+        highlightPaint.setColor(dark ? 0x2AFFFFFF : 0x80FFFFFF);
+        canvas.drawCircle(px - pr * 0.30f, py - pr * 0.32f, pr * 0.22f, highlightPaint);
     }
 
     private void drawFaceDual(Canvas canvas, ControllerLayout.Spec r, float px, float py, float pr, boolean glowMode) {

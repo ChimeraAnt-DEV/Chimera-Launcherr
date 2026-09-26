@@ -19,7 +19,10 @@ public class HitTimingSolverTest {
         HitTimingSolver solver = new HitTimingSolver();
         HitTimingSolver.Decision decision = solver.evaluate(0L);
         assertEquals(HitTimingSolver.Advice.READY, decision.advice);
-        assertTrue(decision.isGreen());
+        // READY is deliberately not green: nothing has been swung yet, so "hit now" would be an
+        // unearned instruction. The indicator is idle until the first attack.
+        assertFalse(decision.isGreen());
+        assertTrue(decision.isIdle());
         assertEquals(0, decision.combo);
     }
 

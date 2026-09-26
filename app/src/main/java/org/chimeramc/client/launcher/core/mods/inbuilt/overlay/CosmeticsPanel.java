@@ -49,9 +49,30 @@ final class CosmeticsPanel {
         preview = new CapePreviewView(activity);
         preview.setCape(store.getEquippedCape());
         preview.setAccessory(store.getEquippedAccessory());
+        preview.setContentDescription(activity.getString(R.string.cosmetics_preview_description));
+
+        // The preview gets its own column so the caption can state which skin is on screen.
+        // Without it a failed skin lookup is indistinguishable from a successful one.
+        LinearLayout previewColumn = new LinearLayout(activity);
+        previewColumn.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.MATCH_PARENT, compact ? 0.42f : 0.36f);
-        root.addView(preview, previewParams);
+        root.addView(previewColumn, previewParams);
+        previewColumn.addView(preview, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        TextView skinLine = new TextView(activity);
+        skinLine.setTextSize(compact ? 9f : 10f);
+        skinLine.setTextColor(0xFF8F979F);
+        skinLine.setGravity(Gravity.CENTER);
+        skinLine.setPadding(0, dp(4), 0, 0);
+        if (preview.isShowingFallbackSkin()) {
+            skinLine.setText(R.string.cosmetics_skin_fallback);
+        } else {
+            skinLine.setText(activity.getString(R.string.cosmetics_skin_source,
+                    preview.getSkinSourceName()));
+        }
+        previewColumn.addView(skinLine);
 
         ScrollView scroller = new ScrollView(activity);
         scroller.setFillViewport(true);

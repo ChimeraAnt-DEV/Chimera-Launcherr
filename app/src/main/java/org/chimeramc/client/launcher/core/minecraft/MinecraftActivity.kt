@@ -45,6 +45,12 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
     private lateinit var gameManager: GamePackageManager
     private lateinit var trace: LaunchTrace
     private var overlayManager: InbuiltOverlayManager? = null
+
+    /** Scaled touch slop, resolved once; used to tell an attack tap from a camera drag. */
+    private val touchSlopPx by lazy {
+        android.view.ViewConfiguration.get(this).scaledTouchSlop
+    }
+
     private var normalExitPrepared = false
     private var normalExitRestartScheduled = false
     private var gameRuntimeStarted = false
@@ -438,6 +444,9 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
         }
 
         overlayManager?.handleTouchEvent(event)
+        // The game consumes the raw event itself, so a vanilla tap attack has no other funnel
+        // to observe. Classify the same gesture the game acted on for the Select Hit metronome.
+        overlayManager?.notifyTouchForAttack(event, touchSlopPx)
 
         return super.dispatchTouchEvent(event)
     }

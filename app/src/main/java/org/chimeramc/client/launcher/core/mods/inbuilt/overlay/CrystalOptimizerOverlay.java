@@ -130,6 +130,8 @@ public final class CrystalOptimizerOverlay {
             String status;
             if (!CrystalOptimizerMod.isActive()) {
                 status = activity.getString(R.string.crystal_optimizer_status_off);
+            } else if (CrystalOptimizerMod.isAwaitingGameData()) {
+                status = activity.getString(R.string.crystal_optimizer_status_no_data);
             } else if (candidate == null) {
                 status = activity.getString(R.string.crystal_optimizer_status_no_spot);
             } else if (CrystalOptimizerMod.isManualAssist()) {

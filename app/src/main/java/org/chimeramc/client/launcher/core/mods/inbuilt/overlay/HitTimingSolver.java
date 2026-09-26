@@ -54,9 +54,20 @@ public final class HitTimingSolver {
             this.progress = progress;
         }
 
-        /** True when the indicator should read "hit now" (green). */
+        /**
+         * True when a click right now will land.
+         *
+         * <p>{@link Advice#READY} is <em>not</em> green: nothing has been swung yet in this
+         * engagement, so claiming "hit now" would be an unearned instruction. The indicator
+         * stays in its neutral state until the first attack, then tracks the real window.
+         */
         public boolean isGreen() {
-            return advice != Advice.WAIT;
+            return advice == Advice.HIT;
+        }
+
+        /** True when the indicator has no live window to report. */
+        public boolean isIdle() {
+            return advice == Advice.READY;
         }
     }
 

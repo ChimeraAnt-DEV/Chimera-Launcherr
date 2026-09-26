@@ -69,6 +69,7 @@ public final class InbuiltModuleProvider {
     private static final String CFG_HITBOX_SHOW_MOBS = "hitbox_show_mobs";
     private static final String CFG_HITBOX_SHOW_ITEMS = "hitbox_show_items";
     private static final String CFG_HITBOX_SHOW_PROJECTILES = "hitbox_show_projectiles";
+    private static final String CFG_HITBOX_SHOW_THROWN_ITEMS = "hitbox_show_thrown_items";
     private static final String CFG_HITBOX_SHOW_LOOK_LINE = "hitbox_show_look_line";
     private static final String CFG_HITBOX_SHOW_CRIT_LINE = "hitbox_show_crit_line";
     private static final String CFG_HITBOX_SHOW_COMBO_BOX = "hitbox_show_combo_box";
@@ -306,6 +307,7 @@ public final class InbuiltModuleProvider {
                 nodes.put(configNode(context, mod, CFG_HITBOX_SHOW_MOBS, "entities"));
                 nodes.put(configNode(context, mod, CFG_HITBOX_SHOW_ITEMS, "entities"));
                 nodes.put(configNode(context, mod, CFG_HITBOX_SHOW_PROJECTILES, "entities"));
+                nodes.put(configNode(context, mod, CFG_HITBOX_SHOW_THROWN_ITEMS, "entities"));
                 nodes.put(configNode(context, mod, CFG_HITBOX_SHOW_LOOK_LINE, "guides"));
                 nodes.put(configNode(context, mod, CFG_HITBOX_SHOW_CRIT_LINE, "guides"));
                 nodes.put(configNode(context, mod, CFG_HITBOX_SHOW_COMBO_BOX, "guides"));
@@ -379,6 +381,7 @@ public final class InbuiltModuleProvider {
             case CFG_HITBOX_SHOW_MOBS: return R.string.mod_config_hitbox_show_mobs_desc;
             case CFG_HITBOX_SHOW_ITEMS: return R.string.mod_config_hitbox_show_items_desc;
             case CFG_HITBOX_SHOW_PROJECTILES: return R.string.mod_config_hitbox_show_projectiles_desc;
+            case CFG_HITBOX_SHOW_THROWN_ITEMS: return R.string.mod_config_hitbox_show_thrown_items_desc;
             case CFG_HITBOX_SHOW_LOOK_LINE: return R.string.mod_config_hitbox_show_look_line_desc;
             case CFG_HITBOX_SHOW_CRIT_LINE: return R.string.mod_config_hitbox_show_crit_line_desc;
             case CFG_HITBOX_SHOW_COMBO_BOX: return R.string.mod_config_hitbox_show_combo_box_desc;
@@ -696,6 +699,11 @@ public final class InbuiltModuleProvider {
                     UnifiedMod.ConfigType.TOGGLE,
                     "true", "", "",
                     String.valueOf(manager.isHitboxShowProjectiles())));
+            configs.add(config(CFG_HITBOX_SHOW_THROWN_ITEMS,
+                    context.getString(R.string.mod_config_hitbox_show_thrown_items),
+                    UnifiedMod.ConfigType.TOGGLE,
+                    "true", "", "",
+                    String.valueOf(manager.isHitboxShowThrownItems())));
             configs.add(config(CFG_HITBOX_SHOW_LOOK_LINE,
                     context.getString(R.string.mod_config_hitbox_show_look_line),
                     UnifiedMod.ConfigType.TOGGLE,
@@ -875,6 +883,11 @@ public final class InbuiltModuleProvider {
                 break;
             case CFG_HITBOX_SHOW_PROJECTILES:
                 manager.setHitboxShowProjectiles(parseBoolean(value));
+                org.chimeramc.client.core.mods.inbuilt.overlay.HitboxMod.onConfigChanged(manager);
+                break;
+            case CFG_HITBOX_SHOW_THROWN_ITEMS:
+                manager.setHitboxShowThrownItems(parseBoolean(value));
+                org.chimeramc.client.core.mods.inbuilt.overlay.HitboxMod.onConfigChanged(manager);
                 break;
             case CFG_HITBOX_SHOW_LOOK_LINE:
                 manager.setHitboxShowLookLine(parseBoolean(value));

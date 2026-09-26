@@ -65,6 +65,7 @@ public class InbuiltModManager {
     private static final String KEY_HITBOX_SHOW_MOBS = "hitbox_show_mobs";
     private static final String KEY_HITBOX_SHOW_ITEMS = "hitbox_show_items";
     private static final String KEY_HITBOX_SHOW_PROJECTILES = "hitbox_show_projectiles";
+    private static final String KEY_HITBOX_SHOW_THROWN_ITEMS = "hitbox_show_thrown_items";
     private static final String KEY_HITBOX_SHOW_LOOK_LINE = "hitbox_show_look_line";
     private static final String KEY_HITBOX_SHOW_CRIT_LINE = "hitbox_show_crit_line";
     private static final String KEY_HITBOX_SHOW_COMBO_BOX = "hitbox_show_combo_box";
@@ -593,6 +594,15 @@ public class InbuiltModManager {
 
     public void setHitboxShowProjectiles(boolean show) {
         prefs.edit().putBoolean(KEY_HITBOX_SHOW_PROJECTILES, show).apply();
+    }
+
+    /** Thrown items (ender pearls, wind charges) are their own class from fired projectiles. */
+    public boolean isHitboxShowThrownItems() {
+        return prefs.getBoolean(KEY_HITBOX_SHOW_THROWN_ITEMS, true);
+    }
+
+    public void setHitboxShowThrownItems(boolean show) {
+        prefs.edit().putBoolean(KEY_HITBOX_SHOW_THROWN_ITEMS, show).apply();
     }
 
     public boolean isHitboxShowLookLine() {
