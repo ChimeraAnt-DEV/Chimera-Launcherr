@@ -1,15 +1,12 @@
 name: Notify Discord
 
 on:
-  # 1. Automatic trigger when you publish a new release
   release:
     types: [published]
-  
-  # 2. Manual trigger for custom messages
   workflow_dispatch:
     inputs:
       message:
-        description: 'The custom message to send to Discord'
+        description: 'Custom message'
         required: true
         default: 'A new update for ChimeraClient has been released!'
 
@@ -19,20 +16,23 @@ jobs:
     steps:
       - name: Send Discord Notification
         env:
-          # This comes from your GitHub Secrets
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          # Determine which message to send based on the trigger
+          if [ -z "$WEBHOOK_URL" ] || [ "$WEBHOOK_URL" == "RL" ]; then
+            echo "Webhook secret is empty or set to the placeholder 'RL'!"
+            exit 1
+          fi
+
           if [ "${{ github.event_name }}" == "release" ]; then
-            # Message for automatic release notifications
-            MESSAGE="🚀 **A new ChimeraClient update has been released!**\n\n**Version:** ${{ github.event.release.tag_name }}\n**Changelog:** [Read the full notes here](${{ github.event.release.html_url }})"
+            MESSAGE="🚀 **New ChimeraClient Release!**\nVersion: ${{ github.event.release.tag_name }}\nNotes: [Read here](${{ github.event.release.html_url }})"
           else
-            # Message for manual workflow_dispatch
             MESSAGE="${{ github.event.inputs.message }}"
           fi
 
-          # Send the message to Discord
+          # Use jq to safely format the JSON payload
+          PAYLOAD=$(jq -n --arg content "$MESSAGE" '{content: $content}')
+
           curl -H "Content-Type: application/json" \
                -X POST \
-               -d "{\"content\": \"$MESSAGE\"}" \
-               $DISCORD_WEBHOOK_U RL
+               -d "$PAYLOAD" \
+               "$WEBHOOK_URL"
