@@ -16,8 +16,14 @@ import android.widget.Toast;
 import org.chimeramc.client.R;
 import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
 import org.chimeramc.client.core.cosmetics.CosmeticStore;
+import org.chimeramc.client.core.content.CapeInGameInstaller;
+import org.chimeramc.client.core.content.SkinPackActivator;
+import org.chimeramc.client.core.versions.GameVersion;
+import org.chimeramc.client.core.versions.VersionManager;
+import org.chimeramc.client.util.LauncherStorage;
 import org.chimeramc.client.ui.animation.DynamicAnim;
 
+import java.io.File;
 import java.util.List;
 
 /**
@@ -27,6 +33,9 @@ import java.util.List;
  * Built in code rather than XML because the cape preview is an animated custom view and the
  * chips are data-driven from {@link CosmeticCatalog}. The equipped selection persists through
  * {@link CosmeticStore}, so it survives closing the menu and relaunching the game.
+ *
+ * Selecting a cape also offers to put it on the character in-game, which is done by installing a
+ * resource pack that overrides the player's cape texture. See {@link CapeInGameInstaller}.
  */
 final class CosmeticsPanel {
 
@@ -36,6 +45,7 @@ final class CosmeticsPanel {
     private final CapePreviewView preview;
     private final LinearLayout capeRow;
     private final LinearLayout accessoryRow;
+    private TextView gameStatus;
 
     CosmeticsPanel(Activity activity, boolean compact) {
         this.activity = activity;
@@ -108,7 +118,110 @@ final class CosmeticsPanel {
         note.setPadding(0, dp(10), 0, 0);
         column.addView(note);
 
+        column.addView(sectionTitle(R.string.cosmetics_in_game));
+        gameStatus = new TextView(activity);
+        gameStatus.setTextSize(compact ? 10f : 11f);
+        gameStatus.setTextColor(0xFF8F979F);
+        column.addView(gameStatus);
+
+        LinearLayout actions = new LinearLayout(activity);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setPadding(0, dp(6), 0, 0);
+        actions.addView(gameButton(R.string.cosmetics_apply_in_game, true, v -> applyInGame()));
+        actions.addView(gameButton(R.string.cosmetics_remove_in_game, false, v -> removeInGame()));
+        column.addView(actions);
+        refreshGameStatus();
+
         rebuildChips();
+    }
+
+    /**
+     * Installs the equipped cape as a resource pack on the selected instance.
+     *
+     * <p>This is the step that makes the cape appear on the character in-game, so it reports
+     * plainly when there is nothing to apply or no instance to apply it to rather than appearing
+     * to succeed.
+     */
+    private void applyInGame() {
+        File gameDataDir = resolveGameDataDir();
+        if (gameDataDir == null) {
+            toast(R.string.cosmetics_no_instance);
+            return;
+        }
+        CosmeticCatalog.Cape cape = store.getEquippedCape();
+        if (cape == null) {
+            toast(R.string.cosmetics_no_cape_selected);
+            return;
+        }
+        SkinPackActivator.Result result = CapeInGameInstaller.install(
+                new File(activity.getFilesDir(), "cape"), gameDataDir, cape);
+        toast(result.success ? R.string.cosmetics_applied_in_game : R.string.cosmetics_apply_failed);
+        refreshGameStatus();
+    }
+
+    private void removeInGame() {
+        File gameDataDir = resolveGameDataDir();
+        if (gameDataDir == null) {
+            toast(R.string.cosmetics_no_instance);
+            return;
+        }
+        SkinPackActivator.Result result = CapeInGameInstaller.uninstall(gameDataDir);
+        toast(result.success ? R.string.cosmetics_removed_in_game : R.string.cosmetics_remove_failed);
+        refreshGameStatus();
+    }
+
+    private void refreshGameStatus() {
+        if (gameStatus == null) return;
+        File gameDataDir = resolveGameDataDir();
+        if (gameDataDir == null) {
+            gameStatus.setText(R.string.cosmetics_no_instance);
+            return;
+        }
+        gameStatus.setText(CapeInGameInstaller.isInstalled(gameDataDir)
+                ? R.string.cosmetics_in_game_installed
+                : R.string.cosmetics_in_game_not_installed);
+    }
+
+    /** The selected instance's game data root, or null when no instance is selected. */
+    private File resolveGameDataDir() {
+        try {
+            VersionManager versionManager = VersionManager.get(activity);
+            GameVersion version = versionManager.getSelectedVersion();
+            if (version == null) return null;
+            return LauncherStorage.getProfileGameDataDir(
+                    activity, version.getStorageProfileId(), true);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private void toast(int res) {
+        Toast.makeText(activity, activity.getString(res), Toast.LENGTH_SHORT).show();
+    }
+
+    private TextView gameButton(int labelRes, boolean primary, View.OnClickListener listener) {
+        TextView button = new TextView(activity);
+        button.setText(labelRes);
+        button.setTextSize(12f);
+        button.setSingleLine(true);
+        button.setGravity(Gravity.CENTER);
+        button.setPadding(dp(16), dp(9), dp(16), dp(9));
+        button.setTextColor(Color.WHITE);
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.RECTANGLE);
+        bg.setCornerRadius(dp(16));
+        bg.setColor(primary ? getAccent() : 0xFF23272B);
+        if (!primary) bg.setStroke(dp(1), 0xFF3A4048);
+        button.setBackground(bg);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMarginEnd(dp(8));
+        button.setLayoutParams(lp);
+        button.setOnClickListener(listener);
+        DynamicAnim.applyPressScale(button);
+        return button;
     }
 
     View getView() {

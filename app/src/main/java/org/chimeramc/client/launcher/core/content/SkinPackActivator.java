@@ -68,6 +68,11 @@ public final class SkinPackActivator {
         static Result failed(String message) {
             return new Result(false, message);
         }
+
+        /** Exposed so other pack installers can report failure through the same type. */
+        public static Result failure(String message) {
+            return new Result(false, message);
+        }
     }
 
     /** Identity of a skin pack as the game knows it. */
