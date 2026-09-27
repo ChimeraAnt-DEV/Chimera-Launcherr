@@ -1,0 +1,17 @@
+name: Simple Webhook Test
+
+on:
+  workflow_dispatch: # Only runs when you manually click the button
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Test Message
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d '{"content": "✅ Chimera Launcher Webhook Test Successful!"}' \
+               "$WEBHOOK_URL"
