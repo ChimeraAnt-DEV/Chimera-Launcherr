@@ -2,9 +2,8 @@ name: Discord Update Bot
 
 on:
   release:
-    types: [published] # Automatically triggers when you publish a release
-  
-  workflow_dispatch: # Allows you to trigger manually with a custom message
+    types: [published]
+  workflow_dispatch:
     inputs:
       title:
         description: 'Update Title'
@@ -21,15 +20,17 @@ jobs:
     steps:
       - name: Send Notification to Discord
         env:
-          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }} # Use ONE unified secret
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          if [ -z "$WEBHOOK_URL" ] || [ "$WEBHOOK_URL" == "RL" ]; then
-            echo "Webhook secret is empty or invalid!"
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "Webhook secret is empty or not set!"
             exit 1
           fi
 
+          # 🚨 THE FIX: Strip out any accidental spaces, tabs, or newlines from the URL
+          SANITIZED_URL=$(echo "$WEBHOOK_URL" | tr -d '[:space:]')
+
           if [ "${{ github.event_name }}" == "release" ]; then
-            # Automatic Release logic
             TAG="${{ github.event.release.tag_name }}"
             NAME="${{ github.event.release.name }}"
             BODY="${{ github.event.release.body }}"
@@ -40,23 +41,17 @@ jobs:
             fi
 
             TRUNCATED_BODY=$(echo "$BODY" | head -c 1500)
-            
-            # Using printf to fix the glitched \n formatting
             MESSAGE=$(printf "🚀 **%s (%s)** 🚀\n\n%s\n\n🔗 **[View Full Release on GitHub](%s)**" "$NAME" "$TAG" "$TRUNCATED_BODY" "$URL")
           else
-            # Manual Dispatch logic
             TITLE="${{ github.event.inputs.title }}"
             BODY="${{ github.event.inputs.message }}"
-            
-            # Using printf to fix the glitched \n formatting
             MESSAGE=$(printf "📢 **%s** 📢\n\n%s" "$TITLE" "$BODY")
           fi
 
-          # Safely encode the JSON payload
           PAYLOAD=$(jq -n --arg content "$MESSAGE" '{content: $content}')
 
-          # Send to Discord
+          # Send to Discord using the sanitized URL
           curl -H "Content-Type: application/json" \
                -X POST \
                -d "$PAYLOAD" \
-               "$WEBHOOK_URL"
+               "$SANITIZED_URL"
