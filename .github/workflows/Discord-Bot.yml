@@ -22,35 +22,45 @@ jobs:
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
+          # 1. Check if the secret exists
           if [ -z "$WEBHOOK_URL" ]; then
-            echo "Webhook secret is empty or not set!"
+            echo "Webhook secret is empty!"
             exit 1
           fi
 
-          # 🚨 THE FIX: Strip out any accidental spaces, tabs, or newlines from the URL
+          # 2. Sanitize the URL (removes accidental spaces or newlines)
           SANITIZED_URL=$(echo "$WEBHOOK_URL" | tr -d '[:space:]')
 
+          # 3. Determine which message to send
           if [ "${{ github.event_name }}" == "release" ]; then
+            # Extract release details
             TAG="${{ github.event.release.tag_name }}"
             NAME="${{ github.event.release.name }}"
             BODY="${{ github.event.release.body }}"
             URL="${{ github.event.release.html_url }}"
 
+            # Fallback if no changelog is provided
             if [ -z "$BODY" ]; then
               BODY="No detailed changelog provided. Click the link below to view the release."
             fi
 
+            # Truncate body to fit Discord's 2000-character limit
             TRUNCATED_BODY=$(echo "$BODY" | head -c 1500)
+            
+            # Use printf to properly format newlines and include the URL
             MESSAGE=$(printf "🚀 **%s (%s)** 🚀\n\n%s\n\n🔗 **[View Full Release on GitHub](%s)**" "$NAME" "$TAG" "$TRUNCATED_BODY" "$URL")
           else
+            # Manual Dispatch logic
             TITLE="${{ github.event.inputs.title }}"
             BODY="${{ github.event.inputs.message }}"
+            
             MESSAGE=$(printf "📢 **%s** 📢\n\n%s" "$TITLE" "$BODY")
           fi
 
+          # 4. Safely encode the JSON payload using jq
           PAYLOAD=$(jq -n --arg content "$MESSAGE" '{content: $content}')
 
-          # Send to Discord using the sanitized URL
+          # 5. Send to Discord using the sanitized URL
           curl -H "Content-Type: application/json" \
                -X POST \
                -d "$PAYLOAD" \
