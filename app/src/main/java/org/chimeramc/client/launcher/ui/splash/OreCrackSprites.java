@@ -1,10 +1,11 @@
 package org.chimeramc.client.launcher.ui.splash;
 
 /**
- * Original pixel art for the splash loader: a crystal-ore block, nine crack stages, and a
+ * Original pixel art for the splash loader: a faceted gem block, ten crack stages, and a
  * pickaxe. Nothing here is traced from a game asset; the shapes are drawn to read as the same
- * <em>kind</em> of thing (a faceted ore cube, a fracture spreading across it, a swung tool)
- * without reusing any Mojang texture.
+ * <em>kind</em> of thing (a cut gem cube, a fracture spreading across it, a swung tool) without
+ * reusing any Mojang texture. The block and tool are deliberately paired in the same spirit as a
+ * diamond block and an iron pickaxe, but every cell is our own.
  *
  * <p>Every sprite is a square grid of characters: {@code #} is a filled cell and {@code .} empty.
  * The block additionally uses a small shading palette. Keeping the art as string data means it is
@@ -17,42 +18,46 @@ public final class OreCrackSprites {
     }
 
     /**
-     * The ore block, on a 16x16 grid.
+     * The block, on a 16x16 grid: a faceted gem cube, the whole block cut from the crystal so it
+     * reads as a diamond block rather than a stone block with a gem stuck on it.
      *
-     * <p>Shading characters: {@code #} is the base stone, {@code +} the lit top-left facet,
-     * {@code -} the shaded bottom-right facet, {@code o} the crystal, {@code O} the crystal
-     * highlight. Using several tones for the stone rather than one is what makes the cube read as
-     * faceted rather than flat.
+     * <p>Shading characters: {@code o} is the gem's body, {@code O} the lit top-left bevel and the
+     * central facets, {@code x} the shaded bottom-right bevel and the border. The two bevel tones
+     * are what give the cube its edges; a single tone would read as a flat square. The body takes
+     * the theme accent so the cube belongs to the app, while the bevels are lighter/darker shades
+     * of that same accent rather than neutral grey, which is what makes the facets look like one
+     * material.
      */
     private static final String[] BLOCK = {
-            "++++++++++++++++",
-            "++++++++++++++++",
-            "+++###########--",
-            "+++##ooo######--",
-            "+++#ooOoo#####--",
-            "++##ooooo#####--",
-            "++##ooo######o--",
-            "++##########ooO-",
-            "++#######o#ooo--",
-            "++#######oo#o---",
-            "++#######o------",
-            "+#########------",
-            "+#o#######------",
-            "+oo######-------",
-            "--o######-------",
-            "----------------",
+            "xxxxxxxxxxxxxxxx",
+            "xOOOOOOOOOOOOOOx",
+            "xOooooooooooooxx",
+            "xOooooooooooooxx",
+            "xOooOooooooOooxx",
+            "xOooooooooooooxx",
+            "xOooooooooooooxx",
+            "xOoooooOOoooooxx",
+            "xOoooooOOoooooxx",
+            "xOooooooooooooxx",
+            "xOooooooooooooxx",
+            "xOooOooooooOooxx",
+            "xOooooooooooooxx",
+            "xOooooooooooooxx",
+            "xOxxxxxxxxxxxxxx",
+            "xxxxxxxxxxxxxxxx",
     };
 
     /**
-     * Nine crack stages, each on the same 16x16 grid.
+     * Ten crack stages, each on the same 16x16 grid.
      *
-     * <p>Stage 0 is empty and each later stage adds fracture lines along a path that grows from
-     * the top-left facet toward the bottom-right. They are stored in full rather than derived, so
-     * a stage can never be a partial composite of an earlier one by accident: what is in the array
-     * is exactly what is painted.
+     * <p>Stage 0 is empty and each later stage adds fracture lines along a path that grows out from
+     * the block's top edge and branches toward every corner, so the break reads as spreading
+     * through the gem rather than being stamped on one face. They are stored in full rather than
+     * derived, so a stage can never be a partial composite of an earlier one by accident: what is
+     * in the array is exactly what is painted.
      */
     private static final String[][] CRACKS = {
-            // Stage 0 -- intact.
+            // Stage 0. Intact.
             {
                     "................",
                     "................",
@@ -74,10 +79,10 @@ public final class OreCrackSprites {
             // Stage 1.
             {
                     "................",
+                    "........#.......",
+                    "........#.......",
+                    "........#.......",
                     "................",
-                    "................",
-                    "......#.........",
-                    "......#.........",
                     "................",
                     "................",
                     "................",
@@ -93,11 +98,11 @@ public final class OreCrackSprites {
             // Stage 2.
             {
                     "................",
+                    "........#.......",
+                    "........#.......",
+                    ".......##.......",
+                    "......##........",
                     "................",
-                    "......#.........",
-                    "......##........",
-                    "......##........",
-                    "......#.........",
                     "................",
                     "................",
                     "................",
@@ -112,12 +117,12 @@ public final class OreCrackSprites {
             // Stage 3.
             {
                     "................",
+                    "........#.......",
+                    "........#.......",
+                    ".......##.......",
+                    "......####......",
+                    ".....##.........",
                     "................",
-                    "......#.........",
-                    "......##........",
-                    "......###.......",
-                    "......###.......",
-                    ".......#........",
                     "................",
                     "................",
                     "................",
@@ -128,18 +133,18 @@ public final class OreCrackSprites {
                     "................",
                     "................",
             },
-            // Stage 4 -- a second branch splits off.
+            // Stage 4.
             {
                     "................",
-                    "................",
-                    "......#.........",
-                    "......##........",
-                    "......###.......",
-                    "......####......",
+                    "........#.......",
+                    "........#.......",
                     ".......##.......",
-                    "....#..#........",
-                    "....#...........",
-                    "....#...........",
+                    "......####......",
+                    ".....##..##.....",
+                    "..........##....",
+                    "................",
+                    "................",
+                    "................",
                     "................",
                     "................",
                     "................",
@@ -150,16 +155,16 @@ public final class OreCrackSprites {
             // Stage 5.
             {
                     "................",
+                    "........#.......",
+                    "........#.......",
+                    ".......##.......",
+                    "......####......",
+                    ".....##..##.....",
+                    ".......#..##....",
+                    "......##...#....",
                     "................",
-                    "......#.........",
-                    "......##.#......",
-                    "......#####.....",
-                    "......#####.....",
-                    ".......###......",
-                    "....#..##.......",
-                    "....##..........",
-                    "....##..........",
-                    ".....#..........",
+                    "................",
+                    "................",
                     "................",
                     "................",
                     "................",
@@ -169,17 +174,17 @@ public final class OreCrackSprites {
             // Stage 6.
             {
                     "................",
-                    "................",
-                    "......#.........",
-                    "......##.#......",
-                    "......#####...#.",
-                    "......#####..##.",
-                    ".......#####.##.",
-                    "....#..##...##..",
-                    "....##..........",
-                    "....###.........",
+                    "........#.......",
+                    "........#.......",
+                    ".......##.......",
+                    "......####......",
+                    ".....##..##.....",
+                    ".......#..##....",
+                    "......##...#....",
                     ".....##.........",
-                    "......#.........",
+                    "....##..........",
+                    "................",
+                    "................",
                     "................",
                     "................",
                     "................",
@@ -188,58 +193,58 @@ public final class OreCrackSprites {
             // Stage 7.
             {
                     "................",
-                    "......#.........",
-                    "......#.........",
-                    "......##.#....#.",
-                    "......#####..###",
-                    "......#####..###",
-                    ".......######.##",
-                    "....#..##...###.",
-                    "....##......###.",
-                    "....###......#..",
-                    ".....##.........",
-                    "......##........",
-                    ".......#........",
+                    "........#.......",
+                    "........#.......",
+                    ".......##.......",
+                    "......####......",
+                    ".....##..##.....",
+                    ".......#..##....",
+                    "......####.#....",
+                    ".....##..#......",
+                    "....##..........",
+                    "....#...........",
+                    "................",
+                    "................",
                     "................",
                     "................",
                     "................",
             },
             // Stage 8.
             {
+                    "................",
                     "........#.......",
-                    "......###.......",
-                    "......###.......",
-                    "......##.#....#.",
-                    "......#####..###",
-                    "......#####.####",
-                    ".......#########",
-                    "....#..##...####",
-                    "....##......####",
-                    "....####.....##.",
-                    ".....##.#.....#.",
-                    "......###.......",
+                    "........#.......",
                     ".......##.......",
-                    "........#.......",
+                    "......####......",
+                    ".....##..##.....",
+                    ".......#..##....",
+                    "......####.#....",
+                    ".....##..##.....",
+                    "....##....##....",
+                    "....#......##...",
+                    "................",
+                    "................",
+                    "................",
                     "................",
                     "................",
             },
-            // Stage 9 -- about to give.
+            // Stage 9.
             {
+                    "................",
                     "........#.......",
-                    "......####......",
-                    "......####.#....",
-                    "......#####.#.#.",
-                    "......##########",
-                    "......##########",
-                    "......#########.",
-                    "....####...#####",
-                    "....###.....####",
-                    "....####.....##.",
-                    "....#####....##.",
-                    ".....####.....#.",
-                    "......####......",
+                    "........#.......",
                     ".......##.......",
-                    "........#.......",
+                    "......####......",
+                    ".....##..##.....",
+                    ".......#..##....",
+                    "......####.#....",
+                    ".....##..##.....",
+                    "...###....##....",
+                    "..###..##..##...",
+                    "..#...##........",
+                    "......#.........",
+                    "................",
+                    "................",
                     "................",
             },
     };
@@ -253,21 +258,21 @@ public final class OreCrackSprites {
      */
     private static final String[] PICKAXE = {
             "................",
-            ".......////.....",
-            "......######....",
-            ".....#######....",
-            "....########...h",
-            "....#####.###..h",
-            "....####...##.h.",
-            "....###.....h.h.",
-            "...#.#.....h....",
-            "...........h....",
-            "..........h.....",
-            ".........h......",
-            "........h.......",
-            ".......h........",
-            "......h.........",
-            ".....h..........",
+            ".....//////.....",
+            "...//######//...",
+            ".//##########//.",
+            "/####..hh..####/",
+            "####...hh...####",
+            "###...hhh....###",
+            "##....hh......##",
+            "#.....hh.......#",
+            ".....hh.........",
+            ".....hh.........",
+            "....hh..........",
+            "....hh..........",
+            "...hh...........",
+            "...hh...........",
+            "..h.............",
     };
 
     /** The logical side of every sprite; each row string is exactly this long. */

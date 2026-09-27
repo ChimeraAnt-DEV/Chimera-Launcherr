@@ -13,7 +13,6 @@ import org.chimeramc.client.ui.activities.CustomizeActivity;
 import org.chimeramc.client.ui.activities.InstancesActivity;
 import org.chimeramc.client.ui.activities.MainActivity;
 import org.chimeramc.client.ui.activities.ModsFullscreenActivity;
-import org.chimeramc.client.ui.activities.VoiceChatActivity;
 import org.junit.Test;
 
 public class LauncherTabTest {
@@ -25,12 +24,12 @@ public class LauncherTabTest {
         assertSame(LauncherTab.VERSIONS, tabs[1]);
         assertSame(LauncherTab.INSTALLATIONS, tabs[2]);
         assertSame(LauncherTab.MODS, tabs[3]);
-        assertSame(LauncherTab.VOICE, tabs[4]);
-        assertSame(LauncherTab.CUSTOMIZE, tabs[5]);
-        assertSame(LauncherTab.SETTINGS, tabs[6]);
-        // Seven tabs fit the HorizontalScrollView; About lives inside Settings and
-        // Controller/Skins inside Customize, but Voice is its own destination.
-        assertEquals(7, tabs.length);
+        assertSame(LauncherTab.CUSTOMIZE, tabs[4]);
+        assertSame(LauncherTab.SETTINGS, tabs[5]);
+        // Six tabs fit the HorizontalScrollView. About lives inside Settings,
+        // Controller/Skins inside Customize, and Voice is an in-game Mod Menu section
+        // rather than a launcher destination, so it is deliberately not here.
+        assertEquals(6, tabs.length);
     }
 
     @Test
@@ -39,7 +38,6 @@ public class LauncherTabTest {
         assertSame(InstancesActivity.class, LauncherTab.VERSIONS.activity());
         assertSame(InstallationsActivity.class, LauncherTab.INSTALLATIONS.activity());
         assertSame(ModsFullscreenActivity.class, LauncherTab.MODS.activity());
-        assertSame(VoiceChatActivity.class, LauncherTab.VOICE.activity());
         assertSame(CustomizeActivity.class, LauncherTab.CUSTOMIZE.activity());
     }
 

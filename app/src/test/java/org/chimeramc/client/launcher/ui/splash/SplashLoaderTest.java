@@ -45,6 +45,89 @@ public class SplashLoaderTest {
         }
     }
 
+    /**
+     * The block must be a gem cube, not a stone block.
+     *
+     * <p>If the sprite ever loses its shaded bevel ring -- the lighter top-left and darker
+     * bottom-right cells -- it stops reading as a cut cube and flattens into a plain square, which
+     * is exactly the "ugly block" regression. The gem body and its lit facets are pinned too, so a
+     * future edit cannot leave the block unshaded or un-crystalled.
+     */
+    @Test
+    public void theBlockReadsAsAShadedGemCube() {
+        String[] block = OreCrackSprites.block();
+        int body = 0;
+        int lit = 0;
+        int shaded = 0;
+        for (String row : block) {
+            for (char c : row.toCharArray()) {
+                if (c == 'o') body++;
+                else if (c == 'O') lit++;
+                else if (c == 'x') shaded++;
+            }
+        }
+        assertTrue("the gem body must dominate the block", body > 100);
+        assertTrue("the top-left bevel and facets must be lit", lit > 12);
+        assertTrue("the bottom-right bevel must be shaded", shaded > 12);
+    }
+
+    /**
+     * The pickaxe needs a head, a lit edge and a handle to read as a tool.
+     *
+     * <p>A handle with no head is a stick and a head with no handle is a lump; both are silent
+     * regressions on a build machine. The lit edge is checked because the head is one flat tone
+     * without it.
+     */
+    @Test
+    public void thePickaxeHasAHeadALitEdgeAndAHandle() {
+        int head = 0;
+        int lit = 0;
+        int handle = 0;
+        for (String row : OreCrackSprites.pickaxe()) {
+            for (char c : row.toCharArray()) {
+                if (c == '#') head++;
+                else if (c == '/') lit++;
+                else if (c == 'h') handle++;
+            }
+        }
+        assertTrue("the iron head must be substantial", head > 40);
+        assertTrue("the head needs a lit top edge", lit > 8);
+        assertTrue("the pickaxe needs a handle", handle > 15);
+    }
+
+    /**
+     * The pickaxe must sit beside the block, never on top of it.
+     *
+     * <p>This is the whole point of the two-cell layout and the bug the redesign fixed: anchored at
+     * the block's centre, the sprite covered the gem. Checked across many widths so a change that
+     * only works at one size is caught.
+     */
+    @Test
+    public void thePickaxeSitsOutsideTheBlock() {
+        for (int width = 40; width <= 2000; width += 7) {
+            assertTrue("overlap at width " + width, OreLoaderLayout.pickaxeOutsideBlock(width));
+        }
+    }
+
+    /** Both sprites must fit inside the view horizontally, or they are clipped to nothing. */
+    @Test
+    public void bothSpritesFitInsideTheView() {
+        for (int width = 40; width <= 2000; width += 7) {
+            float cell = OreLoaderLayout.cellSize(width);
+            float art = cell * OreCrackSprites.GRID;
+            assertTrue("pickaxe starts before the view", OreLoaderLayout.pickaxeLeft(width) >= 0f);
+            float blockRight = OreLoaderLayout.blockLeft(width) + art;
+            assertTrue("block ends past the view at width " + width, blockRight <= width);
+        }
+    }
+
+    /** A cell is always at least one pixel, even in a degenerate zero-width view. */
+    @Test
+    public void cellSizeNeverCollapsesToZero() {
+        assertEquals(1, OreLoaderLayout.cellSize(0));
+        assertEquals(1, OreLoaderLayout.cellSize(-10));
+    }
+
     @Test
     public void stageZeroIsIntactAndTheLastStageIsHeavilyCracked() {
         assertEquals(0, countInk(OreCrackSprites.crack(0)));

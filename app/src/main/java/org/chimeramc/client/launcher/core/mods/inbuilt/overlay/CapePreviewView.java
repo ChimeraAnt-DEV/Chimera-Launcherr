@@ -11,6 +11,7 @@ import android.view.View;
 
 import org.chimeramc.client.core.cosmetics.CapeSimulator;
 import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
+import org.chimeramc.client.core.cosmetics.CosmeticLayering;
 import org.chimeramc.client.core.cosmetics.PlayerSkinProvider;
 import org.chimeramc.client.core.cosmetics.SkinModel;
 import org.chimeramc.client.ui.animation.DynamicAnim;
@@ -263,9 +264,14 @@ public class CapePreviewView extends View {
         float originY = h * 0.58f + SkinModel.heightPixels() * 0.5f * scale;
 
         drawGroundShadow(canvas, originX, originY, scale);
+        // Wings sit behind the character, so they must be painted before the cape and the body;
+        // drawing them last (as the accessories used to be) made them cover the torso and read as
+        // a flat sheet stuck to the front of the model. The over-head and beside-head pieces stay
+        // in the foreground pass, where they belong.
+        drawAccessoryBehind(canvas, originX, originY, scale);
         if (cape != null) drawCape(canvas, originX, originY, scale);
         drawModel(canvas, originX, originY, scale);
-        if (accessory != null) drawAccessory(canvas, originX, originY, scale);
+        if (accessory != null) drawAccessoryFront(canvas, originX, originY, scale);
     }
 
     private void drawGroundShadow(Canvas canvas, float originX, float originY, float scale) {
@@ -371,9 +377,10 @@ public class CapePreviewView extends View {
     private void drawCape(Canvas canvas, float originX, float originY, float scale) {
         int cols = CapeSimulator.COLS;
         int rows = CapeSimulator.ROWS;
-        // The cloth is anchored at the shoulders and hangs from just below the neck.
+        // The cloth is anchored at the shoulders and hangs from just below the neck, on the same
+        // back plane the wings reference so the two never disagree about where "behind" is.
         float anchorY = 24f;
-        float anchorZ = -2.4f;
+        float anchorZ = CosmeticLayering.CAPE_Z;
 
         int particleCount = cols * rows;
         int quadCount = (cols - 1) * (rows - 1);
@@ -555,60 +562,113 @@ public class CapePreviewView extends View {
     }
 
     /**
-     * Accessories are drawn as projected model geometry anchored to the character, so they sit
-     * in the same 3D space rather than floating as a flat decal.
+     * Accessories behind the character: anything worn on the back.
+     *
+     * <p>Wings are geometry anchored to the shoulder blades, so they are painted before the cape
+     * and the body. A back-worn piece drawn in the foreground pass covers the torso and looks
+     * pasted onto the chest instead of worn.
      */
-    private void drawAccessory(Canvas canvas, float originX, float originY, float scale) {
+    private void drawAccessoryBehind(Canvas canvas, float originX, float originY, float scale) {
+        if (accessory == null || CosmeticCatalog.NONE.equals(accessory.id)) return;
+        if (!"wings".equals(accessory.id)) return;
+        paint.setShader(null);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(accessory.color);
+        paint.setAlpha(235);
+        for (int side = -1; side <= 1; side += 2) {
+            float[][] pts = {
+                    {side * 2.6f, 22f, CosmeticLayering.WINGS_Z + 0.4f},
+                    {side * 11f, 24.5f, CosmeticLayering.WINGS_Z + 1.9f},
+                    {side * 12.5f, 16f, CosmeticLayering.WINGS_Z + 2.9f},
+                    {side * 7f, 13.5f, CosmeticLayering.WINGS_Z + 1.4f},
+                    {side * 2.6f, 15f, CosmeticLayering.WINGS_Z + 0.4f}
+            };
+            boolean first = true;
+            for (float[] p : pts) {
+                projectPoint(p[0], p[1], p[2], scale, originX, originY);
+                if (first) { path.moveTo(projected[0], projected[1]); first = false; }
+                else path.lineTo(projected[0], projected[1]);
+            }
+            path.close();
+            canvas.drawPath(path, paint);
+        }
+        // Feather ribs so the wings read as layered feathers rather than two flat triangles.
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1f, scale * 0.5f));
+        paint.setColor(darker(accessory.color));
+        for (int side = -1; side <= 1; side += 2) {
+            for (int f = 0; f < 3; f++) {
+                float t = 0.28f + f * 0.26f;
+                projectPoint(side * (2.6f + t * 8.4f), 22f - t * 7.5f, CosmeticLayering.WINGS_Z + 0.4f - t * 1.8f,
+                        scale, originX, originY);
+                float sx = projected[0];
+                float sy = projected[1];
+                projectPoint(side * (2.6f + t * 9.9f), 21.6f - t * 9.0f, CosmeticLayering.WINGS_Z + 0.4f - t * 2.4f,
+                        scale, originX, originY);
+                canvas.drawLine(sx, sy, projected[0], projected[1], paint);
+            }
+        }
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAlpha(255);
+    }
+
+    /**
+     * Accessories in front of the character: worn on or around the head.
+     *
+     * <p>Drawn after the model so they sit over the head instead of being hidden inside it.
+     */
+    private void drawAccessoryFront(Canvas canvas, float originX, float originY, float scale) {
         if (accessory == null || CosmeticCatalog.NONE.equals(accessory.id)) return;
         paint.setShader(null);
+        paint.setStyle(Paint.Style.FILL);
         switch (accessory.id) {
             case "headphones": {
+                // Band arcing over the crown, then one cup on each side, in the same 3D space as
+                // the head box (which spans y=24..32, x=-4..4, z=-4..4). Anchoring to those actual
+                // bounds is what stops the headphones floating above the head or sinking into it.
+                canvas.save();
+                path.reset();
+                int segments = 16;
+                for (int i = 0; i <= segments; i++) {
+                    double a = Math.PI * (i / (double) segments);
+                    float x = (float) (Math.cos(a) * 4.6f);
+                    float y = 32f + (float) (Math.sin(a) * 1.4f);
+                    projectPoint(x, y, 0f, scale, originX, originY);
+                    if (i == 0) path.moveTo(projected[0], projected[1]);
+                    else path.lineTo(projected[0], projected[1]);
+                }
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(Math.max(2f, scale * 1.0f));
                 paint.setColor(accessory.color);
-                drawBox(canvas, 0f, 33.4f, 0f, 10f, 1.6f, 10f, scale, originX, originY);
+                canvas.drawPath(path, paint);
+                canvas.restore();
+                paint.setStyle(Paint.Style.FILL);
                 paint.setColor(darker(accessory.color));
-                drawBox(canvas, -5.2f, 28.5f, 0f, 1.6f, 4f, 4f, scale, originX, originY);
-                drawBox(canvas, 5.2f, 28.5f, 0f, 1.6f, 4f, 4f, scale, originX, originY);
+                // Cups: slightly proud of the head's x bounds so they read as worn over the ears.
+                drawBox(canvas, -4.6f, 27.6f, 0f, 1.6f, 4.4f, 4.4f, scale, originX, originY);
+                drawBox(canvas, 4.6f, 27.6f, 0f, 1.6f, 4.4f, 4.4f, scale, originX, originY);
                 break;
             }
             case "halo": {
                 paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(Math.max(2f, scale * 0.8f));
                 paint.setColor(accessory.color);
+                paint.setStrokeWidth(Math.max(2f, scale * 0.9f));
                 path.reset();
                 int segments = 24;
                 for (int i = 0; i <= segments; i++) {
                     double a = i / (double) segments * Math.PI * 2.0;
-                    projectPoint((float) (Math.cos(a) * 5.5f), 35.4f,
-                            (float) (Math.sin(a) * 5.5f), scale, originX, originY);
+                    projectPoint((float) (Math.cos(a) * 5.2f), 35.0f,
+                            (float) (Math.sin(a) * 5.2f), scale, originX, originY);
                     if (i == 0) path.moveTo(projected[0], projected[1]);
                     else path.lineTo(projected[0], projected[1]);
                 }
                 canvas.drawPath(path, paint);
-                paint.setStyle(Paint.Style.FILL);
-                break;
-            }
-            case "wings": {
-                paint.setColor(accessory.color);
-                paint.setAlpha(235);
-                for (int side = -1; side <= 1; side += 2) {
-                    path.reset();
-                    float[][] pts = {
-                            {side * 2.6f, 22f, -2f},
-                            {side * 11f, 24.5f, -3.5f},
-                            {side * 12.5f, 16f, -4.5f},
-                            {side * 7f, 13.5f, -3f},
-                            {side * 2.6f, 15f, -2f}
-                    };
-                    boolean first = true;
-                    for (float[] p : pts) {
-                        projectPoint(p[0], p[1], p[2], scale, originX, originY);
-                        if (first) { path.moveTo(projected[0], projected[1]); first = false; }
-                        else path.lineTo(projected[0], projected[1]);
-                    }
-                    path.close();
-                    canvas.drawPath(path, paint);
-                }
+                // A soft inner glow ring, so the halo reads as lit rather than as a drawn circle.
+                paint.setStrokeWidth(Math.max(1f, scale * 0.4f));
+                paint.setAlpha(140);
+                canvas.drawPath(path, paint);
                 paint.setAlpha(255);
+                paint.setStyle(Paint.Style.FILL);
                 break;
             }
             default:

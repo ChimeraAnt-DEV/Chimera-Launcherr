@@ -94,15 +94,34 @@ public class VoiceChatActivity extends BaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_voice_chat);
-        setActiveNavTab(R.id.nav_tab_voice);
 
         PersonalizationManager pm = new PersonalizationManager(this);
         View root = findViewById(R.id.voice_root);
         if (root != null) pm.applyAccentToView(root, this);
 
+        View back = findViewById(R.id.voice_back);
+        if (back != null) back.setOnClickListener(v -> finish());
+
         bindViews();
         wireControls();
         refresh();
+    }
+
+    /**
+     * Voice is a Mod Menu destination, not a launcher nav tab, so it carries no nav bar.
+     *
+     * <p>The screen is opened from the in-game Mod Menu and from the Mods screen; without this it
+     * would inject the launcher's own top bar, which is the very thing its tab was removed from.
+     */
+    @Override
+    protected boolean shouldSkipNavBar() {
+        return true;
+    }
+
+    /** No nav bar is shown, so bumper keys must not try to cycle launcher tabs. */
+    @Override
+    protected boolean shouldHandleNavKeys() {
+        return false;
     }
 
     private void bindViews() {
