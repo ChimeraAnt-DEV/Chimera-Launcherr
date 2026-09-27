@@ -433,6 +433,15 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
             return super.dispatchTouchEvent(event)
         }
 
+        // Classify the gesture BEFORE the preloader gets a chance to consume it. The game
+        // consumes the raw event itself, so a vanilla tap attack has no other funnel to observe;
+        // but the preloader also consumes touches (it returns true above), and returning early
+        // left the detector's state machine without its UP for that pointer. The next DOWN then
+        // restarted tracking from scratch, so the following tap's UP arrived with `tracking`
+        // already false and the attack was dropped — the metronome silently under-counted.
+        overlayManager?.handleTouchEvent(event)
+        overlayManager?.notifyTouchForAttack(event, touchSlopPx)
+
         val actionIndex = event.actionIndex
         if (org.chimeramc.client.preloader.PreloaderInput.onTouch(
                 event.actionMasked,
@@ -442,11 +451,6 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
             )) {
             return true
         }
-
-        overlayManager?.handleTouchEvent(event)
-        // The game consumes the raw event itself, so a vanilla tap attack has no other funnel
-        // to observe. Classify the same gesture the game acted on for the Select Hit metronome.
-        overlayManager?.notifyTouchForAttack(event, touchSlopPx)
 
         return super.dispatchTouchEvent(event)
     }
