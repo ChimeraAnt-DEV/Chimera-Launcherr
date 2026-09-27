@@ -14,6 +14,9 @@ public final class LauncherStorage {
     private static final String PREFS_NAME = "storage_migration";
     private static final String KEY_COMPLETED = "storage_migration_completed";
     private static final String STORAGE_LAYOUT_PREFS_NAME = "storage_layout";
+    /** SharedPreferences file the content screens persist the player's storage choice in. */
+    public static final String CONTENT_MANAGEMENT_PREFS_NAME = "content_management";
+    public static final String CONTENT_STORAGE_TYPE_KEY = "storage_type";
     private static final String KEY_SHARED_INTERNAL_MODE = "shared_internal_mode";
     private static final String KEY_SHARED_EXTERNAL_MODE = "shared_external_mode";
     static final String SHARED_MODE_LEGACY = "legacy";
@@ -336,6 +339,100 @@ public final class LauncherStorage {
             return getProfileGameDataDir(context, profileId, false);
         }
         return getSharedGameDataDir(context, storageType == FeatureSettings.StorageType.EXTERNAL);
+    }
+
+    /**
+     * The game data root the selected instance actually plays from.
+     *
+     * <p>This is the single resolution the launcher must use whenever it writes content the game
+     * is expected to read back — resource packs, skin packs, cape packs. Writing to a
+     * hardcoded {@code getProfileGameDataDir(..., true)} path instead of this one is how a pack
+     * gets installed "successfully" into a directory the game never loads, which shows up as a
+     * cape or skin that simply never appears.
+     *
+     * <p>Mirrors the resolution the content screens already use: read the player's saved storage
+     * choice, normalise it against the instance's isolation setting, then resolve.
+     *
+     * <p>Takes primitives rather than a {@code GameVersion} so this stays a pure function of its
+     * inputs and unit-testable without an instance.
+     *
+     * @return the game data root, or {@code null} when there is no profile to resolve
+     */
+    public static File getActiveGameDataDir(Context context, String profileId,
+                                            boolean versionIsolation,
+                                            FeatureSettings.StorageType savedType) {
+        if (context == null || profileId == null || profileId.isEmpty()) return null;
+        FeatureSettings.StorageType normalized =
+                normalizeContentStorageType(savedType, versionIsolation);
+        return getContentGameDataDir(context, profileId, normalized);
+    }
+
+    /**
+     * The player's saved content-storage choice, defaulting to internal.
+     *
+     * <p>The key lived inline in every screen that resolved a game data directory, which is what
+     * let the cape and skin writers drift onto a different path from the readers. Reading it in
+     * one place is what keeps them in agreement.
+     */
+    public static FeatureSettings.StorageType readSavedContentStorageType(Context context) {
+        if (context == null) return FeatureSettings.StorageType.INTERNAL;
+        try {
+            android.content.SharedPreferences prefs =
+                    context.getSharedPreferences(CONTENT_MANAGEMENT_PREFS_NAME, Context.MODE_PRIVATE);
+            return parseStorageType(prefs.getString(CONTENT_STORAGE_TYPE_KEY, "INTERNAL"));
+        } catch (Exception e) {
+            return FeatureSettings.StorageType.INTERNAL;
+        }
+    }
+
+    /** Parses a stored storage-type name, falling back to internal for an unknown value. */
+    public static FeatureSettings.StorageType parseStorageType(String value) {
+        if (value == null) return FeatureSettings.StorageType.INTERNAL;
+        try {
+            return FeatureSettings.StorageType.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            return FeatureSettings.StorageType.INTERNAL;
+        }
+    }
+
+    /**
+     * Every game data root the selected instance could plausibly read from.
+     *
+     * <p>The launch path resolves the game's storage from the instance's isolation setting and
+     * the player's internal/external choice, and the bundled-pack installer already defends
+     * against getting that single guess wrong by writing to every candidate root. Cape and skin
+     * packs need the same defence: a cape written to only one of these is invisible whenever the
+     * game resolved a different one.
+     *
+     * <p>Distinct and null-free, so a caller can iterate without checking.
+     */
+    public static java.util.List<File> getCandidateGameDataDirs(Context context, String profileId,
+                                                                boolean versionIsolation) {
+        java.util.List<File> dirs = new java.util.ArrayList<>(4);
+        if (context == null || profileId == null || profileId.isEmpty()) return dirs;
+        FeatureSettings.StorageType[] types = {
+                FeatureSettings.StorageType.VERSION_ISOLATION_INTERNAL,
+                FeatureSettings.StorageType.VERSION_ISOLATION_EXTERNAL,
+                FeatureSettings.StorageType.INTERNAL,
+                FeatureSettings.StorageType.EXTERNAL
+        };
+        for (FeatureSettings.StorageType type : types) {
+            try {
+                File dir = getContentGameDataDir(context, profileId, type);
+                if (dir == null) continue;
+                String path = dir.getAbsolutePath();
+                boolean duplicate = false;
+                for (File existing : dirs) {
+                    if (existing.getAbsolutePath().equals(path)) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (!duplicate) dirs.add(dir);
+            } catch (Exception ignored) {
+            }
+        }
+        return dirs;
     }
 
     public static FeatureSettings.StorageType normalizeContentStorageType(

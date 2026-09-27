@@ -182,15 +182,18 @@ public class ControllerResponseTest {
     public void emptyProfileIsIdentityAndUntouched() {
         ControllerResponse response = new ControllerResponse(new ControllerProfile("empty"), false);
         assertEquals(KeyEvent.KEYCODE_BUTTON_A, response.remapKey(KeyEvent.KEYCODE_BUTTON_A));
-        // Default dead zone of 0.15 still applies.
-        assertEquals(0f, response.adjustAxis(MotionEvent.AXIS_X, 0.1f), EPS);
+        // The default dead zone still applies. Referenced through the constant so lowering it
+        // does not silently turn this into an assertion about nothing.
+        assertEquals(0f, response.adjustAxis(MotionEvent.AXIS_X,
+                ControllerProfile.DEFAULT_DEAD_ZONE * 0.9f), EPS);
     }
 
     @Test
     public void nullProfileFallsBackToDefaultsInsteadOfThrowing() {
         ControllerResponse response = new ControllerResponse(null, false);
         assertEquals(KeyEvent.KEYCODE_BUTTON_A, response.remapKey(KeyEvent.KEYCODE_BUTTON_A));
-        assertEquals(0f, response.adjustAxis(MotionEvent.AXIS_X, 0.1f), EPS);
+        assertEquals(0f, response.adjustAxis(MotionEvent.AXIS_X,
+                ControllerProfile.DEFAULT_DEAD_ZONE * 0.9f), EPS);
         assertEquals(1f, response.adjustAxis(MotionEvent.AXIS_X, 1f), EPS);
     }
 

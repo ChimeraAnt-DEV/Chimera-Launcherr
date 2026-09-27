@@ -119,7 +119,6 @@ import okhttp3.OkHttpClient;
     private ActivityResultLauncher<Intent> apkImportResultLauncher;
     private ActivityResultLauncher<String> notificationPermissionLauncher;
 
-    private LinearLayout modsListContainer;
     private ContentManager contentManager;
     private TextView worldsCountText;
     private TextView resourcePacksCountText;
@@ -691,33 +690,10 @@ import okhttp3.OkHttpClient;
     private void initModsSection() {
         if (versionManager == null || viewModel == null) return;
 
-        modsListContainer = binding.modsListContainer;
-
-        // Show mods section (all instances are 64-bit)
-        if (modsListContainer != null) {
-            modsListContainer.setVisibility(View.VISIBLE);
-        }
-
-        binding.manageModsButton.setOnClickListener(v -> openModsFullscreen());
-        DynamicAnim.applyPressScale(binding.manageModsButton);
-
-        org.chimeramc.client.util.PersonalizationManager pm = new org.chimeramc.client.util.PersonalizationManager(this);
-        int accent = pm.getAccentColor();
-        if (accent != 0) {
-            binding.manageModsButton.setTextColor(accent);
-            android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
-            gd.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-            gd.setColor(android.graphics.Color.argb(26, android.graphics.Color.red(accent), android.graphics.Color.green(accent), android.graphics.Color.blue(accent)));
-            gd.setCornerRadius(5 * getResources().getDisplayMetrics().density);
-            gd.setStroke((int)(1 * getResources().getDisplayMetrics().density),
-                    android.graphics.Color.argb(51, android.graphics.Color.red(accent), android.graphics.Color.green(accent), android.graphics.Color.blue(accent)));
-            binding.manageModsButton.setBackground(gd);
-
-            // The branding title sits on the fixed dark header gradient (primary_dark →
-            // accent_purple in BOTH themes), so its colour must stay light. Applying the raw
-            // accent here made a dark preset (indigo/green) read as near-black on the header.
-        }
-
+        // The quick_mods_card is the single way into the mods screen. The old "Active Mods"
+        // heading with a Manage button and a list of enabled mod names was a second, weaker
+        // entry point to the same destination, so it is gone; only the per-instance count on
+        // the hero card remains.
         viewModel.getModsLiveData().observe(this, this::updateModsUI);
     }
 
@@ -2063,36 +2039,12 @@ import okhttp3.OkHttpClient;
         // the hero card reflects the instance that is actually selected.
         refreshActiveModsStat(mods);
 
-        if (modsListContainer == null) return;
-        modsListContainer.removeAllViews();
-
-        // Add enabled external mods
-        if (mods != null) {
-            for (Mod mod : mods) {
-                if (mod.isEnabled()) {
-                    addModNameEntry(mod.getDisplayName());
-                }
-            }
-        }
     }
 
     private void refreshActiveModsStat(List<Mod> mods) {
         TextView modsStat = findViewById(R.id.last_played_mods_stat);
         if (modsStat == null) return;
         setAnimatedStatText(modsStat, getString(R.string.stat_mods_count, Mod.countEnabled(mods)));
-    }
-
-    private void addModNameEntry(String name) {
-        TextView tv = new TextView(this);
-        tv.setText(name);
-        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
-        tv.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.on_surface));
-        tv.setFontFeatureSettings(null);
-        tv.setTypeface(getResources().getFont(R.font.misans));
-        tv.setPadding(0, (int)(3 * getResources().getDisplayMetrics().density), 0, (int)(3 * getResources().getDisplayMetrics().density));
-        tv.setMaxLines(1);
-        tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        modsListContainer.addView(tv);
     }
 
     private void setupNavBar() {

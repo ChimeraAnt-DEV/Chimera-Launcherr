@@ -644,66 +644,6 @@
                     android:nestedScrollingEnabled="false" />
             </LinearLayout>
 
-            <!-- Mods Preview Section -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="16dp"
-                android:orientation="vertical">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/home_active_mods"
-                        android:fontFamily="@font/misans"
-                        android:textColor="@color/on_surface"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:drawableStart="@drawable/section_accent_bar"
-                        android:drawablePadding="8dp" />
-
-                    <Button
-                        android:id="@+id/manage_mods_button"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:minWidth="0dp"
-                        android:minHeight="32dp"
-                        android:paddingHorizontal="12dp"
-                        android:background="@drawable/button_outline"
-                        android:text="@string/home_manage"
-                        android:textColor="@color/primary"
-                        android:textSize="11sp"
-                        android:textStyle="bold"
-                        android:textAllCaps="false" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/mods_list_container"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:orientation="vertical" />
-
-                <TextView
-                    android:id="@+id/no_mods_text"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/home_no_mods"
-                    android:fontFamily="@font/misans"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp"
-                    android:gravity="center"
-                    android:paddingVertical="20dp"
-                    android:visibility="gone" />
-            </LinearLayout>
         <!-- Content Library Section -->
             <LinearLayout
                 android:layout_width="match_parent"

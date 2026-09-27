@@ -143,8 +143,8 @@ final class CosmeticsPanel {
      * to succeed.
      */
     private void applyInGame() {
-        File gameDataDir = resolveGameDataDir();
-        if (gameDataDir == null) {
+        List<File> gameDataDirs = resolveGameDataDirs();
+        if (gameDataDirs.isEmpty()) {
             toast(R.string.cosmetics_no_instance);
             return;
         }
@@ -154,44 +154,53 @@ final class CosmeticsPanel {
             return;
         }
         SkinPackActivator.Result result = CapeInGameInstaller.install(
-                new File(activity.getFilesDir(), "cape"), gameDataDir, cape);
+                new File(activity.getFilesDir(), "cape"), gameDataDirs, cape);
         toast(result.success ? R.string.cosmetics_applied_in_game : R.string.cosmetics_apply_failed);
         refreshGameStatus();
     }
 
     private void removeInGame() {
-        File gameDataDir = resolveGameDataDir();
-        if (gameDataDir == null) {
+        List<File> gameDataDirs = resolveGameDataDirs();
+        if (gameDataDirs.isEmpty()) {
             toast(R.string.cosmetics_no_instance);
             return;
         }
-        SkinPackActivator.Result result = CapeInGameInstaller.uninstall(gameDataDir);
+        SkinPackActivator.Result result = CapeInGameInstaller.uninstall(gameDataDirs);
         toast(result.success ? R.string.cosmetics_removed_in_game : R.string.cosmetics_remove_failed);
         refreshGameStatus();
     }
 
     private void refreshGameStatus() {
         if (gameStatus == null) return;
-        File gameDataDir = resolveGameDataDir();
-        if (gameDataDir == null) {
+        List<File> gameDataDirs = resolveGameDataDirs();
+        if (gameDataDirs.isEmpty()) {
             gameStatus.setText(R.string.cosmetics_no_instance);
             return;
         }
-        gameStatus.setText(CapeInGameInstaller.isInstalled(gameDataDir)
+        gameStatus.setText(CapeInGameInstaller.isInstalled(gameDataDirs)
                 ? R.string.cosmetics_in_game_installed
                 : R.string.cosmetics_in_game_not_installed);
     }
 
-    /** The selected instance's game data root, or null when no instance is selected. */
-    private File resolveGameDataDir() {
+    /**
+     * The selected instance's candidate game data roots, empty when no instance is selected.
+     *
+     * <p>Resolved through {@link LauncherStorage#getCandidateGameDataDirs} rather than a
+     * hardcoded {@code getProfileGameDataDir(..., true)}: the game reads its packs from wherever
+     * its storage resolves to, so installing into one fixed path made the cape apply
+     * "successfully" to a directory the running game never loaded — the cape was written but
+     * never appeared. Writing to every candidate root is the same defence the bundled-pack
+     * installer uses.
+     */
+    private List<File> resolveGameDataDirs() {
         try {
             VersionManager versionManager = VersionManager.get(activity);
             GameVersion version = versionManager.getSelectedVersion();
-            if (version == null) return null;
-            return LauncherStorage.getProfileGameDataDir(
-                    activity, version.getStorageProfileId(), true);
+            if (version == null) return java.util.Collections.emptyList();
+            return LauncherStorage.getCandidateGameDataDirs(
+                    activity, version.getStorageProfileId(), version.versionIsolation);
         } catch (Throwable t) {
-            return null;
+            return java.util.Collections.emptyList();
         }
     }
 
