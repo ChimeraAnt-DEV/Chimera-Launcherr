@@ -66,6 +66,13 @@ public class CapePreviewView extends View {
     private final CapeSimulator capeSim = new CapeSimulator();
     private final List<FaceQuad> drawList = new ArrayList<>();
 
+    /** Reused cape projections so a swinging cape allocates nothing per frame. */
+    private float[] capeXs;
+    private float[] capeYs;
+    private float[] capeParticleDepth;
+    private float[] capeQuadDepth;
+    private int[] capeOrder;
+
     private float yawDeg = 28f;
     private float pitchDeg = DEFAULT_PITCH;
     private float spinVelocity;
@@ -368,40 +375,97 @@ public class CapePreviewView extends View {
         float anchorY = 24f;
         float anchorZ = -2.4f;
 
-        float[] xs = new float[cols * rows];
-        float[] ys = new float[cols * rows];
-        for (int i = 0; i < cols * rows; i++) {
+        int particleCount = cols * rows;
+        int quadCount = (cols - 1) * (rows - 1);
+        if (capeXs == null || capeXs.length != particleCount) {
+            capeXs = new float[particleCount];
+            capeYs = new float[particleCount];
+            capeParticleDepth = new float[particleCount];
+            capeQuadDepth = new float[quadCount];
+            capeOrder = new int[quadCount];
+        }
+
+        // Project every particle once, keeping its depth, so the quads can be depth-sorted.
+        // Without the sort the mesh is painted row-major and, the moment the cape swings, the
+        // far side of a fold paints over the near side — the "glitched paper cape" where the
+        // cloth appears to fold through itself and reads as a flat sheet.
+        for (int i = 0; i < particleCount; i++) {
             float mx = capeSim.x(i) / SkinModel.PIXELS_TO_BLOCKS;
             float my = capeSim.y(i) / SkinModel.PIXELS_TO_BLOCKS;
             float mz = capeSim.z(i) / SkinModel.PIXELS_TO_BLOCKS;
             projectPoint(mx, anchorY + my, anchorZ + mz, scale, originX, originY);
-            xs[i] = projected[0];
-            ys[i] = projected[1];
+            capeXs[i] = projected[0];
+            capeYs[i] = projected[1];
+            capeParticleDepth[i] = projected[2];
         }
 
-        paint.setShader(null);
         for (int r = 0; r + 1 < rows; r++) {
             for (int c = 0; c + 1 < cols; c++) {
+                int q = r * (cols - 1) + c;
                 int i00 = r * cols + c, i10 = r * cols + c + 1;
                 int i01 = (r + 1) * cols + c, i11 = (r + 1) * cols + c + 1;
-                // A vertical gradient over the cloth gives it shading without a texture.
-                float v = r / (float) (rows - 1);
-                paint.setColor(lerpColor(cape.color, darker(cape.color), v * 0.55f));
-                path.reset();
-                path.moveTo(xs[i00], ys[i00]);
-                path.lineTo(xs[i10], ys[i10]);
-                path.lineTo(xs[i11], ys[i11]);
-                path.lineTo(xs[i01], ys[i01]);
-                path.close();
-                canvas.drawPath(path, paint);
+                capeQuadDepth[q] = (capeParticleDepth[i00] + capeParticleDepth[i10]
+                        + capeParticleDepth[i01] + capeParticleDepth[i11]) * 0.25f;
+                capeOrder[q] = q;
             }
         }
+        sortQuadsByDepth(capeOrder, capeQuadDepth, quadCount);
 
-        drawCapeTrim(canvas, xs, ys, cols, rows);
-        if (cape.branded) drawCrawlingMark(canvas, xs, ys, cols, rows);
+        paint.setShader(null);
+        for (int k = 0; k < quadCount; k++) {
+            int q = capeOrder[k];
+            int r = q / (cols - 1);
+            int c = q % (cols - 1);
+            int i00 = r * cols + c, i10 = r * cols + c + 1;
+            int i01 = (r + 1) * cols + c, i11 = (r + 1) * cols + c + 1;
+
+            // Two-sided shading. The projected winding tells which face of the cloth is toward
+            // the viewer, so a fold that curls back is visibly darker instead of the cape
+            // reading as a single cardboard sheet. A vertical ramp adds the shading down to the
+            // hem.
+            float cross = (capeXs[i10] - capeXs[i00]) * (capeYs[i01] - capeYs[i00])
+                    - (capeYs[i10] - capeYs[i00]) * (capeXs[i01] - capeXs[i00]);
+            boolean frontFace = cross >= 0f;
+            float v = r / (float) Math.max(1, rows - 2);
+            int color;
+            if (frontFace) {
+                color = lerpColor(cape.color, darker(cape.color), v * 0.45f);
+            } else {
+                int back = darker(cape.color);
+                color = lerpColor(back, darker(back), v * 0.55f);
+            }
+            paint.setColor(color);
+            path.reset();
+            path.moveTo(capeXs[i00], capeYs[i00]);
+            path.lineTo(capeXs[i10], capeYs[i10]);
+            path.lineTo(capeXs[i11], capeYs[i11]);
+            path.lineTo(capeXs[i01], capeYs[i01]);
+            path.close();
+            canvas.drawPath(path, paint);
+        }
+
+        drawCapeTrim(canvas);
+        if (cape.branded) drawCrawlingMark(canvas);
     }
 
-    private void drawCapeTrim(Canvas canvas, float[] xs, float[] ys, int cols, int rows) {
+    /** Farthest-first insertion sort; small fixed quad count, allocation-free. */
+    private static void sortQuadsByDepth(int[] order, float[] depth, int count) {
+        for (int i = 1; i < count; i++) {
+            int key = order[i];
+            float keyDepth = depth[key];
+            int j = i - 1;
+            while (j >= 0 && depth[order[j]] > keyDepth) {
+                order[j + 1] = order[j];
+                j--;
+            }
+            order[j + 1] = key;
+        }
+    }
+
+    private void drawCapeTrim(Canvas canvas) {
+        int cols = CapeSimulator.COLS;
+        float[] xs = capeXs;
+        float[] ys = capeYs;
         paint.setShader(null);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(1.4f);
@@ -409,8 +473,8 @@ public class CapePreviewView extends View {
         path.reset();
         path.moveTo(xs[cols - 1], ys[cols - 1]);
         for (int c = cols - 2; c >= 0; c--) path.lineTo(xs[c], ys[c]);
-        for (int r = 1; r < rows; r++) path.lineTo(xs[r * cols], ys[r * cols]);
-        for (int r = rows - 1; r >= 0; r--) {
+        for (int r = 1; r < CapeSimulator.ROWS; r++) path.lineTo(xs[r * cols], ys[r * cols]);
+        for (int r = CapeSimulator.ROWS - 1; r >= 0; r--) {
             path.lineTo(xs[r * cols + cols - 1], ys[r * cols + cols - 1]);
         }
         canvas.drawPath(path, paint);
@@ -424,7 +488,11 @@ public class CapePreviewView extends View {
      * sliding over a flat quad, and it is clipped to the cloth so it reads as printed on the
      * fabric. The phase comes from uptime, so the crawl speed does not depend on frame rate.
      */
-    private void drawCrawlingMark(Canvas canvas, float[] xs, float[] ys, int cols, int rows) {
+    private void drawCrawlingMark(Canvas canvas) {
+        int cols = CapeSimulator.COLS;
+        int rows = CapeSimulator.ROWS;
+        float[] xs = capeXs;
+        float[] ys = capeYs;
         float phase;
         if (cape.animated && animating && DynamicAnim.areAnimationsEnabled()) {
             long elapsed = android.os.SystemClock.uptimeMillis() - animStartMs;

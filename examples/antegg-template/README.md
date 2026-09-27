@@ -1,0 +1,85 @@
+# .AntEgg mod format
+
+`.AntEgg` is the Chimera Client mod packaging format. It is a ZIP archive with the `.antegg`
+extension, so a package is one file a user can download and import, and its contents are
+inspectable with any ZIP tool.
+
+## Layout
+
+A script mod (the smallest valid package):
+
+```
+my-mod.antegg
+├── egg.json
+└── scripts/
+    └── main.lua
+```
+
+A native mod:
+
+```
+my-mod.antegg
+├── egg.json
+└── bin/
+    └── libmymod.so
+```
+
+`egg.json` must be at the archive root, and `entry_point` must be a file inside the archive.
+
+## egg.json
+
+```json
+{
+  "name": "My Mod",
+  "version": "1.0.0",
+  "author": "Your Name",
+  "type": "script",
+  "entry_point": "scripts/main.lua",
+  "dependencies": ["Some Other Mod"],
+  "description": "Optional one-line summary."
+}
+```
+
+| Field          | Required | Rules                                                                    |
+| -------------- | -------- | ------------------------------------------------------------------------ |
+| `name`         | yes      | Non-empty. It is slugged (`My Mod` → `my-mod`) to name the sandbox dir.   |
+| `version`      | yes      | Semantic version: `major.minor.patch`, optional `-pre`/`+build` suffix.   |
+| `author`       | yes      | Non-empty.                                                               |
+| `type`         | yes      | `"native"` (C++) or `"script"` (Lua).                                    |
+| `entry_point`  | yes      | Relative path inside the package; must end `.so` for native, `.lua` for script. |
+| `dependencies` | no       | Array of other mod names; each must already be installed.                |
+| `description`  | no       | Free text.                                                               |
+
+Validation is strict: unknown JSON value types, a missing field, a non-semver version, an
+`entry_point` that escapes the package, or an extension that disagrees with `type` all reject the
+package before anything is extracted.
+
+## Loading
+
+- **native** — the extracted `.so` is handed by absolute path to the preloader's native-mod
+  injection entry point, the same call an ordinary native mod uses.
+- **script** — the entry `.lua` file is executed by the embedded Lua VM (LuaJ, Lua 5.2). The
+  script sees a `mod` table: `mod.name`, `mod.version`, `mod.author`, `mod.id`, `mod.dir`
+  (absolute path of the extracted mod) and `mod.sandbox` (a `data/` directory it may write to).
+
+## Where packages live
+
+Imported packages are extracted to `getExternalFilesDir()/AntEggs/<mod-id>/`, which falls back to
+internal storage when external storage is unavailable. A failed import leaves no partial mod: a
+package is extracted to a temporary sibling directory and moved into place only when the whole
+archive has been written and the entry point verified.
+
+## Building a package
+
+```sh
+cd examples/antegg-template
+cp egg.json egg.json.bak    # for the native example, use egg.native.json instead
+zip -r ../my-mod.antegg egg.json scripts   # or bin/ for native
+```
+
+Import the resulting file through the launcher's mod import flow.
+
+## Example template
+
+`examples/antegg-template/` contains a working script mod (`egg.json`, `scripts/main.lua`) and the
+native equivalents (`egg.native.json`, `src/ExampleAntEggMod.cpp`).

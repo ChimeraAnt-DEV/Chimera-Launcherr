@@ -290,33 +290,48 @@ public final class PlayerSkinProvider {
         fill(canvas, paint, 20, 16, 8, 4, 0xFF6236E8);
         fill(canvas, paint, 28, 16, 8, 4, 0xFF4A22B5);
 
-        // Arms: sleeves in the same violet, hands in skin tone.
-        for (int[] r : new int[][]{{40, 20, 4, 12}, {44, 20, 4, 12}, {48, 20, 4, 12}, {52, 20, 4, 12},
-                {32, 52, 4, 12}, {36, 52, 4, 12}, {44, 52, 4, 12}, {48, 52, 4, 12}}) {
-            fill(canvas, paint, r[0], r[1], r[2], r[3], 0xFF6236E8);
+        // Limbs: painted from the same UV table the renderer samples, so the stand-in cannot
+        // drift from the model. A hardcoded region list previously used the wrong columns for
+        // the left arm and leg, so the placeholder rendered with mismatched limbs.
+        for (SkinModel.Box box : SkinModel.boxes()) {
+            boolean arm = box.id.startsWith("arm");
+            boolean leg = box.id.startsWith("leg");
+            if (!arm && !leg) continue;
+            int sleeve = arm ? (box.id.equals("arm_r") ? 0xFF6236E8 : 0xFF5429C9)
+                    : 0xFF2A2E38;
+            int sleeveSide = arm ? sleeve : 0xFF24272F;
+            // Hands and shoes sit at the bottom of the limb's side strips.
+            int end = arm ? 0xFFE8B98F : 0xFF1B1E24;
+            for (SkinModel.Face face : SkinModel.Face.values()) {
+                SkinModel.Uv uv = box.baseUv(face);
+                if (uv == null) continue;
+                int color;
+                switch (face) {
+                    case FRONT:
+                        color = sleeve;
+                        break;
+                    case LEFT:
+                    case RIGHT:
+                    case BACK:
+                        color = sleeveSide;
+                        break;
+                    default:
+                        color = sleeve;
+                        break;
+                }
+                fill(canvas, paint, uv.u, uv.v, uv.w, uv.h, color);
+            }
+            // The lower quarter of the front and side strips is the exposed hand/shoe.
+            SkinModel.Uv front = box.baseUv(SkinModel.Face.FRONT);
+            SkinModel.Uv left = box.baseUv(SkinModel.Face.LEFT);
+            SkinModel.Uv right = box.baseUv(SkinModel.Face.RIGHT);
+            SkinModel.Uv back = box.baseUv(SkinModel.Face.BACK);
+            for (SkinModel.Uv uv : new SkinModel.Uv[]{front, left, right, back}) {
+                fill(canvas, paint, uv.u, uv.v + uv.h - 4, uv.w, 4, end);
+            }
         }
-        fill(canvas, paint, 40, 28, 4, 4, 0xFFE8B98F);
-        fill(canvas, paint, 44, 28, 4, 4, 0xFFE8B98F);
-        fill(canvas, paint, 48, 28, 4, 4, 0xFFE8B98F);
-        fill(canvas, paint, 52, 28, 4, 4, 0xFFE8B98F);
-        fill(canvas, paint, 32, 60, 4, 4, 0xFFE8B98F);
-        fill(canvas, paint, 36, 60, 4, 4, 0xFFE8B98F);
-        fill(canvas, paint, 44, 60, 4, 4, 0xFFE8B98F);
-        fill(canvas, paint, 48, 60, 4, 4, 0xFFE8B98F);
 
-        // Legs: dark trousers, shoes at the bottom.
-        for (int[] r : new int[][]{{0, 20, 4, 12}, {4, 20, 4, 12}, {8, 20, 4, 12}, {12, 20, 4, 12},
-                {16, 52, 4, 12}, {20, 52, 4, 12}, {28, 52, 4, 12}, {32, 52, 4, 12}}) {
-            fill(canvas, paint, r[0], r[1], r[2], r[3], 0xFF2A2E38);
-        }
-        fill(canvas, paint, 0, 28, 4, 4, 0xFF1B1E24);
-        fill(canvas, paint, 4, 28, 4, 4, 0xFF1B1E24);
-        fill(canvas, paint, 8, 28, 4, 4, 0xFF1B1E24);
-        fill(canvas, paint, 12, 28, 4, 4, 0xFF1B1E24);
-        fill(canvas, paint, 16, 60, 4, 4, 0xFF1B1E24);
-        fill(canvas, paint, 20, 60, 4, 4, 0xFF1B1E24);
-        fill(canvas, paint, 28, 60, 4, 4, 0xFF1B1E24);
-        fill(canvas, paint, 32, 60, 4, 4, 0xFF1B1E24);
+        // Legs: dark trousers with shoes at the bottom are covered by the loop above.
 
         return bmp;
     }

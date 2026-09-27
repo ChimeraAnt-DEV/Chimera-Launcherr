@@ -453,6 +453,7 @@ public class VersionManager {
             gv.versionIsolation = metadata.versionIsolation;
             gv.launchVertically = metadata.launchVertically;
             gv.shaderCompatEnabled = metadata.shaderCompatEnabled;
+            gv.inGamePackChangerEnabled = metadata.inGamePackChangerEnabled;
 
             installedVersions.add(gv);
         } catch (PackageManager.NameNotFoundException ignored) {
@@ -500,6 +501,7 @@ public class VersionManager {
                         metadata.installed = current.installed;
                         metadata.packageName = current.packageName;
                         metadata.shaderCompatEnabled = current.shaderCompatEnabled;
+                        metadata.inGamePackChangerEnabled = current.inGamePackChangerEnabled;
                     }
             );
         } catch (IOException ignored) {
@@ -579,6 +581,7 @@ public class VersionManager {
         gv.versionIsolation = metadata.versionIsolation;
         gv.launchVertically = metadata.launchVertically;
         gv.shaderCompatEnabled = metadata.shaderCompatEnabled;
+        gv.inGamePackChangerEnabled = metadata.inGamePackChangerEnabled;
 
         return gv;
     }
@@ -623,6 +626,31 @@ public class VersionManager {
                     metadata -> metadata.shaderCompatEnabled = enabled
             );
         } catch (Exception ignored) {}
+    }
+
+    /**
+     * Toggles the in-game resource-pack changer for an instance.
+     *
+     * <p>Persisted per instance so the in-game Mod Menu can decide whether to expose the changer
+     * without re-deriving it from global settings. Defaults off: the changer writes to the
+     * instance's pack lists, so it is opt-in rather than silently active.
+     */
+    public void setInstanceInGamePackChangerEnabled(GameVersion version, boolean enabled) {
+        if (version == null) return;
+        version.inGamePackChangerEnabled = enabled;
+        updateCachedInstance(version, cached -> cached.inGamePackChangerEnabled = enabled);
+        try {
+            File metadataDir = LauncherStorage.getProfileMetadataDir(context, getMetadataDirectoryName(version));
+            metadataStore.update(
+                    metadataDir,
+                    metadataDefaults(version.isInstalled, version.directoryName, version.packageName, version.versionCode),
+                    metadata -> metadata.inGamePackChangerEnabled = enabled
+            );
+        } catch (Exception ignored) {}
+    }
+
+    public boolean isInstanceInGamePackChangerEnabled(GameVersion version) {
+        return version != null && version.inGamePackChangerEnabled;
     }
 
     public boolean setInstanceDisplayName(GameVersion version, String displayName) {

@@ -299,6 +299,8 @@ Migration must complete before Chimera Client can continue.</string>
     <string name="instance_shortcut_default_icon">Use Default</string>
     <string name="instance_shortcut_add_button">Add Shortcut</string>
     <string name="instance_settings_auto_save_failed">Could not save this instance setting.</string>
+    <string name="in_game_pack_changer_title">In-game pack changer</string>
+    <string name="in_game_pack_changer_desc">Adds a resource-pack switcher to the in-game Mod Menu so packs can be enabled or disabled without leaving the game.</string>
     <string name="instance_shortcut_not_supported">Your home screen launcher does not support pinned shortcuts.</string>
     <string name="instance_shortcut_missing">This Minecraft instance is no longer available.</string>
     <string name="instance_danger_zone">Danger Zone</string>
@@ -772,6 +774,7 @@ Migration must complete before Chimera Client can continue.</string>
     <string name="mod_menu_no_favorites">No favorite mods yet</string>
     <string name="mod_menu_no_matches">No matching mods</string>
     <string name="mod_menu_group_inbuilt">Inbuilt Features</string>
+    <string name="mod_menu_group_voice">Voice</string>
     <string name="mod_menu_group_external_ungrouped">Ungrouped External Mods</string>
     <string name="mod_menu_module_count">%1$d / %2$d</string>
     <string name="mod_menu_general_settings">General Settings</string>
@@ -788,6 +791,18 @@ Migration must complete before Chimera Client can continue.</string>
     <string name="mod_menu_compact">Compact Mod Menu</string>
     <string name="mod_menu_compact_desc">Use a smaller menu with a dense module list and compact filters</string>
     <string name="mod_menu_cosmetics">Cosmetics</string>
+    <string name="mod_menu_packs">Packs</string>
+    <string name="pack_changer_title">In-game packs</string>
+    <string name="pack_changer_status">%1$d of %2$d resource packs active</string>
+    <string name="pack_changer_empty">No resource packs are installed for this instance.</string>
+    <string name="pack_changer_disabled">In-game pack changer is off. Enable it in Instance Settings to change packs here.</string>
+    <string name="pack_changer_no_instance">No instance is selected.</string>
+    <string name="pack_changer_write_failed">Could not update the pack list.</string>
+    <string name="pack_changer_enable">Enable</string>
+    <string name="pack_changer_disable">Disable</string>
+    <string name="pack_changer_on">on</string>
+    <string name="pack_changer_off">off</string>
+    <string name="pack_changer_pack_meta">v%1$s · %2$s</string>
     <string name="cosmetics_capes">Capes</string>
     <string name="cosmetics_accessories">Accessories</string>
     <string name="cosmetics_none">None</string>
@@ -1430,6 +1445,34 @@ Migration must complete before Chimera Client can continue.</string>
     <string name="mod_config_hitbox_show_combo_box">Show Best-Combo Box</string>
     <string name="mod_config_hitbox_show_combo_box_desc">Red box marking the best place to hit for combos; turns blue while you are aimed at it</string>
     <string name="hitbox_scope_note">Boxes come from a game-data feed. Until that feed is available nothing is drawn — an invented box would be worse than none, because you would aim at it.</string>
+
+    <!-- Proximity Voice Chat -->
+    <string name="inbuilt_mod_voice_chat">Proximity Voice Chat</string>
+    <string name="inbuilt_mod_voice_chat_desc">Talk to other Chimera users in the same world, volume falling off with distance, over LAN multicast with multiple channels</string>
+    <string name="mod_config_voice_range" formatted="false">Hearing Range (blocks)</string>
+    <string name="mod_config_voice_range_desc">How far away another launcher user can still be heard; louder up close, silent at the edge</string>
+    <string name="mod_config_voice_volume" formatted="false">Voice Volume (%)</string>
+    <string name="mod_config_voice_volume_desc">Output level for everyone you can hear</string>
+    <string name="mod_config_voice_channel">Voice Channel</string>
+    <string name="mod_config_voice_channel_desc">A private channel hears only players on the same channel, plus anyone on the open \"world\" channel</string>
+    <string name="mod_config_voice_mic">Transmit Microphone</string>
+    <string name="mod_config_voice_mic_desc">Off means listen-only: you hear others but nobody hears you</string>
+    <string name="voice_chat_scope_note">This links Chimera launcher users in the same world over the local network. It cannot give a vanilla client without the launcher a voice channel, and the game\'s own friends-only worlds still apply.</string>
+    <string name="voice_chat_title">Voice</string>
+    <string name="voice_chat_status_off">Voice chat is off.</string>
+    <string name="voice_chat_status_searching">Listening for nearby players on the local network...</string>
+    <string name="voice_chat_status" formatted="false">%1$d player(s) in range - channel: %2$s - %3$s</string>
+    <string name="voice_chat_status_count_alone">No one else is nearby.</string>
+    <string name="voice_chat_status_count" formatted="false">%1$d nearby</string>
+    <string name="voice_chat_channel_world">World</string>
+    <string name="voice_chat_channel_team">Team</string>
+    <string name="voice_chat_channel_custom">Custom</string>
+    <string name="voice_chat_channel_hint">Channel name</string>
+    <string name="voice_chat_mic_on">mic on</string>
+    <string name="voice_chat_mic_off">listen-only</string>
+    <string name="voice_chat_permission_needed">Microphone permission is needed to transmit. Listening still works.</string>
+    <string name="voice_chat_unknown_peer">Player</string>
+    <string name="voice_chat_dbm" formatted="false">%1$d dB</string>
 
     <!-- ABI / bitness -->
     <string name="abi_64_bit">64-bit</string>

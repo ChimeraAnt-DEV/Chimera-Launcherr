@@ -22,6 +22,8 @@ public class GameVersion implements Parcelable {
     public boolean versionIsolation;
     public boolean launchVertically;
     public boolean shaderCompatEnabled;
+    /** When true, the in-game Mod Menu exposes a resource-pack changer for this instance. */
+    public boolean inGamePackChangerEnabled;
     public final File modsDir;
 
     public GameVersion(String directoryName, String displayName, String versionCode, File versionDir, boolean isOfficial, String packageName, String abiList) {
@@ -60,6 +62,7 @@ public class GameVersion implements Parcelable {
         shaderCompatEnabled = in.readByte() != 0;
         String modsDirPath = in.readString();
         modsDir = modsDirPath == null ? null : new File(modsDirPath);
+        inGamePackChangerEnabled = in.readByte() != 0;
     }
 
     @Override
@@ -79,6 +82,7 @@ public class GameVersion implements Parcelable {
         dest.writeByte((byte) (launchVertically ? 1 : 0));
         dest.writeByte((byte) (shaderCompatEnabled ? 1 : 0));
         dest.writeString(modsDir == null ? null : modsDir.getAbsolutePath());
+        dest.writeByte((byte) (inGamePackChangerEnabled ? 1 : 0));
     }
 
     @Override

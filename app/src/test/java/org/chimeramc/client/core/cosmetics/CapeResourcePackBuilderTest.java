@@ -133,6 +133,48 @@ public class CapeResourcePackBuilderTest {
         }
     }
 
+    /**
+     * Every face of the cape box the game can sample must be opaque.
+     *
+     * <p>The cape is a thin box, not a single quad: the front panel (1,1), the side columns at
+     * x=0 and x=11, and the top/bottom edge row at y=0 are all sampled when the cape swings and
+     * folds. Leaving them transparent made the cape show holes as it moved — the "glitched paper
+     * cape" the player sees — so this pins the whole box, not just the visible back panel.
+     */
+    @Test
+    public void everyCapeBoxFaceIsOpaque() {
+        int[] pixels = decodeToPixels(CapeTexturePainter.paint(0xFF6236E8, 0xFFA88CFF, true));
+
+        // Front panel against the player's back.
+        for (int y = 1; y < 17; y++) {
+            for (int x = 1; x < 11; x++) {
+                assertEquals("front panel alpha at " + x + "," + y,
+                        0xFF, pixels[y * 64 + x] >>> 24);
+            }
+        }
+        // Side strips and the top edge.
+        for (int y = 0; y < 17; y++) {
+            assertEquals("left strip at y=" + y, 0xFF, pixels[y * 64 + 0] >>> 24);
+            assertEquals("right strip at y=" + y, 0xFF, pixels[y * 64 + 11] >>> 24);
+        }
+        for (int x = 0; x < 22; x++) {
+            assertEquals("top edge at x=" + x, 0xFF, pixels[x] >>> 24);
+        }
+    }
+
+    /** The front and back of the cape must differ, or the cape reads as a flat sheet. */
+    @Test
+    public void frontAndBackPanelsHaveDifferentShading() {
+        int[] pixels = decodeToPixels(CapeTexturePainter.paint(0xFF6236E8, 0xFFA88CFF, true));
+        // Sample away from the inset trim band and the brand mark so both points are panel fill.
+        int back = pixels[14 * 64 + 14];
+        int front = pixels[8 * 64 + 6];
+        assertTrue("front and back must not be identical", back != front);
+        // Back is the bright base colour; front is a darker shade of the same hue.
+        assertTrue("back must be brighter than front",
+                ((back >>> 16) & 0xFF) > ((front >>> 16) & 0xFF));
+    }
+
     @Test
     public void shadeDarkensWithoutTouchingAlpha() {
         int shaded = CapeTexturePainter.shade(0xFF808080, 0.5f);

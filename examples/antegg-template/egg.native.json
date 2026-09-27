@@ -1,0 +1,9 @@
+{
+  "name": "Example Native Mod",
+  "version": "1.0.0",
+  "author": "Your Name",
+  "type": "native",
+  "entry_point": "bin/libexample.so",
+  "dependencies": [],
+  "description": "A minimal .AntEgg native mod. The listed .so is passed to the preloader."
+}

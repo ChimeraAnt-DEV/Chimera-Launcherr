@@ -49,7 +49,9 @@ public class InstanceSettingsActivity extends BaseActivity {
     private SwitchMaterial switchIsolation;
     private SwitchMaterial switchLaunchVertically;
     private SwitchMaterial switchShaderCompat;
+    private SwitchMaterial switchInGamePackChanger;
     private View shaderCompatContainer;
+    private View inGamePackChangerContainer;
     private EditText editShortcutName;
     private ImageView shortcutIconPreview;
     private String shortcutIconUri;
@@ -107,6 +109,8 @@ public class InstanceSettingsActivity extends BaseActivity {
         switchLaunchVertically = findViewById(R.id.switch_launch_vertically);
         switchShaderCompat = findViewById(R.id.switch_shader_compat);
         shaderCompatContainer = findViewById(R.id.shader_compat_container);
+        switchInGamePackChanger = findViewById(R.id.switch_in_game_pack_changer);
+        inGamePackChangerContainer = findViewById(R.id.in_game_pack_changer_container);
         editShortcutName = findViewById(R.id.edit_shortcut_name);
         shortcutIconPreview = findViewById(R.id.shortcut_icon_preview);
 
@@ -133,6 +137,13 @@ public class InstanceSettingsActivity extends BaseActivity {
             versionManager.setInstanceShaderCompatEnabled(version, isChecked);
             setResult(RESULT_OK);
         });
+        if (switchInGamePackChanger != null) {
+            switchInGamePackChanger.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (populatingData) return;
+                versionManager.setInstanceInGamePackChangerEnabled(version, isChecked);
+                setResult(RESULT_OK);
+            });
+        }
 
         editName.addTextChangedListener(new TextWatcher() {
             @Override
@@ -211,6 +222,10 @@ public class InstanceSettingsActivity extends BaseActivity {
         
         if (switchShaderCompat != null) {
             switchShaderCompat.setChecked(version.shaderCompatEnabled);
+        }
+
+        if (switchInGamePackChanger != null) {
+            switchInGamePackChanger.setChecked(version.inGamePackChangerEnabled);
         }
         
         editShortcutName.setText(InstanceShortcutManager.getSavedName(this, version));

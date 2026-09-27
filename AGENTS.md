@@ -421,3 +421,68 @@ conclusions.
   who consumes it -- the same reason `dispatchKeyEvent` records the mouse-button press before the
   preloader may consume it. `overlayManager.handleTouchEvent` moved up with it (it also maintains
   gesture state). Pinned by `TouchTapDetectorTest.aSwallowedUpDoesNotPoisonTheNextTap`.
+
+## .AntEgg mod packaging (core.antegg + preloader AntEggLoader)
+- **`.AntEgg` is a ZIP archive with a custom extension.** The manifest `egg.json` sits at the
+  archive root and carries `name`/`version`/`author`/`type` (`native`|`script`)/`entry_point` and
+  an optional `dependencies` array. `AntEggManifest` (Java) and `pl::runtime::AntEggManifest`
+  (C++) parse the same grammar; both reject a missing field, a non-semver version, a type that
+  disagrees with the entry-point extension, or an `entry_point` that escapes the package.
+- **Two runtimes, two seams.** `type: "native"` hands the extracted `.so`'s absolute path to
+  `ModManager.initializeLoadedMod` -- the same preloader injection an ordinary native mod uses;
+  `.AntEgg` adds packaging/validation, not a second injection mechanism. (The original spec calls
+  this API "ApexAntLamina"; no class or symbol by that name exists in this tree -- it is the `pl`
+  preloader bridge.) `type: "script"` runs the entry `.lua` on the embedded Lua VM (`luaj.jse`,
+  Lua 5.2) through `AntEggScriptHost`, which populates a `mod` table (`name`, `version`, `author`,
+  `id`, `dir`, `sandbox`, `dependencies`).
+- **Script failures are returned, never thrown** -- a broken script shows an error in the Mods tab
+  instead of taking the launcher down. `AntEggScriptLoadingTest` runs a real archive through
+  extract-then-execute and pins both error paths.
+- **Extraction is sandboxed and atomic.** `getExternalFilesDir()/AntEggs/<mod-id>/` (internal
+  fallback); every ZIP entry is resolved and checked to stay inside the sandbox (entry names are
+  attacker-controlled), and the archive is staged in a temp sibling and moved into place only when
+  complete, so a failed import leaves no partial mod. `.antegg` is a recognized import extension
+  in `FileHandler` and an intent-filter path suffix in the manifest.
+- Native: `AntEggLoader.cpp`/`AntEggJni.cpp` use zlib raw inflate (no new third-party ZIP dep),
+  bound to `AntEggBridge.nativeValidate`/`nativeLoadMod`/`nativeLooksLikeAntEgg`. The symbol
+  prefix is `Java_org_chimeramc_client_core_antegg_*`; verify with `llvm-nm -D`.
+- Template and format docs: `examples/antegg-template/`.
+
+## Proximity voice chat (core.voice + VoiceChatOverlay)
+- **A launcher-side peer link between Chimera users in the same world**, over LAN multicast UDP.
+  Transport = `VoiceTransport` (MulticastSocket), framing = `VoiceProtocol` (raw 16 kHz mono PCM;
+  no per-ABI codec), mixing = `VoiceRegistry` + `VoiceChannel`, device = `VoiceAudioEngine`.
+  Nothing talks to the game.
+- **Channels are the multi-channel contract.** A listener hears their own channel plus the open
+  `world` channel in both directions (so switching to a private channel never cuts off someone
+  standing in front of you); two different private channels do not hear each other. Gain falls
+  from 1 to 0 across the range with a linear band (`VoiceChannel.gain`). Pinned by
+  `VoiceChannelTest`/`VoiceProtocolTest`.
+- **The position seam is not implemented.** Distance needs a world position that lives in
+  `libminecraftpe.so` (see the native-feed section), so `VoiceChatModule.PositionSource` has no
+  provider and the module runs in **channel mode** -- everyone on a reachable channel is audible at
+  full volume. That is a real mode, and the overlay says so rather than pretending a range applies.
+- **`VoiceAudioEngine.ensureCapture`/`stopCapture` exist because a mic toggled on after a
+  listen-only start must open the recorder**; a bare `setMicEnabled` only gates an already-running
+  capture loop. `applyConfig` calls them. The RECORD_AUDIO permission is requested when voice
+  starts (`InbuiltOverlayManager.REQUEST_VOICE_MIC`); if denied the module still starts listen-only.
+- The module is `ModIds.VOICE_CHAT` in `GROUP_VOICE` (the `Voice` section), a non-PvP module, so
+  `groupPvpLast` keeps it a single contiguous run. `VoiceModuleGroupingTest` pins the grouping.
+
+## In-game pack changer (core.content.InGamePackChanger + PackChangerPanel)
+- Per-instance opt-in toggle in Instance Settings (`GameVersion.inGamePackChangerEnabled`,
+  persisted in `VersionProfileMetadata`). When on, the in-game Mod Menu's **Packs** section lists
+  the instance's resource packs with a per-pack pill toggle.
+- It rewrites `minecraftpe/global_resource_packs.json`, the file the running game reads, and
+  writes to **every candidate game-data root** (`LauncherStorage.getCandidateGameDataDirs`) -- the
+  same defence the cape installer uses, because the game picks its storage from isolation and
+  internal/external, and a write to only the wrong guess is silently ignored.
+
+## Mod Menu focus highlight (the "50% white overlay")
+- **The white wash is the platform's default focus highlight.** A clickable View is implicitly
+  focusable, so the d-pad/analogue stick moved focus onto the overlay root and the framework
+  painted a full-screen translucent white highlight. Fix: `overlay_mod_menu.xml` root is
+  `focusable="false"` and `defaultFocusHighlightEnabled="false"`, and `ModMenuOverlay.
+  disableFocusHighlight` sets `setFocusable(false)` on the root plus clears the highlight flag
+  recursively (buttons stay focusable for controller nav). Only the highlight flag is touched,
+  never a background.

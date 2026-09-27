@@ -73,6 +73,10 @@ public final class InbuiltModuleProvider {
     private static final String CFG_HITBOX_SHOW_LOOK_LINE = "hitbox_show_look_line";
     private static final String CFG_HITBOX_SHOW_CRIT_LINE = "hitbox_show_crit_line";
     private static final String CFG_HITBOX_SHOW_COMBO_BOX = "hitbox_show_combo_box";
+    private static final String CFG_VOICE_RANGE = "voice_range_blocks";
+    private static final String CFG_VOICE_VOLUME = "voice_volume_percent";
+    private static final String CFG_VOICE_CHANNEL = "voice_channel";
+    private static final String CFG_VOICE_MIC = "voice_mic_enabled";
 
     private InbuiltModuleProvider() {
     }
@@ -143,6 +147,9 @@ public final class InbuiltModuleProvider {
         mods.add(create(activity, manager, overlayManager, ModIds.HITBOX,
                 R.string.inbuilt_mod_hitbox, R.string.inbuilt_mod_hitbox_desc,
                 groupName));
+        mods.add(create(activity, manager, overlayManager, ModIds.VOICE_CHAT,
+                R.string.inbuilt_mod_voice_chat, R.string.inbuilt_mod_voice_chat_desc,
+                activity.getString(R.string.mod_menu_group_voice)));
 
         return groupPvpLast(mods);
     }
@@ -172,7 +179,7 @@ public final class InbuiltModuleProvider {
         boolean customConfig = ModIds.POJAV_CONTROLS.equals(id) || ModIds.MORE_BUTTONS.equals(id)
                 || ModIds.ARMOR_HUD.equals(id) || ModIds.CRYSTAL_OPTIMIZER.equals(id)
                 || ModIds.HIT_REGISTRATION.equals(id) || ModIds.HIT_TIMING.equals(id)
-                || ModIds.HITBOX.equals(id);
+                || ModIds.HITBOX.equals(id) || ModIds.VOICE_CHAT.equals(id);
         // Combat modules get their own PvP section so the tab is a real destination, not just a
         // filter over the inbuilt list. They remain inbuilt modules, so the Inbuilt filter and
         // the "Inbuilt" grouping still find them.
@@ -204,6 +211,9 @@ public final class InbuiltModuleProvider {
                 || ModIds.HIT_REGISTRATION.equals(modId) || ModIds.HIT_TIMING.equals(modId)
                 || ModIds.HITBOX.equals(modId)) {
             return createCombatConfigSchema(context, mod);
+        }
+        if (ModIds.VOICE_CHAT.equals(modId)) {
+            return createVoiceConfigSchema(context, mod);
         }
         boolean hotbar = ModIds.HOTBAR_SLOT.equals(mod.getId());
         if (!hotbar && !ModIds.GYRO.equals(mod.getId())) return null;
@@ -335,6 +345,37 @@ public final class InbuiltModuleProvider {
         }
     }
 
+    /**
+     * Category layout for the proximity voice module: who you hear, and how loud.
+     *
+     * <p>The scope note is placed in the default category so it is the first thing read — the
+     * module is named "Proximity Voice Chat" but only applies distance when a position feed
+     * exists, and that distinction has to be on screen, not buried.
+     */
+    private static RuntimeConfigSchema createVoiceConfigSchema(Context context, UnifiedMod mod) {
+        try {
+            JSONArray categories = new JSONArray();
+            JSONArray nodes = new JSONArray();
+            categories.put(configCategory(context, "channel", R.string.mod_config_category_behavior));
+            categories.put(configCategory(context, "audio", R.string.mod_config_category_appearance));
+            categories.put(configCategory(context, "overlay", R.string.mod_config_category_button));
+            nodes.put(configNode(context, mod, CFG_VOICE_CHANNEL, "channel"));
+            nodes.put(configNode(context, mod, CFG_VOICE_MIC, "channel"));
+            nodes.put(configNode(context, mod, CFG_VOICE_RANGE, "audio"));
+            nodes.put(configNode(context, mod, CFG_VOICE_VOLUME, "audio"));
+            nodes.put(configNode(context, mod, CFG_OVERLAY_SIZE, "overlay"));
+            nodes.put(configNode(context, mod, CFG_OVERLAY_OPACITY, "overlay"));
+            nodes.put(configNode(context, mod, CFG_OVERLAY_LOCK, "overlay"));
+            nodes.put(configNode(context, mod, CFG_OVERLAY_SHOW_EVERYWHERE, "overlay"));
+            nodes.put(scopeNoteNode(context, mod, R.string.voice_chat_scope_note, "channel"));
+            return RuntimeConfigSchema.parse(new JSONObject().put("version", 2)
+                    .put("default_category", "channel")
+                    .put("categories", categories).put("nodes", nodes).toString());
+        } catch (JSONException e) {
+            throw new IllegalStateException("Unable to build voice config schema", e);
+        }
+    }
+
     private static JSONObject configCategory(Context context, String id, int titleRes) throws JSONException {
         return new JSONObject().put("id", id).put("title", context.getString(titleRes));
     }
@@ -385,6 +426,10 @@ public final class InbuiltModuleProvider {
             case CFG_HITBOX_SHOW_LOOK_LINE: return R.string.mod_config_hitbox_show_look_line_desc;
             case CFG_HITBOX_SHOW_CRIT_LINE: return R.string.mod_config_hitbox_show_crit_line_desc;
             case CFG_HITBOX_SHOW_COMBO_BOX: return R.string.mod_config_hitbox_show_combo_box_desc;
+            case CFG_VOICE_RANGE: return R.string.mod_config_voice_range_desc;
+            case CFG_VOICE_VOLUME: return R.string.mod_config_voice_volume_desc;
+            case CFG_VOICE_CHANNEL: return R.string.mod_config_voice_channel_desc;
+            case CFG_VOICE_MIC: return R.string.mod_config_voice_mic_desc;
             default: return 0;
         }
     }
@@ -412,6 +457,7 @@ public final class InbuiltModuleProvider {
         if (ModIds.HIT_TIMING.equals(modId)) return R.string.hit_timing_scope_note;
         if (ModIds.HITBOX.equals(modId)) return R.string.hitbox_scope_note;
         if (ModIds.ARMOR_HUD.equals(modId)) return R.string.armor_hud_no_data;
+        if (ModIds.VOICE_CHAT.equals(modId)) return R.string.voice_chat_scope_note;
         return 0;
     }
 
@@ -719,6 +765,27 @@ public final class InbuiltModuleProvider {
                     UnifiedMod.ConfigType.TOGGLE,
                     "true", "", "",
                     String.valueOf(manager.isHitboxShowComboBox())));
+        } else if (ModIds.VOICE_CHAT.equals(modId)) {
+            configs.add(config(CFG_VOICE_RANGE,
+                    context.getString(R.string.mod_config_voice_range),
+                    UnifiedMod.ConfigType.SLIDER_INT,
+                    "24", "4", "64",
+                    String.valueOf((int) manager.getVoiceRangeBlocks())));
+            configs.add(config(CFG_VOICE_VOLUME,
+                    context.getString(R.string.mod_config_voice_volume),
+                    UnifiedMod.ConfigType.SLIDER_INT,
+                    "100", "0", "200",
+                    String.valueOf(manager.getVoiceVolumePercent())));
+            configs.add(config(CFG_VOICE_CHANNEL,
+                    context.getString(R.string.mod_config_voice_channel),
+                    UnifiedMod.ConfigType.TEXT,
+                    org.chimeramc.client.core.voice.VoiceChannel.WORLD, "", "",
+                    manager.getVoiceChannel()));
+            configs.add(config(CFG_VOICE_MIC,
+                    context.getString(R.string.mod_config_voice_mic),
+                    UnifiedMod.ConfigType.TOGGLE,
+                    "true", "", "",
+                    String.valueOf(manager.isVoiceMicEnabled())));
         }
         return configs;
     }
@@ -898,6 +965,18 @@ public final class InbuiltModuleProvider {
             case CFG_HITBOX_SHOW_COMBO_BOX:
                 manager.setHitboxShowComboBox(parseBoolean(value));
                 break;
+            case CFG_VOICE_RANGE:
+                manager.setVoiceRangeBlocks(parseInt(value, (int) manager.getVoiceRangeBlocks()));
+                break;
+            case CFG_VOICE_VOLUME:
+                manager.setVoiceVolumePercent(parseInt(value, manager.getVoiceVolumePercent()));
+                break;
+            case CFG_VOICE_CHANNEL:
+                manager.setVoiceChannel(value);
+                break;
+            case CFG_VOICE_MIC:
+                manager.setVoiceMicEnabled(parseBoolean(value));
+                break;
             default:
                 break;
         }
@@ -913,6 +992,10 @@ public final class InbuiltModuleProvider {
             org.chimeramc.client.core.mods.inbuilt.overlay.HitTimingMod.onConfigChanged(manager);
         } else if (ModIds.HITBOX.equals(mod.getId())) {
             org.chimeramc.client.core.mods.inbuilt.overlay.HitboxMod.onConfigChanged(manager);
+        } else if (ModIds.VOICE_CHAT.equals(mod.getId())) {
+            org.chimeramc.client.core.voice.VoiceChatModule module =
+                    org.chimeramc.client.core.voice.VoiceChatModule.peek();
+            if (module != null) module.applyConfig(manager);
         }
     }
 

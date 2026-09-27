@@ -12,6 +12,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission
@@ -338,6 +339,11 @@
                 <data android:pathPattern="/.*\\..*\\..*\\.so" />
                 <data android:pathPattern="/.*\\..*\\..*\\..*\\.so" />
                 <data android:pathPattern="/.*\\..*\\..*\\..*\\..*\\.so" />
+                <data android:pathPattern="/.*\\.antegg" />
+                <data android:pathPattern="/.*\\..*\\.antegg" />
+                <data android:pathPattern="/.*\\..*\\..*\\.antegg" />
+                <data android:pathPattern="/.*\\..*\\..*\\..*\\.antegg" />
+                <data android:pathPattern="/.*\\..*\\..*\\..*\\..*\\.antegg" />
                 <data android:pathPattern="/.*\\.mcworld" />
                 <data android:pathPattern="/.*\\..*\\.mcworld" />
                 <data android:pathPattern="/.*\\..*\\..*\\.mcworld" />
@@ -362,6 +368,7 @@
                 <data android:pathSuffix=".chimerabackup" />
                 <data android:pathSuffix=".chimerapack" />
                 <data android:pathSuffix=".so" />
+                <data android:pathSuffix=".antegg" />
                 <data android:pathSuffix=".mcworld" />
                 <data android:pathSuffix=".mcpack" />
                 <data android:pathSuffix=".mcaddon" />
@@ -397,6 +404,11 @@
                 <data android:pathPattern="/.*\\..*\\..*\\.so" />
                 <data android:pathPattern="/.*\\..*\\..*\\..*\\.so" />
                 <data android:pathPattern="/.*\\..*\\..*\\..*\\..*\\.so" />
+                <data android:pathPattern="/.*\\.antegg" />
+                <data android:pathPattern="/.*\\..*\\.antegg" />
+                <data android:pathPattern="/.*\\..*\\..*\\.antegg" />
+                <data android:pathPattern="/.*\\..*\\..*\\..*\\.antegg" />
+                <data android:pathPattern="/.*\\..*\\..*\\..*\\..*\\.antegg" />
                 <data android:pathPattern="/.*\\.mcworld" />
                 <data android:pathPattern="/.*\\..*\\.mcworld" />
                 <data android:pathPattern="/.*\\..*\\..*\\.mcworld" />
@@ -421,6 +433,7 @@
                 <data android:pathSuffix=".chimerabackup" />
                 <data android:pathSuffix=".chimerapack" />
                 <data android:pathSuffix=".so" />
+                <data android:pathSuffix=".antegg" />
                 <data android:pathSuffix=".mcworld" />
                 <data android:pathSuffix=".mcpack" />
                 <data android:pathSuffix=".mcaddon" />

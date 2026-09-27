@@ -43,6 +43,7 @@ public class InbuiltOverlayManager {
     private CrystalOptimizerOverlay crystalOptimizerOverlay;
     private HitTimingOverlay hitTimingOverlay;
     private HitboxOverlay hitboxOverlay;
+    private VoiceChatOverlay voiceChatOverlay;
     private ModMenuButton modMenuButton;
     private HudOverlay hudOverlay;
     private BaseOverlayButton selectedHudEditorOverlay;
@@ -61,6 +62,9 @@ public class InbuiltOverlayManager {
      * {@link OverlayVisibility} for why that distinction keeps a mod's UI from disappearing.
      */
     private boolean gameWorldSeen = false;
+
+    /** Result code for the microphone request issued when proximity voice starts. */
+    private static final int REQUEST_VOICE_MIC = 0x7C01;
 
     public InbuiltOverlayManager(Activity activity) {
         this.activity = activity;
@@ -102,6 +106,7 @@ public class InbuiltOverlayManager {
         modActiveStates.put(ModIds.HIT_REGISTRATION, false);
         modActiveStates.put(ModIds.HIT_TIMING, false);
         modActiveStates.put(ModIds.HITBOX, false);
+        modActiveStates.put(ModIds.VOICE_CHAT, false);
 
         modPositionMap.put(ModIds.QUICK_DROP, nextY + SPACING);
         modPositionMap.put(ModIds.CAMERA_PERSPECTIVE, nextY + SPACING * 2);
@@ -144,6 +149,7 @@ public class InbuiltOverlayManager {
         restorePersistedInbuiltModState(manager, ModIds.HIT_REGISTRATION);
         restorePersistedInbuiltModState(manager, ModIds.HIT_TIMING);
         restorePersistedInbuiltModState(manager, ModIds.HITBOX);
+        restorePersistedInbuiltModState(manager, ModIds.VOICE_CHAT);
 
         modMenuButton = new ModMenuButton(activity);
         modMenuButton.show(START_X, nextY);
@@ -318,6 +324,13 @@ public class InbuiltOverlayManager {
                 hitboxOverlay.show();
                 HitboxMod.setEnabled(true, manager);
                 break;
+            case ModIds.VOICE_CHAT:
+                if (voiceChatOverlay == null) {
+                    voiceChatOverlay = new VoiceChatOverlay(activity);
+                }
+                voiceChatOverlay.show(savedX, savedY);
+                startVoiceChat(manager);
+                break;
         }
     }
 
@@ -356,6 +369,14 @@ public class InbuiltOverlayManager {
                 hitboxOverlay = null;
             }
             HitboxMod.setEnabled(false, null);
+            return;
+        }
+        if (modId.equals(ModIds.VOICE_CHAT)) {
+            stopVoiceChat();
+            if (voiceChatOverlay != null) {
+                voiceChatOverlay.hide();
+                voiceChatOverlay = null;
+            }
             return;
         }
         if (modId.equals(ModIds.AIM_SETTINGS)) {
@@ -731,6 +752,11 @@ public class InbuiltOverlayManager {
             hitboxOverlay.hide();
             hitboxOverlay = null;
         }
+        stopVoiceChat();
+        if (voiceChatOverlay != null) {
+            voiceChatOverlay.hide();
+            voiceChatOverlay = null;
+        }
         if (modMenuButton != null) {
             modMenuButton.hide();
             modMenuButton = null;
@@ -740,6 +766,45 @@ public class InbuiltOverlayManager {
             hudOverlay = null;
         }
         instance = null;
+    }
+
+    /**
+     * Starts the proximity voice link, seeded with the module's stored config.
+     *
+     * <p>The module owns the socket and the audio device for the whole session, so it is started
+     * once here and only reconfigured on a settings change — not per event.
+     */
+    private void startVoiceChat(InbuiltModManager manager) {
+        try {
+            if (manager.isVoiceMicEnabled()
+                    && activity.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                // Ask now; the module already handles a missing mic by starting listen-only, so
+                // if this is denied the feature still works and the pill reports listen-only.
+                activity.requestPermissions(
+                        new String[]{android.Manifest.permission.RECORD_AUDIO}, REQUEST_VOICE_MIC);
+            }
+            org.chimeramc.client.core.voice.VoiceChatModule module =
+                    org.chimeramc.client.core.voice.VoiceChatModule.get(activity, deviceName());
+            module.start(manager);
+        } catch (Throwable t) {
+            android.util.Log.w("InbuiltOverlayManager", "Could not start voice chat", t);
+        }
+    }
+
+    private void stopVoiceChat() {
+        org.chimeramc.client.core.voice.VoiceChatModule module =
+                org.chimeramc.client.core.voice.VoiceChatModule.peek();
+        if (module != null) module.stop();
+    }
+
+    private String deviceName() {
+        try {
+            String name = android.os.Build.MODEL;
+            return name == null || name.trim().isEmpty() ? "Chimera" : name.trim();
+        } catch (Throwable t) {
+            return "Chimera";
+        }
     }
 
     public boolean handleKeyEvent(int keyCode, int action) {
@@ -885,6 +950,9 @@ public class InbuiltOverlayManager {
         if (modId.equals(ModIds.HITBOX) && hitboxOverlay != null) {
             hitboxOverlay.applyConfigurationChanges();
         }
+        if (modId.equals(ModIds.VOICE_CHAT) && voiceChatOverlay != null) {
+            voiceChatOverlay.applyConfigurationChanges();
+        }
         if (modId.equals(ModIds.MORE_BUTTONS)) {
             refreshMoreButtons();
         }
@@ -912,6 +980,9 @@ public class InbuiltOverlayManager {
         }
         if (hitboxOverlay != null) {
             hitboxOverlay.setHudEditorMode(active);
+        }
+        if (voiceChatOverlay != null) {
+            voiceChatOverlay.setHudEditorMode(active);
         }
         if (hudOverlay != null) {
             hudOverlay.setHudEditorMode(active);
@@ -1235,6 +1306,13 @@ public class InbuiltOverlayManager {
                         ? android.view.View.VISIBLE
                         : android.view.View.GONE;
                 hitboxOverlay.setOverlayVisibility(visibility);
+            }
+
+            if (voiceChatOverlay != null) {
+                int visibility = inbuiltVisible || manager.isOverlayShowEverywhere(ModIds.VOICE_CHAT)
+                        ? android.view.View.VISIBLE
+                        : android.view.View.GONE;
+                voiceChatOverlay.setOverlayVisibility(visibility);
             }
         });
     }
