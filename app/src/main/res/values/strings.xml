@@ -1474,6 +1474,46 @@ Migration must complete before Chimera Client can continue.</string>
     <string name="voice_chat_unknown_peer">Player</string>
     <string name="voice_chat_dbm" formatted="false">%1$d dB</string>
 
+    <!-- Voice tab -->
+    <string name="nav_voice">Voice</string>
+    <string name="voice_master_on">Voice is on</string>
+    <string name="voice_master_off">Voice is off</string>
+    <string name="voice_current_channel">Your channel</string>
+    <string name="voice_channel_kind_public">Public - listed for nearby players, anyone can join</string>
+    <string name="voice_channel_kind_private" formatted="false">Private - code %1$s, share it to invite</string>
+    <string name="voice_channel_name_hint">Channel name</string>
+    <string name="voice_channel_private">Private (join by code)</string>
+    <string name="voice_channel_private_desc">A private channel is not listed. Share its generated code with the people you want in it.</string>
+    <string name="voice_channel_created" formatted="false">Created channel %1$s</string>
+    <string name="voice_channel_name_required">Enter a name for the channel</string>
+    <string name="voice_create_channel">Create a channel</string>
+    <string name="voice_create_button">Create and join</string>
+    <string name="voice_join_by_code">Join by code</string>
+    <string name="voice_join_code_hint">CHIMERA-XXXX or a channel name</string>
+    <string name="voice_join_button">Join</string>
+    <string name="voice_join_code_required">Enter a code or channel name</string>
+    <string name="voice_joined_channel" formatted="false">Joined %1$s</string>
+    <string name="voice_public_directory">Public channels nearby</string>
+    <string name="voice_directory_empty">No public channels are advertising nearby yet. Private channels never appear here - join one with its code.</string>
+    <string name="voice_directory_current" formatted="false">%1$s (you are here)</string>
+    <string name="voice_leave_channel">Leave channel (back to world)</string>
+    <string name="voice_copy_code">Copy code</string>
+    <string name="voice_share_code">Share</string>
+    <string name="voice_code_copied" formatted="false">Code %1$s copied</string>
+    <string name="voice_channel_code_label">Chimera channel code</string>
+    <string name="voice_share_subject">Join my Chimera voice channel</string>
+    <string name="voice_share_body" formatted="false">Join my Chimera voice channel with code %1$s - open the Voice tab and paste it into "Join by code".</string>
+    <string name="voice_share_chooser">Share channel code</string>
+    <string name="voice_members_none">No one else is on this channel yet.</string>
+    <plurals name="voice_members">
+        <item quantity="one">%1$d member on your channel</item>
+        <item quantity="other">%1$d members on your channel</item>
+    </plurals>
+    <plurals name="voice_member_count">
+        <item quantity="one">%1$d player</item>
+        <item quantity="other">%1$d players</item>
+    </plurals>
+
     <!-- ABI / bitness -->
     <string name="abi_64_bit">64-bit</string>
     <string name="abi_32_bit">32-bit</string>

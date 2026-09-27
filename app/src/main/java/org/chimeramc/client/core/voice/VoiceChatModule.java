@@ -66,6 +66,25 @@ public final class VoiceChatModule {
         return instance;
     }
 
+    /**
+     * Returns the existing module, or creates an idle one with the stored display name.
+     *
+     * <p>Used by the launcher-side Voice screen, which must be able to start the link itself --
+     * during a game the in-game overlay {@link #get} creates the singleton, but from the launcher
+     * nothing else has. The module is inert until {@link #start} is called.
+     */
+    public static synchronized VoiceChatModule getPreferred(Context context) {
+        if (instance == null) {
+            String name = null;
+            try {
+                name = android.os.Build.MODEL;
+            } catch (Throwable ignored) {
+            }
+            instance = new VoiceChatModule(context, name);
+        }
+        return instance;
+    }
+
     public static VoiceChatModule peek() {
         return instance;
     }
@@ -205,6 +224,20 @@ public final class VoiceChatModule {
                 : manager.getVoiceChannel();
     }
 
+    /** The channel's advertised display name; "" on the open, unnamed channel. */
+    private String currentChannelName() {
+        InbuiltModManager manager = InbuiltModManager.getInstance(context);
+        return manager == null ? "" : manager.getVoiceChannelName();
+    }
+
+    /** The channel's advertised visibility byte. */
+    private byte currentChannelVisibility() {
+        InbuiltModManager manager = InbuiltModManager.getInstance(context);
+        return manager == null
+                ? VoiceProtocol.VISIBILITY_PUBLIC
+                : manager.getVoiceChannelVisibility();
+    }
+
     private float currentRange() {
         InbuiltModManager manager = InbuiltModManager.getInstance(context);
         return manager == null ? 24f : manager.getVoiceRangeBlocks();
@@ -228,6 +261,7 @@ public final class VoiceChatModule {
         if (active == null) return;
         float[] position = localPosition();
         active.send(VoiceProtocol.encodeBeacon(peerId, displayName, currentChannel(),
+                currentChannelVisibility(), currentChannelName(),
                 position[0], position[1], position[2], sequence++));
     }
 
@@ -236,6 +270,7 @@ public final class VoiceChatModule {
         if (active == null) return;
         float[] position = localPosition();
         active.send(VoiceProtocol.encodeBye(peerId, displayName, currentChannel(),
+                currentChannelVisibility(), currentChannelName(),
                 position[0], position[1], position[2]));
     }
 
@@ -258,6 +293,7 @@ public final class VoiceChatModule {
         lastSendMs = now;
         float[] position = localPosition();
         active.send(VoiceProtocol.encodeAudio(peerId, displayName, currentChannel(),
+                currentChannelVisibility(), currentChannelName(),
                 position[0], position[1], position[2], sequence++, pcm));
     }
 
@@ -275,13 +311,15 @@ public final class VoiceChatModule {
         String channel = VoiceChannel.normalize(packet.channel);
         if (packet.type == VoiceProtocol.TYPE_BEACON) {
             registry.put(new VoicePeer(packet.peerId, packet.name,
-                    packet.x, packet.y, packet.z, channel, now));
+                    packet.x, packet.y, packet.z, channel,
+                    packet.channelName, packet.visibility, now));
             return;
         }
 
         if (packet.type == VoiceProtocol.TYPE_AUDIO) {
             registry.put(new VoicePeer(packet.peerId, packet.name,
-                    packet.x, packet.y, packet.z, channel, now));
+                    packet.x, packet.y, packet.z, channel,
+                    packet.channelName, packet.visibility, now));
             String listenerChannel = currentChannel();
             float gain;
             if (isChannelMode()) {
@@ -298,6 +336,45 @@ public final class VoiceChatModule {
 
     private static float sq(float value) {
         return value * value;
+    }
+
+    /** The public channels peers are currently on, for the directory screen. */
+    public List<VoiceChannelDirectory.Channel> publicChannels() {
+        return VoiceChannelDirectory.build(registry.snapshot(), currentChannel());
+    }
+
+    /** The peers on the local channel, for the "current channel" member list. */
+    public List<VoicePeer> channelMembers() {
+        return VoiceChannelDirectory.membersOf(registry.snapshot(), currentChannel());
+    }
+
+    /** The local channel id currently selected. */
+    public String channel() {
+        return currentChannel();
+    }
+
+    /** Live microphone level in {@code [0,1]} for the indicator; 0 when not transmitting. */
+    public float micLevel() {
+        return transmit ? audio.currentLevel() : 0f;
+    }
+
+    /** The audio engine's smoothed level without the transmit gate, for the meter's own logic. */
+    public float rawMicLevel() {
+        return audio.currentLevel();
+    }
+
+    /**
+     * Sends a beacon immediately.
+     *
+     * <p>Switching channel is a persisted preference, but peers only learn of it on the next
+     * periodic beacon -- up to a second of "I switched and nobody heard me". This is called from
+     * the UI right after a switch so the new channel is advertised at once.
+     */
+    public void announceNow() {
+        if (!running) return;
+        Thread thread = new Thread(this::sendBeacon, "voice-announce");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     /** Peers currently audible, for the overlay. */

@@ -10,6 +10,7 @@ import org.chimeramc.client.ui.activities.InstancesActivity;
 import org.chimeramc.client.ui.activities.MainActivity;
 import org.chimeramc.client.ui.activities.ModsFullscreenActivity;
 import org.chimeramc.client.ui.activities.SettingsActivity;
+import org.chimeramc.client.ui.activities.VoiceChatActivity;
 
 /**
  * The launcher's top-level destinations.
@@ -23,6 +24,7 @@ public enum LauncherTab {
     VERSIONS(InstancesActivity.class),
     INSTALLATIONS(InstallationsActivity.class),
     MODS(ModsFullscreenActivity.class),
+    VOICE(VoiceChatActivity.class),
     CUSTOMIZE(CustomizeActivity.class),
     SETTINGS(SettingsActivity.class);
 

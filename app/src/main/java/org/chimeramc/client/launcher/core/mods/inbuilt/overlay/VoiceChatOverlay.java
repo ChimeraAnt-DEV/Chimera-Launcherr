@@ -2,8 +2,6 @@ package org.chimeramc.client.core.mods.inbuilt.overlay;
 
 import android.app.Activity;
 import android.content.Context;
-import android.graphics.Canvas;
-import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.os.Handler;
 import android.os.Looper;
@@ -13,28 +11,26 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 
-import org.chimeramc.client.R;
 import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
 import org.chimeramc.client.core.mods.inbuilt.model.ModIds;
 import org.chimeramc.client.core.voice.VoiceChatModule;
-import org.chimeramc.client.core.voice.VoiceRegistry;
-
-import java.util.List;
 
 /**
- * Proximity voice status pill: how many players are in range, which channel you are on, and
- * whether your microphone is live.
+ * The bottom-right in-game microphone indicator.
  *
- * <p>Deliberately a readout, not a control surface. Channel switching lives in the module's
- * config dialog, where it persists; this pill exists so the player can tell at a glance that the
- * feature is on and who can hear them. It never draws a peer's position — the launcher cannot
- * see other players' coordinates from the game, and inventing a direction would be a lie.
+ * <p>A blocky {@link MicIndicatorView} driven by the live microphone level, plus a tiny text
+ * readout of who can hear you. The pixel meter is the point: muted shows the red X immediately,
+ * talking fills green from the bottom up with the audio actually being sent, and idle sits
+ * neutral. The readout answers the other question the meter cannot -- how many players and which
+ * channel -- without turning the corner of the screen into a panel.
  *
- * <p>Draggable in HUD-editor mode like the other overlays.
+ * <p>Draggable in HUD-editor mode like the other overlays. In normal play it never takes a touch
+ * (the drag listener declines outside the editor), so it cannot swallow a look gesture.
  */
 public final class VoiceChatOverlay {
-    private static final int REFRESH_MS = 250;
+    private static final int REFRESH_MS = 100;
     private static final float DRAG_THRESHOLD = 10f;
 
     private final Activity activity;
@@ -42,6 +38,7 @@ public final class VoiceChatOverlay {
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private View overlayView;
+    private MicIndicatorView micView;
     private WindowManager.LayoutParams wmParams;
     private boolean isShowing;
     private boolean isHudEditorMode;
@@ -54,7 +51,7 @@ public final class VoiceChatOverlay {
         @Override
         public void run() {
             if (!isShowing) return;
-            if (overlayView != null) overlayView.invalidate();
+            updateMeter();
             handler.postDelayed(this, REFRESH_MS);
         }
     };
@@ -66,7 +63,7 @@ public final class VoiceChatOverlay {
 
     public void show(int startX, int startY) {
         if (isShowing || activity.isFinishing() || activity.isDestroyed()) return;
-        VoiceChatView view = new VoiceChatView(activity);
+        View view = buildView(activity);
         try {
             wmParams = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.WRAP_CONTENT,
@@ -101,7 +98,23 @@ public final class VoiceChatOverlay {
         }
         isShowing = true;
         isLocked = InbuiltModManager.getInstance(activity).isOverlayLocked(ModIds.VOICE_CHAT);
+        updateMeter();
         handler.post(refreshRunnable);
+    }
+
+    private View buildView(Context context) {
+        LinearLayout column = new LinearLayout(context);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        micView = new MicIndicatorView(context);
+        LinearLayout.LayoutParams micParams = new LinearLayout.LayoutParams(
+                (int) (30 * context.getResources().getDisplayMetrics().density),
+                (int) (30 * context.getResources().getDisplayMetrics().density));
+        micParams.gravity = Gravity.CENTER_HORIZONTAL;
+        column.addView(micView, micParams);
+
+        return column;
     }
 
     public void hide() {
@@ -118,6 +131,7 @@ public final class VoiceChatOverlay {
         } catch (Exception ignored) {
         }
         overlayView = null;
+        micView = null;
         wmParams = null;
     }
 
@@ -127,18 +141,36 @@ public final class VoiceChatOverlay {
 
     public void applyConfigurationChanges() {
         isLocked = InbuiltModManager.getInstance(activity).isOverlayLocked(ModIds.VOICE_CHAT);
-        if (overlayView != null) overlayView.invalidate();
+        updateMeter();
     }
 
     public void setHudEditorMode(boolean active) {
         isHudEditorMode = active;
-        if (overlayView != null) overlayView.invalidate();
     }
 
     public void setOverlayVisibility(int visibility) {
         if (overlayView != null && overlayView.getVisibility() != visibility) {
             overlayView.setVisibility(visibility);
         }
+    }
+
+    /**
+     * Pushes the current muted/level state into the meter.
+     *
+     * <p>Read straight from the module each tick rather than pushed by the audio thread: the
+     * capture thread must never touch a View, and sampling at 10 Hz is faster than the eye.
+     */
+    private void updateMeter() {
+        MicIndicatorView view = micView;
+        if (view == null) return;
+        VoiceChatModule module = VoiceChatModule.peek();
+        if (module == null || !module.isRunning()) {
+            view.setMuted(true);
+            view.setLevel(0f);
+            return;
+        }
+        view.setMuted(!module.isTransmitting());
+        view.setLevel(module.rawMicLevel());
     }
 
     private boolean handleTouch(View view, MotionEvent event) {
@@ -195,52 +227,6 @@ public final class VoiceChatOverlay {
                 return true;
             default:
                 return false;
-        }
-    }
-
-    private final class VoiceChatView extends View {
-        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final float density;
-
-        VoiceChatView(Context context) {
-            super(context);
-            density = getResources().getDisplayMetrics().density;
-            text.setTextAlign(Paint.Align.LEFT);
-            text.setFakeBoldText(true);
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            VoiceChatModule module = VoiceChatModule.peek();
-            String status;
-            int color;
-            if (module == null || !module.isRunning()) {
-                status = activity.getString(R.string.voice_chat_status_off);
-                color = 0xFF8F979F;
-            } else {
-                List<VoiceRegistry.Audible> audible = module.audibleNow();
-                String channel = InbuiltModManager.getInstance(activity).getVoiceChannel();
-                String mic = module.isTransmitting()
-                        ? activity.getString(R.string.voice_chat_mic_on)
-                        : activity.getString(R.string.voice_chat_mic_off);
-                if (module.isChannelMode()) {
-                    status = activity.getString(R.string.voice_chat_status, audible.size(), channel, mic);
-                } else {
-                    status = activity.getString(R.string.voice_chat_status, audible.size(), channel, mic);
-                }
-                color = audible.isEmpty() ? 0xFFA8B0B8 : 0xFF6BD68A;
-            }
-
-            float pad = 8f * density;
-            text.setTextSize(11f * density);
-            float textWidth = text.measureText(status);
-            float boxHeight = 20f * density;
-            fill.setColor(0x99000000);
-            canvas.drawRoundRect(pad, pad, pad + textWidth + pad * 2, pad + boxHeight,
-                    4f * density, 4f * density, fill);
-            text.setColor(color);
-            canvas.drawText(status, pad * 2, pad + boxHeight * 0.68f, text);
         }
     }
 }

@@ -324,13 +324,20 @@ public class InbuiltOverlayManager {
                 hitboxOverlay.show();
                 HitboxMod.setEnabled(true, manager);
                 break;
-            case ModIds.VOICE_CHAT:
+            case ModIds.VOICE_CHAT: {
                 if (voiceChatOverlay == null) {
                     voiceChatOverlay = new VoiceChatOverlay(activity);
                 }
-                voiceChatOverlay.show(savedX, savedY);
+                // The mic indicator lives bottom-right, above the hotbar's right edge; a caller
+                // that never dragged it keeps that home instead of the generic centre default.
+                int voiceX = manager.getOverlayPositionX(ModIds.VOICE_CHAT,
+                        metrics.widthPixels - (int) (44 * metrics.density));
+                int voiceY = manager.getOverlayPositionY(ModIds.VOICE_CHAT,
+                        metrics.heightPixels - (int) (120 * metrics.density));
+                voiceChatOverlay.show(voiceX, voiceY);
                 startVoiceChat(manager);
                 break;
+            }
         }
     }
 
@@ -796,6 +803,35 @@ public class InbuiltOverlayManager {
         org.chimeramc.client.core.voice.VoiceChatModule module =
                 org.chimeramc.client.core.voice.VoiceChatModule.peek();
         if (module != null) module.stop();
+    }
+
+    /**
+     * Starts or stops the whole voice link for a screen that is not the in-game overlay.
+     *
+     * <p>The standalone Voice screen can be reached from the launcher at any time; it drives the
+     * same module the in-game overlay uses, so turning the feature on there and in the game is one
+     * piece of state, not two. Persisting the enable flag keeps the in-game restore path honest.
+     */
+    public boolean setVoiceChatEnabled(boolean enabled) {
+        InbuiltModManager manager = InbuiltModManager.getInstance(activity);
+        manager.setInbuiltModEnabled(ModIds.VOICE_CHAT, enabled);
+        handleModToggle(ModIds.VOICE_CHAT, enabled);
+        return isModActive(ModIds.VOICE_CHAT);
+    }
+
+    /** Whether the voice link is currently running. */
+    public boolean isVoiceChatActive() {
+        return isModActive(ModIds.VOICE_CHAT);
+    }
+
+    /** Applies a channel or mic change to a running session without restarting it. */
+    public void applyVoiceConfig() {
+        org.chimeramc.client.core.voice.VoiceChatModule module =
+                org.chimeramc.client.core.voice.VoiceChatModule.peek();
+        if (module != null && module.isRunning()) {
+            module.applyConfig(InbuiltModManager.getInstance(activity));
+            module.announceNow();
+        }
     }
 
     private String deviceName() {

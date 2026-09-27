@@ -971,9 +971,17 @@ public final class InbuiltModuleProvider {
             case CFG_VOICE_VOLUME:
                 manager.setVoiceVolumePercent(parseInt(value, manager.getVoiceVolumePercent()));
                 break;
-            case CFG_VOICE_CHANNEL:
-                manager.setVoiceChannel(value);
+            case CFG_VOICE_CHANNEL: {
+                // Route the free-text field through the same join path the Voice tab uses, so the
+                // advertised name and visibility are set from one place and the directory shows
+                // the typed room name rather than falling back to its id.
+                String typed = value == null ? "" : value.trim();
+                String normalized = org.chimeramc.client.core.voice.VoiceChannel.normalize(typed);
+                boolean privateChannel =
+                        org.chimeramc.client.core.voice.VoiceChannel.isJoinCode(normalized);
+                manager.joinVoiceChannel(normalized, typed, privateChannel);
                 break;
+            }
             case CFG_VOICE_MIC:
                 manager.setVoiceMicEnabled(parseBoolean(value));
                 break;
