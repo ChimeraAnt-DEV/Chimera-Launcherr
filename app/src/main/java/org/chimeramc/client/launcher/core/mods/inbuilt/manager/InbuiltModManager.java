@@ -69,6 +69,11 @@ public class InbuiltModManager {
     private static final String KEY_HITBOX_SHOW_LOOK_LINE = "hitbox_show_look_line";
     private static final String KEY_HITBOX_SHOW_CRIT_LINE = "hitbox_show_crit_line";
     private static final String KEY_HITBOX_SHOW_COMBO_BOX = "hitbox_show_combo_box";
+    private static final String KEY_VOICE_RANGE = "voice_range_blocks";
+    private static final String KEY_VOICE_VOLUME = "voice_volume_percent";
+    private static final String KEY_VOICE_CHANNEL = "voice_channel";
+    private static final String KEY_VOICE_MIC = "voice_mic_enabled";
+    private static final String KEY_VOICE_REFRESH_MS = "voice_chatter_refresh_ms";
     private static final int DEFAULT_AIM_SMOOTHING = 40;
     private static final int DEFAULT_AIM_SENSITIVITY = 100;
     private static final int DEFAULT_AIM_CROSSHAIR_COLOR = 0xFF3DDC84;
@@ -87,6 +92,11 @@ public class InbuiltModManager {
     private static final int DEFAULT_CURSOR_SENSITIVITY = 120;
     private static final int DEFAULT_GYRO_SENSITIVITY = 100;
     private static final int DEFAULT_GYRO_DEADZONE = 5;
+    private static final float DEFAULT_VOICE_RANGE = 24f;
+    private static final float MIN_VOICE_RANGE = 4f;
+    private static final float MAX_VOICE_RANGE = 64f;
+    private static final int DEFAULT_VOICE_VOLUME = 100;
+    private static final int DEFAULT_VOICE_REFRESH_MS = 100;
 
     private static volatile InbuiltModManager instance;
     private final SharedPreferences prefs;
@@ -629,4 +639,55 @@ public class InbuiltModManager {
         prefs.edit().putBoolean(KEY_HITBOX_SHOW_COMBO_BOX, show).apply();
     }
 
+    // --- Proximity voice ----------------------------------------------------------------
+
+    public float getVoiceRangeBlocks() {
+        return prefs.getFloat(KEY_VOICE_RANGE, DEFAULT_VOICE_RANGE);
+    }
+
+    public void setVoiceRangeBlocks(float blocks) {
+        prefs.edit().putFloat(KEY_VOICE_RANGE,
+                Math.max(MIN_VOICE_RANGE, Math.min(MAX_VOICE_RANGE, blocks))).apply();
+    }
+
+    public int getVoiceVolumePercent() {
+        return prefs.getInt(KEY_VOICE_VOLUME, DEFAULT_VOICE_VOLUME);
+    }
+
+    public void setVoiceVolumePercent(int percent) {
+        prefs.edit().putInt(KEY_VOICE_VOLUME, Math.max(0, Math.min(200, percent))).apply();
+    }
+
+    /** The listener's channel: who they hear and who hears them, beyond the open channel. */
+    public String getVoiceChannel() {
+        return org.chimeramc.client.core.voice.VoiceChannel.normalize(
+                prefs.getString(KEY_VOICE_CHANNEL, org.chimeramc.client.core.voice.VoiceChannel.WORLD));
+    }
+
+    public void setVoiceChannel(String channel) {
+        prefs.edit().putString(KEY_VOICE_CHANNEL,
+                org.chimeramc.client.core.voice.VoiceChannel.normalize(channel)).apply();
+    }
+
+    /** Whether the player's own microphone is transmitted. Off means listen-only. */
+    public boolean isVoiceMicEnabled() {
+        return prefs.getBoolean(KEY_VOICE_MIC, true);
+    }
+
+    public void setVoiceMicEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_VOICE_MIC, enabled).apply();
+    }
+
+    /** Resets the channel to the open one, used by the panel's "World" button. */
+    public void useWorldVoiceChannel() {
+        setVoiceChannel(org.chimeramc.client.core.voice.VoiceChannel.WORLD);
+    }
+
+    public int getVoiceChatterRefreshMs() {
+        return prefs.getInt(KEY_VOICE_REFRESH_MS, DEFAULT_VOICE_REFRESH_MS);
+    }
+
+    public void setVoiceChatterRefreshMs(int ms) {
+        prefs.edit().putInt(KEY_VOICE_REFRESH_MS, Math.max(50, Math.min(1000, ms))).apply();
+    }
 }

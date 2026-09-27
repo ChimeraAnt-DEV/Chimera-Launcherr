@@ -49,27 +49,31 @@ public final class CapeTexturePainter {
     /**
      * Fills the cape half of the sheet.
      *
-     * <p>The border is drawn as a one-pixel band inset from the cloth rectangle, not as the outer
-     * edge of the sheet: the game's capes have their trim just inside the silhouette, and painting
-     * the very edge would put the band where it is never sampled.
+     * <p>The cape is a thin 10x16 box, so the sheet is laid out as faces rather than one flat
+     * rectangle: the visible back panel is the 10x16 at (12,1); the front panel (against the
+     * player) is the 10x16 at (1,1); the side strips are the single columns at x=0 and x=11; and
+     * the top and bottom edges are the single rows at y=0. Every face the game can sample while
+     * the cape swings is painted, because leaving one transparent makes the cape show holes and
+     * read as a flapping paper sheet instead of cloth.
      */
     private static void paintCapeRegion(int[] pixels, int baseColor, int trimColor, boolean branded) {
-        fillRect(pixels, CLOTH_X - 1, CLOTH_Y - 1, CLOTH_WIDTH + 2, CLOTH_HEIGHT + 2, baseColor);
+        // The whole cape box first, in a mid shade: this covers the top/bottom edge rows and the
+        // two side columns, which are only sampled at a glancing angle but are visible then.
+        fillRect(pixels, 0, 0, 22, 17, shade(baseColor, 0.85f));
 
-        // The bottom fold strip is a darker shade of the cloth so the cape does not read as a
-        // flat slab when it swings out.
-        int shade = shade(baseColor, 0.78f);
-        fillRect(pixels, CLOTH_X - 1, CLOTH_Y + CLOTH_HEIGHT, CLOTH_WIDTH + 2, 2, shade);
+        // Front panel, against the player's back: darker so the cape has two distinct sides.
+        fillRect(pixels, 1, 1, 10, 16, shade(baseColor, 0.72f));
 
-        // Border band, inset by one pixel inside the cloth.
-        int bandX = CLOTH_X;
-        int bandY = CLOTH_Y;
-        int bandW = CLOTH_WIDTH;
-        int bandH = CLOTH_HEIGHT;
-        fillRect(pixels, bandX, bandY, bandW, 1, trimColor);
-        fillRect(pixels, bandX, bandY + bandH - 1, bandW, 1, trimColor);
-        fillRect(pixels, bandX, bandY, 1, bandH, trimColor);
-        fillRect(pixels, bandX + bandW - 1, bandY, 1, bandH, trimColor);
+        // Visible back panel: the main artwork the player sees on their character.
+        fillRect(pixels, 12, 1, 10, 16, baseColor);
+
+        // Border band, inset by one pixel inside the back panel. The game's capes have their trim
+        // just inside the silhouette, so painting the very edge would put the band where it is
+        // never sampled.
+        fillRect(pixels, CLOTH_X, CLOTH_Y, CLOTH_WIDTH, 1, trimColor);
+        fillRect(pixels, CLOTH_X, CLOTH_Y + CLOTH_HEIGHT - 1, CLOTH_WIDTH, 1, trimColor);
+        fillRect(pixels, CLOTH_X, CLOTH_Y, 1, CLOTH_HEIGHT, trimColor);
+        fillRect(pixels, CLOTH_X + CLOTH_WIDTH - 1, CLOTH_Y, 1, CLOTH_HEIGHT, trimColor);
 
         if (branded) {
             paintMark(pixels, CLOTH_X + 3, CLOTH_Y + 5, 4, 6, trimColor);

@@ -191,14 +191,14 @@ public final class SkinModel {
                 .base(Face.BOTTOM, 40, 48, 4, 4)
                 .base(Face.RIGHT, 32, 52, 4, 12)
                 .base(Face.FRONT, 36, 52, 4, 12)
-                .base(Face.LEFT, 44, 52, 4, 12)
-                .base(Face.BACK, 48, 52, 4, 12)
+                .base(Face.LEFT, 40, 52, 4, 12)
+                .base(Face.BACK, 44, 52, 4, 12)
                 .over(Face.TOP, 52, 48, 4, 4)
                 .over(Face.BOTTOM, 56, 48, 4, 4)
                 .over(Face.RIGHT, 48, 52, 4, 12)
                 .over(Face.FRONT, 52, 52, 4, 12)
-                .over(Face.LEFT, 60, 52, 4, 12)
-                .over(Face.BACK, 56, 52, 4, 12));
+                .over(Face.LEFT, 56, 52, 4, 12)
+                .over(Face.BACK, 60, 52, 4, 12));
 
         // Legs, 4x12x4, from the feet up.
         boxes.add(new Box("leg_r", -2, 6, 0, 4, 12, 4)
@@ -220,8 +220,8 @@ public final class SkinModel {
                 .base(Face.BOTTOM, 24, 48, 4, 4)
                 .base(Face.RIGHT, 16, 52, 4, 12)
                 .base(Face.FRONT, 20, 52, 4, 12)
-                .base(Face.LEFT, 28, 52, 4, 12)
-                .base(Face.BACK, 32, 52, 4, 12)
+                .base(Face.LEFT, 24, 52, 4, 12)
+                .base(Face.BACK, 28, 52, 4, 12)
                 .over(Face.TOP, 4, 48, 4, 4)
                 .over(Face.BOTTOM, 8, 48, 4, 4)
                 .over(Face.RIGHT, 0, 52, 4, 12)

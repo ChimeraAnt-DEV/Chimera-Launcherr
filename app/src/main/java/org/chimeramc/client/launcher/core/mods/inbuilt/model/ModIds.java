@@ -4,6 +4,9 @@ public final class ModIds {
     /** Group id for combat/PvP modules; the Mod Menu exposes it as the PvP tab. */
     public static final String GROUP_PVP = "pvp";
 
+    /** Group id for social modules (proximity voice), so the menu can section them apart. */
+    public static final String GROUP_VOICE = "voice";
+
     public static final String QUICK_DROP = "quick_drop";
     public static final String CAMERA_PERSPECTIVE = "camera_perspective";
     public static final String TOGGLE_HUD = "toggle_hud";
@@ -25,6 +28,7 @@ public final class ModIds {
     public static final String HIT_REGISTRATION = "hit_registration";
     public static final String HIT_TIMING = "hit_timing";
     public static final String HITBOX = "hitbox";
+    public static final String VOICE_CHAT = "voice_chat";
 
     /**
      * Combat-oriented modules the Mod Menu files under its PvP tab. Kept here rather than
@@ -37,6 +41,16 @@ public final class ModIds {
 
     public static boolean isPvpModule(String modId) {
         return modId != null && PVP_MODULES.contains(modId);
+    }
+
+    /**
+     * Social modules the Mod Menu files under its Voice section. Same reasoning as
+     * {@link #isPvpModule}: the section predicate and the provider's grouping must agree.
+     */
+    private static final java.util.Set<String> VOICE_MODULES = java.util.Set.of(VOICE_CHAT);
+
+    public static boolean isVoiceModule(String modId) {
+        return modId != null && VOICE_MODULES.contains(modId);
     }
 
     /**

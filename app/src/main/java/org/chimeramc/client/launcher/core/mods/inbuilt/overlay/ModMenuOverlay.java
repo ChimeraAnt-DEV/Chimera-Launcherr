@@ -67,13 +67,15 @@ public class ModMenuOverlay {
     private boolean hasStaggeredOnce = false;
     private EditText searchInput;
     private ImageButton clearSearchBtn;
-    private TextView navModules, navSettings, navHudEditor, navCosmetics;
+    private TextView navModules, navSettings, navHudEditor, navCosmetics, navPacks;
     private TextView filterAll, filterFavorites, filterEnabled, filterInbuilt, filterExternal, filterPvp;
     private TextView moduleCountText, emptyStateText;
     private TextView compactFilterSelector, compactModuleCount;
     private View settingsContainer;
     private View modulesContainer;
     private FrameLayout cosmeticsContainer;
+    private FrameLayout packsContainer;
+    private PackChangerPanel packChangerPanel;
     private View emptyState;
     private View menuContainer;
     private View modMenuTopBar;
@@ -191,6 +193,14 @@ public class ModMenuOverlay {
         try {
             overlayView = LayoutInflater.from(activity).inflate(R.layout.overlay_mod_menu, null);
 
+            // The overlay root is clickable so a background tap closes the menu. A clickable
+            // View is focusable, and a controller's d-pad or stick moves the focus onto it; the
+            // platform then paints its default focus highlight — a translucent white wash over
+            // the whole screen, which reads as "the menu put a 50% white overlay up" whenever the
+            // player so much as nudges the stick. The highlight is suppressed here rather than
+            // only in XML so it cannot come back through a theme or a re-inflated layout.
+            disableFocusHighlight(overlayView);
+
             int uiOptions = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                     | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                     | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
@@ -246,6 +256,7 @@ public class ModMenuOverlay {
         if (rootView == null) return;
 
         overlayView = LayoutInflater.from(activity).inflate(R.layout.overlay_mod_menu, null);
+        disableFocusHighlight(overlayView);
         setupViews();
         loadMods();
 
@@ -266,6 +277,40 @@ public class ModMenuOverlay {
         }
     }
 
+    /**
+     * Stops the platform painting a focus highlight over the whole overlay.
+     *
+     * <p>A clickable View is implicitly focusable. The d-pad and the analogue stick both move
+     * focus, and when the overlay root takes it the framework draws its default focus highlight:
+     * a full-screen translucent white wash. To the player that is a 50% white overlay appearing
+     * the moment the controller is touched, which obscures the game and the menu itself.
+     *
+     * <p>{@code focusable=false} on the root is the primary fix — it removes the view from focus
+     * search entirely, so no highlight can be painted for any input. It is applied to the root
+     * passed in (this helper is called with the overlay root); children keep their focusability
+     * for controller navigation and only get the highlight flag cleared. Only the highlight flag
+     * is ever touched — never the background, which carries each control's real styling. minSdk
+     * is 28, so {@code setDefaultFocusHighlightEnabled} is always available.
+     */
+    private static void disableFocusHighlight(View view) {
+        if (view == null) return;
+        view.setFocusable(false);
+        view.setDefaultFocusHighlightEnabled(false);
+        clearFocusHighlightRecursive(view);
+    }
+
+    private static void clearFocusHighlightRecursive(View view) {
+        if (view == null) return;
+        view.setDefaultFocusHighlightEnabled(false);
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                clearFocusHighlightRecursive(group.getChildAt(i));
+            }
+        }
+    }
+
+
     private void setupViews() {
         menuContainer = overlayView.findViewById(R.id.mod_menu_container);
         modMenuTopBar = overlayView.findViewById(R.id.mod_menu_topbar);
@@ -282,6 +327,7 @@ public class ModMenuOverlay {
         navSettings = overlayView.findViewById(R.id.nav_settings);
         navHudEditor = overlayView.findViewById(R.id.nav_hud_editor);
         navCosmetics = overlayView.findViewById(R.id.nav_cosmetics);
+        navPacks = overlayView.findViewById(R.id.nav_packs);
         filterAll = overlayView.findViewById(R.id.filter_all);
         filterFavorites = overlayView.findViewById(R.id.filter_favorites);
         filterEnabled = overlayView.findViewById(R.id.filter_enabled);
@@ -292,6 +338,7 @@ public class ModMenuOverlay {
         settingsContainer = overlayView.findViewById(R.id.settings_container);
         modulesContainer = overlayView.findViewById(R.id.modules_container);
         cosmeticsContainer = overlayView.findViewById(R.id.cosmetics_container);
+        packsContainer = overlayView.findViewById(R.id.packs_container);
         emptyState = overlayView.findViewById(R.id.empty_state);
         emptyStateText = overlayView.findViewById(R.id.empty_state_text);
         notificationsSwitch = overlayView.findViewById(R.id.switch_notifications);
@@ -403,6 +450,7 @@ public class ModMenuOverlay {
         navModules.setOnClickListener(v -> showModulesSection());
         navSettings.setOnClickListener(v -> showSettingsSection());
         if (navCosmetics != null) navCosmetics.setOnClickListener(v -> showCosmeticsSection());
+        if (navPacks != null) navPacks.setOnClickListener(v -> showPacksSection());
 
         // Settings
         InbuiltModManager modManager = InbuiltModManager.getInstance(activity);
@@ -524,7 +572,7 @@ public class ModMenuOverlay {
     }
 
     private void showModulesSection() {
-        updateNavigationItems(true, false, false, false);
+        updateNavigationItems(true, false, false, false, false);
 
         if (modulesContainer.getVisibility() != View.VISIBLE) {
             modulesContainer.setVisibility(View.VISIBLE);
@@ -532,6 +580,7 @@ public class ModMenuOverlay {
         }
         settingsContainer.setVisibility(View.GONE);
         hideCosmetics();
+        hidePacks();
 
         if (overlayView != null) {
             View modConfigContainer = overlayView.findViewById(R.id.mod_config_container);
@@ -545,10 +594,11 @@ public class ModMenuOverlay {
     }
 
     private void showSettingsSection() {
-        updateNavigationItems(false, false, false, true);
+        updateNavigationItems(false, false, false, true, false);
 
         modulesContainer.setVisibility(View.GONE);
         hideCosmetics();
+        hidePacks();
         if (settingsContainer.getVisibility() != View.VISIBLE) {
             settingsContainer.setVisibility(View.VISIBLE);
             crossfade(settingsContainer);
@@ -573,10 +623,11 @@ public class ModMenuOverlay {
      * decides which section is on screen.
      */
     private void showCosmeticsSection() {
-        updateNavigationItems(false, true, false, false);
+        updateNavigationItems(false, true, false, false, false);
 
         modulesContainer.setVisibility(View.GONE);
         settingsContainer.setVisibility(View.GONE);
+        hidePacks();
         if (cosmeticsContainer != null) {
             if (cosmeticsPanel == null) {
                 cosmeticsPanel = new CosmeticsPanel(activity, compactMode);
@@ -604,15 +655,60 @@ public class ModMenuOverlay {
     private void hideCosmetics() {
         if (cosmeticsContainer != null) cosmeticsContainer.setVisibility(View.GONE);
     }
+
+    /**
+     * The in-game pack changer: the instance's resource packs with an on/off toggle each.
+     *
+     * Built lazily and rebuilt on entry because the pack list changes whenever the player
+     * imports a pack from the launcher. Only reachable when the instance enabled it, which the
+     * panel reports itself rather than hiding the tab — a hidden destination reads as a bug.
+     */
+    private void showPacksSection() {
+        updateNavigationItems(false, false, false, false, true);
+
+        modulesContainer.setVisibility(View.GONE);
+        settingsContainer.setVisibility(View.GONE);
+        hideCosmetics();
+        hidePacks();
+        if (packsContainer != null) {
+            packsContainer.removeAllViews();
+            packChangerPanel = new PackChangerPanel(activity, compactMode);
+            packsContainer.addView(packChangerPanel.getView(),
+                    new FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT));
+            packsContainer.setVisibility(View.VISIBLE);
+            crossfade(packsContainer);
+        }
+
+        if (overlayView != null) {
+            View modConfigContainer = overlayView.findViewById(R.id.mod_config_container);
+            View searchContainer = overlayView.findViewById(R.id.search_container);
+            View configHeader = overlayView.findViewById(R.id.config_header);
+            if (modConfigContainer != null) modConfigContainer.setVisibility(View.GONE);
+            if (searchContainer != null) searchContainer.setVisibility(View.GONE);
+            if (configHeader != null) configHeader.setVisibility(View.VISIBLE);
+            TextView configTitle = overlayView.findViewById(R.id.config_title);
+            if (configTitle != null) configTitle.setText(R.string.pack_changer_title);
+            if (filterBar != null) filterBar.setVisibility(View.GONE);
+            if (compactFilterBar != null) compactFilterBar.setVisibility(View.GONE);
+        }
+    }
+
+    private void hidePacks() {
+        if (packsContainer != null) packsContainer.setVisibility(View.GONE);
+    }
     private void showConfigSection(UnifiedMod mod) {
         if (mod.openCustomConfig()) {
             hide();
             return;
         }
-        updateNavigationItems(false, false, false, false);
+        updateNavigationItems(false, false, false, false, false);
 
         modulesContainer.setVisibility(View.GONE);
         settingsContainer.setVisibility(View.GONE);
+        hideCosmetics();
+        hidePacks();
 
         if (overlayView != null) {
             View modConfigContainer = overlayView.findViewById(R.id.mod_config_container);
@@ -711,7 +807,7 @@ public class ModMenuOverlay {
     }
 
     private void enterHudEditorMode(View modMenuContainer, View hudEditorTools) {
-        updateNavigationItems(false, false, true, false);
+        updateNavigationItems(false, false, true, false, false);
 
         if (modMenuContainer != null) {
             modMenuContainer.setVisibility(View.GONE);
@@ -905,7 +1001,8 @@ public class ModMenuOverlay {
         boolean modulesSelected = modulesContainer != null && modulesContainer.getVisibility() == View.VISIBLE;
         boolean settingsSelected = settingsContainer != null && settingsContainer.getVisibility() == View.VISIBLE;
         boolean cosmeticsSelected = cosmeticsContainer != null && cosmeticsContainer.getVisibility() == View.VISIBLE;
-        updateNavigationItems(modulesSelected, cosmeticsSelected, false, settingsSelected);
+        boolean packsSelected = packsContainer != null && packsContainer.getVisibility() == View.VISIBLE;
+        updateNavigationItems(modulesSelected, cosmeticsSelected, false, settingsSelected, packsSelected);
 
         if (modsRecycler != null) {
             int padding = dp(compact ? 4 : 14);
@@ -1087,10 +1184,16 @@ public class ModMenuOverlay {
 
     private void updateNavigationItems(boolean modules, boolean cosmetics, boolean hudEditor,
                                        boolean settings) {
+        updateNavigationItems(modules, cosmetics, hudEditor, settings, false);
+    }
+
+    private void updateNavigationItems(boolean modules, boolean cosmetics, boolean hudEditor,
+                                       boolean settings, boolean packs) {
         updateNavigationItem(navModules, modules);
         updateNavigationItem(navCosmetics, cosmetics);
         updateNavigationItem(navHudEditor, hudEditor);
         updateNavigationItem(navSettings, settings);
+        updateNavigationItem(navPacks, packs);
     }
 
     private void updateModuleCount() {

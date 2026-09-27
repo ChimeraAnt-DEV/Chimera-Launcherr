@@ -133,6 +133,79 @@ public class SkinModelTest {
         }
     }
 
+    /**
+     * The left limb regions must match the standard player-skin layout exactly.
+     *
+     * <p>These are the regions that were wrong: the left arm's base left/back strips and its
+     * whole overlay row, and the left leg's base left/back strips all pointed at the neighbouring
+     * strip, so the preview sampled the wrong part of the atlas on one side of the body. The
+     * values are the documented 64x64 layout; a wrong one does not throw, it just renders the
+     * wrong clothing.
+     */
+    @Test
+    public void leftArmMatchesTheStandardSkinLayout() {
+        SkinModel.Box arm = boxById("arm_l");
+        assertSideUv(arm.baseUv(SkinModel.Face.RIGHT), 32, 52);
+        assertSideUv(arm.baseUv(SkinModel.Face.FRONT), 36, 52);
+        assertSideUv(arm.baseUv(SkinModel.Face.LEFT), 40, 52);
+        assertSideUv(arm.baseUv(SkinModel.Face.BACK), 44, 52);
+        assertCapUv(arm.baseUv(SkinModel.Face.TOP), 36, 48);
+        assertCapUv(arm.baseUv(SkinModel.Face.BOTTOM), 40, 48);
+        assertSideUv(arm.overlayUv(SkinModel.Face.RIGHT), 48, 52);
+        assertSideUv(arm.overlayUv(SkinModel.Face.FRONT), 52, 52);
+        assertSideUv(arm.overlayUv(SkinModel.Face.LEFT), 56, 52);
+        assertSideUv(arm.overlayUv(SkinModel.Face.BACK), 60, 52);
+    }
+
+    @Test
+    public void leftLegMatchesTheStandardSkinLayout() {
+        SkinModel.Box leg = boxById("leg_l");
+        assertSideUv(leg.baseUv(SkinModel.Face.RIGHT), 16, 52);
+        assertSideUv(leg.baseUv(SkinModel.Face.FRONT), 20, 52);
+        assertSideUv(leg.baseUv(SkinModel.Face.LEFT), 24, 52);
+        assertSideUv(leg.baseUv(SkinModel.Face.BACK), 28, 52);
+        assertCapUv(leg.baseUv(SkinModel.Face.TOP), 20, 48);
+        assertCapUv(leg.baseUv(SkinModel.Face.BOTTOM), 24, 48);
+    }
+
+    /**
+     * The side strips around a limb must advance left-to-right in the documented order
+     * (right/front/left/back), each by one strip width. A transposed pair is the classic silent
+     * mistake — it swaps two faces' clothing and nothing else complains.
+     */
+    @Test
+    public void limbSideStripsAdvanceInDocumentedOrder() {
+        for (String id : new String[]{"arm_r", "arm_l", "leg_r", "leg_l"}) {
+            SkinModel.Box box = boxById(id);
+            int uRight = box.baseUv(SkinModel.Face.RIGHT).u;
+            int uFront = box.baseUv(SkinModel.Face.FRONT).u;
+            int uLeft = box.baseUv(SkinModel.Face.LEFT).u;
+            int uBack = box.baseUv(SkinModel.Face.BACK).u;
+            int step = (int) box.w;
+            assertEquals(id + " front must follow right", uRight + step, uFront);
+            assertEquals(id + " left must follow front", uFront + step, uLeft);
+            assertEquals(id + " back must follow left", uLeft + step, uBack);
+            assertEquals("all strips share a row", box.baseUv(SkinModel.Face.RIGHT).v,
+                    box.baseUv(SkinModel.Face.BACK).v);
+        }
+    }
+
+    private static void assertSideUv(SkinModel.Uv uv, int u, int v) {
+        assertNotNull(uv);
+        assertEquals("u", u, uv.u);
+        assertEquals("v", v, uv.v);
+        assertEquals(4, uv.w);
+        assertEquals(12, uv.h);
+    }
+
+    private static void assertCapUv(SkinModel.Uv uv, int u, int v) {
+        assertNotNull(uv);
+        assertEquals("u", u, uv.u);
+        assertEquals("v", v, uv.v);
+        assertEquals(4, uv.w);
+        assertEquals(4, uv.h);
+    }
+
     private static SkinModel.Box boxById(String id) {
         for (SkinModel.Box box : SkinModel.boxes()) {
             if (box.id.equals(id)) return box;

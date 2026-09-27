@@ -1,0 +1,9 @@
+{
+  "name": "Example Script Mod",
+  "version": "1.0.0",
+  "author": "Your Name",
+  "type": "script",
+  "entry_point": "scripts/main.lua",
+  "dependencies": [],
+  "description": "A minimal .AntEgg script mod that logs a message when it loads."
+}

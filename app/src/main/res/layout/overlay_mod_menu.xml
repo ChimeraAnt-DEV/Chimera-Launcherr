@@ -11,7 +11,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:clickable="true"
-    android:focusable="true">
+    android:focusable="false"
+    android:background="@android:color/transparent"
+    android:defaultFocusHighlightEnabled="false">
 
     <androidx.cardview.widget.CardView
         android:id="@+id/mod_menu_container"
@@ -24,7 +26,9 @@
         android:layout_marginBottom="20dp"
         app:cardBackgroundColor="#FA181A1D"
         app:cardCornerRadius="14dp"
-        app:cardElevation="12dp">
+        app:cardElevation="12dp"
+        android:focusable="false"
+        android:defaultFocusHighlightEnabled="false">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -87,6 +91,25 @@
                             android:textColor="@color/primary"
                             android:textSize="13sp"
                             android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/nav_packs"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:alpha="0.82"
+                            android:background="?attr/selectableItemBackground"
+                            android:defaultFocusHighlightEnabled="false"
+                            android:drawableStart="@drawable/ic_content"
+                            android:drawablePadding="6dp"
+                            android:drawableTint="#A8B0B8"
+                            android:ellipsize="end"
+                            android:gravity="center_vertical"
+                            android:paddingStart="10dp"
+                            android:paddingEnd="10dp"
+                            android:singleLine="true"
+                            android:text="@string/mod_menu_packs"
+                            android:textColor="#A8B0B8"
+                            android:textSize="13sp" />
 
                         <TextView
                             android:id="@+id/nav_cosmetics"
@@ -479,6 +502,14 @@
                      built in code so the animated cape is a real View, not a static drawable. -->
                 <FrameLayout
                     android:id="@+id/cosmetics_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:visibility="gone" />
+
+                <!-- In-game pack changer: resource packs for the current instance. -->
+                <FrameLayout
+                    android:id="@+id/packs_container"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1"

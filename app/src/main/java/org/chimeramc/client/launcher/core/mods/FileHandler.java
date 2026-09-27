@@ -125,9 +125,15 @@ public class FileHandler {
         new Thread(() -> {
             List<Uri> packagedUris = new ArrayList<>();
             List<Uri> bareUris = new ArrayList<>();
+            List<Uri> antEggUris = new ArrayList<>();
             List<String> invalidZipNames = new ArrayList<>();
             for (Uri uri : supportedUris) {
                 String fileName = resolveImportFileName(uri);
+                if (org.chimeramc.client.core.antegg.AntEggPackage.looksLikeAntEgg(fileName)) {
+                    // .AntEgg has its own validated pipeline; it is not a "zip mod package".
+                    antEggUris.add(uri);
+                    continue;
+                }
                 if (isZipModPackageFile(uri, fileName) && !isValidZipModPackage(uri)) {
                     invalidZipNames.add(fileName);
                     continue;
@@ -141,6 +147,9 @@ public class FileHandler {
             }
 
             new Handler(Looper.getMainLooper()).post(() -> {
+                if (!antEggUris.isEmpty()) {
+                    importAntEggFiles(antEggUris, callback);
+                }
                 Runnable showImportDialogs = () -> {
                     if (!packagedUris.isEmpty()) {
                         new CustomAlertDialog(context)
@@ -1249,13 +1258,40 @@ public class FileHandler {
         new Handler(Looper.getMainLooper()).post(() -> callback.onError(message));
     }
 
+    private void importAntEggFiles(List<Uri> uris, FileOperationCallback callback) {
+        new Thread(() -> {
+            int success = 0;
+            String lastError = null;
+            for (Uri uri : uris) {
+                org.chimeramc.client.core.antegg.AntEggLoader.LoadResult result =
+                        org.chimeramc.client.core.antegg.AntEggImport.importUri(context, uri);
+                if (result.success) {
+                    success++;
+                } else {
+                    lastError = result.error;
+                }
+            }
+            final int successCount = success;
+            final String finalError = lastError;
+            new Handler(Looper.getMainLooper()).post(() -> {
+                if (successCount > 0 && callback != null) {
+                    callback.onSuccess(successCount);
+                } else if (callback != null && finalError != null) {
+                    callback.onError(finalError);
+                }
+            });
+        }).start();
+    }
+
     private boolean isSupportedImportFile(Uri uri, String fileName) {
         if (fileName == null) {
             return false;
         }
 
         String lowerName = fileName.toLowerCase(Locale.ROOT);
-        return lowerName.endsWith(".so") || isZipModPackageFile(uri, fileName);
+        return lowerName.endsWith(".so")
+                || org.chimeramc.client.core.antegg.AntEggPackage.looksLikeAntEgg(lowerName)
+                || isZipModPackageFile(uri, fileName);
     }
 
     private String getStringProperty(JsonObject object, String key) {
