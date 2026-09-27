@@ -378,32 +378,56 @@ only, like the other overlays.
 - A module that needs a native feed (Crystal Optimizer's `WorldSource`, Armor HUD's `DataSource`, Hitboxes' `EntitySource`) must distinguish **"no data source"** from **"data source says nothing is there"**. Crystal Optimizer's `isAwaitingGameData()` renders "waiting for game data"; without it the readout said "no safe spot", blaming the player's aim for a feed that does not exist. `HitboxOverlay` shows an equivalent "awaiting data" state.
 - `TouchTapDetector` classifies a touch attack for the Select Hit metronome. A `POINTER_UP` for a *different* pointer must not end the gesture — ending there dropped the real tap the moment a jump/sneak button was released. Fixed and pinned by `TouchTapDetectorTest`.
 
-## Native entity/camera feed — what is and is not reachable (verified against 1.26.50.04_RC3)
-Verified by downloading the real `lib/arm64-v8a/libminecraftpe.so` for `26-50-arm64-v8a`
+## Native entity/camera feed — what is and is not reachable (verified against 1.26.50.04_RC3 and 1.26.60.28)
+Verified by downloading the real `lib/arm64-v8a/libminecraftpe.so`. First against `26-50-arm64-v8a`
 (363,050,262-byte APK; the `.so` is stored deflated at 98,404,093 bytes so only that range needs
-fetching, then inflate with a raw zlib stream). Do not re-run this RE from scratch; these are the
-conclusions.
+fetching, then inflate with a raw zlib stream). Then re-verified independently against
+`26-60-28` (382,360,914-byte APK from mcpedl.org, `file_id` 7572 -> `minecraft-26-60-28.apk`;
+`libminecraftpe.so` is 368,150,880 bytes, deflate ratio ~0.30). Do not re-run this RE from scratch;
+these are the conclusions.
 
-- **Game classes are stripped of exported symbols.** The 90,653 defined dynamic symbols are
-  third-party only (Xbl, v8, cohtml, leveldb, mbedtls, astc). There is no `_ZN...Actor...`,
-  `_ZTV...Level...` or any Minecraft method symbol, so `dlsym`/`resolveSignature`-by-name cannot
-  reach game state.
+- **Game classes are stripped of exported symbols.** The 90,665 defined dynamic symbols in
+  1.26.60.28 are third-party only (v8/cohtml/webrtc/Xal/xbox/leveldb/`std`). There is no
+  `_ZN...Actor...`, `_ZTV...Level...` or any Minecraft method symbol, so `dlsym`/`resolveSignature`-
+  by-name cannot reach game state. The only `Java_*` exports are host plumbing (`MainActivity`,
+  `BatteryMonitor`, `NetworkMonitor`, `JellyBeanDeviceManager`, Xbox/XAL interop) -- there is no
+  export that returns a `Level*`/`ClientInstance*`/player position.
+- **The `.text` is real AArch64, not encrypted.** A `ret` (`c0 03 5f d6`) appears ~22k times and
+  section entropy is ~6.6 bits/byte, so byte-pattern signatures *can* in principle be derived from
+  the shipped file. That does not make the feed reachable -- see the fragility note below.
 - **RTTI *name strings* exist, and `resolveVtableFunction` does resolve them.** Standalone
-  `11LocalPlayer`, `5Level`, `14ClientInstance`, `11BlockSource` strings are present in `.rodata`
-  (each exactly once) and each has exactly one RELATIVE relocation resolving its address, so the
-  typeinfo and its vtable are found. But the vtables reached this way are the pure-virtual
-  *interface* bases (confirmed: `11LocalPlayer`'s slot[1] and slot[3] are **identical** to
-  `11Mob`'s, the classic shared-base pattern). Slot indices are also version-fragile --
-  `isShowingMenuVtableIndex: 151` in the shipped rules is exactly that kind of hardcoded index.
-- **The entity feed a hitbox/crystal/armor module needs is therefore not derivable statically.**
-  A `dynamic_cast` on a live `Actor*` would identify `LocalPlayer`, but there is no way to obtain
-  the `Level*`/`ClientInstance*` to start from without either a byte-pattern signature per build
-  or a `_ZTI...`-style mangled symbol, and this build exports neither for game classes. The
-  in-repo `resolveSignature` is the right mechanism but needs patterns derived from the binary.
-- **The game's Java layer is no help.** The dex contains 68 `com/mojang/minecraftpe/*` classes, all
-  Android host plumbing (MainActivity, PlayIntegrity, FilePicker, Braze, WorldRecovery). There is
-  no player/entity/position/camera API and no `native` method declaring one -- all game state lives
-  in `libminecraftpe.so`.
+  `11LocalPlayer`, `5Level`, `14ClientInstance`, `11BlockSource`, `5Actor`, `6Player` strings are
+  present in `.rodata` (each exactly once) and each has exactly one RELATIVE relocation resolving
+  its address, so the typeinfo and its vtable are found. Emulating `Vtable.cpp`'s algorithm against
+  1.26.60.28 resolves `14ClientInstance` slot 151 to a `.text` address, so **the shipped
+  `isShowingMenuVtableIndex` mechanism survives a version bump** and needs no new binary.
+- **The vtables reached this way are the pure-virtual *interface* bases.** Confirmed again on
+  1.26.60.28: `11LocalPlayer`'s primary vtable slots 0,1,4,5 are **identical** to `6Player`'s
+  (`0x11232294`, `0x11a115b4`, `0x115d674c`, `0x11a2e908`), the shared-base pattern. Slot indices
+  are also version-fragile (`isShowingMenuVtableIndex` is 151 on 1.26.50 but 150 on 1.26.40).
+- **The shipped 1.26.50 byte patterns mostly do not match 1.26.60.28.** Scanning `.text` with the
+  bundled rules as-is: `pauseMenuOpenSig` matches 2 places (ambiguous), `hudScreenOpenSig` and
+  `pauseMenuDtorSig` match 0. `resolveSignatures` takes the first hit, so this is the concrete
+  evidence that a byte-pattern feed needs a fresh pattern per build and cannot be inherited.
+- **The RTTI relocations are the vtable structures, not calls to a named method.** Of 610,452
+  unique `R_AARCH64_RELATIVE` addends, 110,370 point into `.rodata`, but **none** point at the
+  method-name strings (`Actor::getFilteredNameTag`, `Player::setupCamera`, ...) even though those
+  strings exist -- so they cannot be xref'd via the vtable structures. Finding the function that
+  reads a player's position needs a disassembler pass over the 220 MB `.text`; `resolveVtableFunction`
+  gives a vtable, but a static vtable address alone does not yield a live `Actor*`.
+- **The entity feed a hitbox/crystal/armor/nametag module needs is therefore not derivable
+  statically.** A `dynamic_cast` on a live `Actor*` would identify `LocalPlayer`, but there is no
+  way to obtain the `Level*`/`ClientInstance*` to start from without either a byte-pattern signature
+  per build or a `_ZTI...`-style mangled symbol, and this build exports neither for game classes.
+  The in-repo `resolveSignature` is the right mechanism but needs patterns derived from the binary.
+- **The game's Java layer is no help.** The dex contains 59 `com/mojang/minecraftpe/*` classes in
+  1.26.60.28 (down from 68), all Android host plumbing (MainActivity, PlayIntegrity, FilePicker,
+  Braze, WorldRecovery) plus PairIP-obfuscated stubs. There is no player/entity/position/camera API
+  and no `native` method declaring one -- all game state lives in `libminecraftpe.so`.
+- **The preloader exposes no ergonomic player/level accessor.** Its `PL_EXPORT` surface is memory
+  primitives (`resolveSignature`/`resolveVtableFunction`/`hook`/`writeBytes`), input callbacks, and
+  Mod Menu/HUD submission -- nothing that returns a world position. So even a native mod has to
+  build the feed from the same signatures.
 - **`WorldSource` / `DataSource` / `EntitySource` / `TagSource` have no provider and are never
   installed**
   (`setWorldSource`/`setDataSource`/`setEntitySource`/`setTagSource` have zero callers). Crystal
