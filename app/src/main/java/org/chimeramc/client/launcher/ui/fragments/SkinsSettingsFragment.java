@@ -107,8 +107,7 @@ public class SkinsSettingsFragment extends Fragment {
     private void importSkinFile(Uri uri) {
         Toast.makeText(requireContext(), R.string.skins_loading, Toast.LENGTH_SHORT).show();
         GameVersion version = versionManager.getSelectedVersion();
-        String profileId = version != null ? version.getStorageProfileId() : LauncherStorage.INSTALLED_MINECRAFT_PROFILE_ID;
-        File gameDataDir = LauncherStorage.getProfileGameDataDir(requireContext(), profileId, true);
+        File gameDataDir = resolveGameDataDir(requireContext(), version);
         File resDir = new File(gameDataDir, "resource_packs");
         File behDir = new File(gameDataDir, "behavior_packs");
         File skinDir = new File(gameDataDir, "skin_packs");
@@ -185,7 +184,7 @@ public class SkinsSettingsFragment extends Fragment {
             return;
         }
         String profileId = version.getStorageProfileId();
-        File gameDataDir = LauncherStorage.getProfileGameDataDir(requireContext(), profileId, true);
+        File gameDataDir = resolveGameDataDir(requireContext(), version);
         File source = pack.getFile();
         SkinPackActivator.PackIdentity identity = SkinPackActivator.readIdentity(source);
         if (identity == null) {
@@ -212,7 +211,7 @@ public class SkinsSettingsFragment extends Fragment {
     private String readAppliedPackName() {
         GameVersion version = versionManager.getSelectedVersion();
         if (version == null) return null;
-        File gameDataDir = LauncherStorage.getProfileGameDataDir(requireContext(), version.getStorageProfileId(), true);
+        File gameDataDir = resolveGameDataDir(requireContext(), version);
         for (ResourcePackItem pack : readSkinPacks()) {
             SkinPackActivator.PackIdentity identity = SkinPackActivator.readIdentity(pack.getFile());
             if (identity != null && SkinPackActivator.isAppliedByLauncher(gameDataDir, identity.uuid)) {
@@ -224,5 +223,27 @@ public class SkinsSettingsFragment extends Fragment {
 
     private SharedPreferences prefs() {
         return requireContext().getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE);
+    }
+
+    /**
+     * The game data root the selected instance actually plays from.
+     *
+     * <p>Skin packs must land in the same directory the game loads, so this follows the player's
+     * storage setting rather than a fixed path. Falling back to the installed-profile id when no
+     * version is selected keeps the import usable before an instance is chosen.
+     */
+    private File resolveGameDataDir(android.content.Context context, GameVersion version) {
+        if (version == null) {
+            return LauncherStorage.getActiveGameDataDir(
+                    context,
+                    LauncherStorage.INSTALLED_MINECRAFT_PROFILE_ID,
+                    true,
+                    LauncherStorage.readSavedContentStorageType(context));
+        }
+        return LauncherStorage.getActiveGameDataDir(
+                context,
+                version.getStorageProfileId(),
+                version.versionIsolation,
+                LauncherStorage.readSavedContentStorageType(context));
     }
 }
