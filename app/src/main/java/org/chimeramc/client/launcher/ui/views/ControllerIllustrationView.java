@@ -49,6 +49,9 @@ public class ControllerIllustrationView extends View {
     private final Paint highlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    // Reused rather than allocated per labelled region per frame: the illustration redraws on
+    // every motion event, and getFontMetrics() would churn one object per label per frame.
+    private final Paint.FontMetrics labelMetrics = new Paint.FontMetrics();
     private final Paint symbolPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint detailPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint edgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -186,8 +189,20 @@ public class ControllerIllustrationView extends View {
                 new int[]{0x3C000000, 0x00000000}, null, Shader.TileMode.CLAMP));
     }
 
+    /**
+     * Sets a region's glow, repainting only when the value actually changes.
+     *
+     * Motion events stream at the pad's report rate, and the illustration sets five regions per
+     * event. Invalidating unconditionally queued a full repaint per region per event — five a
+     * frame, on the same UI thread that dispatches the controller's button presses — which is
+     * what made the controller screen feel like it lagged the pad. A stick held still reports the
+     * same lit state every event, so most of those repaints drew an identical frame.
+     */
     public void setRegionGlow(String id, boolean on) {
-        glow.put(id, on ? 1f : 0f);
+        float value = on ? 1f : 0f;
+        Float previous = glow.get(id);
+        if (previous != null && previous == value) return;
+        glow.put(id, value);
         invalidate();
     }
 
@@ -397,8 +412,9 @@ public class ControllerIllustrationView extends View {
         if (r.label != null && !r.label.isEmpty()) {
             textPaint.setTextSize(pr * 0.42f);
             textPaint.setAlpha(170);
-            Paint.FontMetrics fm = textPaint.getFontMetrics();
-            canvas.drawText(r.label, px, py - (fm.ascent + fm.descent) / 2f, textPaint);
+            textPaint.getFontMetrics(labelMetrics);
+            canvas.drawText(r.label, px,
+                    py - (labelMetrics.ascent + labelMetrics.descent) / 2f, textPaint);
             textPaint.setAlpha(255);
         }
     }
