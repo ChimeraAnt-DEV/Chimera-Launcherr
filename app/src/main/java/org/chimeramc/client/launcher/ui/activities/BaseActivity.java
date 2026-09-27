@@ -320,6 +320,25 @@ public class BaseActivity extends AppCompatActivity {
         refreshNewsBadge();
     }
 
+    /**
+     * Plays the nav bar's arrival animation: each tab pops in with a slight overshoot, staggered
+     * left to right.
+     *
+     * <p>Called only on a cold start that came through the splash, so it reads as the launcher
+     * arriving rather than replaying every time a tab is revisited. The overshoot language is
+     * shared with the home cards
+     * ({@link org.chimeramc.client.ui.animation.DynamicAnim#overshootScaleIn}), so the whole
+     * arrival is one motion rather than two unrelated effects.
+     */
+    protected void animateNavTabsArrival() {
+        if (!navBarInjected) return;
+        View[] tabs = new View[NAV_TAB_IDS.length];
+        for (int i = 0; i < NAV_TAB_IDS.length; i++) {
+            tabs[i] = findViewById(NAV_TAB_IDS[i]);
+        }
+        org.chimeramc.client.ui.animation.DynamicAnim.staggerArrival(tabs, 60L);
+    }
+
     private void refreshNewsBadge() {
         if (!navBarInjected) return;
         NewsRepository.loadCached(this, (feed, error) -> applyNewsBadge(feed));

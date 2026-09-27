@@ -2,12 +2,14 @@ package org.chimeramc.client.ui.animation;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.animation.AccelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
 import android.view.animation.PathInterpolator;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -299,5 +301,86 @@ public final class DynamicAnim {
 
     public static android.view.animation.Interpolator getDefaultInterpolator() {
         return new PathInterpolator(0.22f, 1f, 0.36f, 1f);
+    }
+
+    // ------------------------------------------------------------------ arrival motion system
+    //
+    // One shared language for "something arrived on this screen": scale in from a little under
+    // full with an overshoot, staggered across a row. Keeping it here rather than per screen is
+    // what makes the nav bar, the home cards and any later surface read as one motion system
+    // instead of each screen inventing its own feel.
+
+    /** Where an arriving view starts; small enough to read as a pop, not a zoom. */
+    public static final float ARRIVAL_FROM_SCALE = 0.7f;
+
+    /** Gap between successive views in a staggered arrival. */
+    public static final long ARRIVAL_STEP_MS = 50L;
+
+    /**
+     * Scales a view in from {@link #ARRIVAL_FROM_SCALE} with a slight overshoot.
+     *
+     * <p>Honours the global animation switch and the speed multiplier, so reduced motion skips it
+     * and the accessibility "animation speed" setting still applies.
+     */
+    public static void overshootScaleIn(View view, long startDelayMs) {
+        if (view == null) return;
+        if (!animationsEnabled) {
+            view.setAlpha(1f);
+            view.setScaleX(1f);
+            view.setScaleY(1f);
+            return;
+        }
+        view.setAlpha(0f);
+        view.setScaleX(ARRIVAL_FROM_SCALE);
+        view.setScaleY(ARRIVAL_FROM_SCALE);
+        view.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setStartDelay(scaled(startDelayMs))
+                .setDuration(scaled(260L))
+                .setInterpolator(new OvershootInterpolator(1.6f))
+                .start();
+    }
+
+    /**
+     * Staggers {@link #overshootScaleIn} across a row of views.
+     *
+     * <p>Order is the array order, so a caller controls the beat by controlling the order it passes.
+     */
+    public static void staggerArrival(View[] views, long baseDelayMs) {
+        if (views == null) return;
+        for (int i = 0; i < views.length; i++) {
+            overshootScaleIn(views[i], baseDelayMs + i * ARRIVAL_STEP_MS);
+        }
+    }
+
+    /**
+     * Runs a numeric count-up and hands each intermediate value to {@code onValue}.
+     *
+     * <p>The caller formats, so a plain count and a duration that reads as "3h 12m" both animate
+     * without this class knowing about either. On the reduced-motion path it jumps straight to the
+     * target instead of tweening.
+     */
+    public static void countUp(long target, long durationMs,
+                               final java.util.function.LongConsumer onValue) {
+        if (onValue == null) return;
+        if (!animationsEnabled) {
+            onValue.accept(target);
+            return;
+        }
+        ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(scaled(durationMs));
+        animator.setInterpolator(new PathInterpolator(0.22f, 1f, 0.36f, 1f));
+        animator.addUpdateListener(animation -> {
+            float t = (float) animation.getAnimatedValue();
+            onValue.accept(Math.round(target * t));
+        });
+        animator.start();
+    }
+
+    /** Applies the global speed multiplier to a duration, never returning zero. */
+    private static long scaled(long durationMs) {
+        return Math.max(1L, (long) (durationMs / globalSpeedMultiplier));
     }
 }
