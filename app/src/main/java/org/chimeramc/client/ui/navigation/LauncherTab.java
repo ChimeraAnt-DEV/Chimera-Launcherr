@@ -10,7 +10,6 @@ import org.chimeramc.client.ui.activities.InstancesActivity;
 import org.chimeramc.client.ui.activities.MainActivity;
 import org.chimeramc.client.ui.activities.ModsFullscreenActivity;
 import org.chimeramc.client.ui.activities.SettingsActivity;
-import org.chimeramc.client.ui.activities.VoiceChatActivity;
 
 /**
  * The launcher's top-level destinations.
@@ -18,13 +17,17 @@ import org.chimeramc.client.ui.activities.VoiceChatActivity;
  * The launcher navigates by {@link Activity}, not by swapping fragments inside one screen,
  * so a tab is a label plus the activity it opens. Declaration order is the order shown in
  * the nav bar and the order controller bumpers cycle through, so the two cannot drift.
+ *
+ * Voice is deliberately <b>not</b> here. It is a mod, so its home is the in-game Mod Menu's
+ * top bar (first entry, ahead of Modules); a launcher nav tab for it duplicated that home and
+ * put a communication feature in the same row as navigation. {@code VoiceChatActivity} still
+ * exists and is still reachable, but only from the Mod Menu.
  */
 public enum LauncherTab {
     LAUNCH(MainActivity.class),
     VERSIONS(InstancesActivity.class),
     INSTALLATIONS(InstallationsActivity.class),
     MODS(ModsFullscreenActivity.class),
-    VOICE(VoiceChatActivity.class),
     CUSTOMIZE(CustomizeActivity.class),
     SETTINGS(SettingsActivity.class);
 

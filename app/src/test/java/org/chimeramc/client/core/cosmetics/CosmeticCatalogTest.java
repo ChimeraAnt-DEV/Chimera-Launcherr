@@ -70,4 +70,18 @@ public class CosmeticCatalogTest {
         assertNotNull(CosmeticCatalog.accessory(CosmeticCatalog.NONE));
         assertEquals(CosmeticCatalog.NONE, CosmeticCatalog.accessories().get(0).id);
     }
+
+    /**
+     * The wings must be layered behind the cape, which must in turn be behind the body.
+     *
+     * <p>The preview has no depth buffer, so these plane values are the entire depth ordering.
+     * Getting them wrong is the difference between wings peeking out from under the cape and
+     * wings painted flat across the character's chest; the assertion is on the ordering rather
+     * than the literal z values so the planes can be tuned without breaking the test.
+     */
+    @Test
+    public void wingsAndCapeAreLayeredBehindTheBody() {
+        assertTrue("wings must sit behind the cape", CosmeticLayering.wingsBehindCape());
+        assertTrue("cape must sit behind the body", CosmeticLayering.capeBehindBody());
+    }
 }

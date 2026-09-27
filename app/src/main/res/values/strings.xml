@@ -1478,6 +1478,8 @@ Migration must complete before Chimera Client can continue.</string>
     <string name="nav_voice">Voice</string>
     <string name="voice_master_on">Voice is on</string>
     <string name="voice_master_off">Voice is off</string>
+    <string name="voice_mod_menu_running">Voice is live - %1$s</string>
+    <string name="voice_directory_row" formatted="false">%1$s - %2$s</string>
     <string name="voice_current_channel">Your channel</string>
     <string name="voice_channel_kind_public">Public - listed for nearby players, anyone can join</string>
     <string name="voice_channel_kind_private" formatted="false">Private - code %1$s, share it to invite</string>

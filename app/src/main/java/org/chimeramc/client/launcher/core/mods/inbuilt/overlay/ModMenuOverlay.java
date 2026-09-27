@@ -67,7 +67,7 @@ public class ModMenuOverlay {
     private boolean hasStaggeredOnce = false;
     private EditText searchInput;
     private ImageButton clearSearchBtn;
-    private TextView navModules, navSettings, navHudEditor, navCosmetics, navPacks;
+    private TextView navModules, navSettings, navHudEditor, navCosmetics, navPacks, navVoice;
     private TextView filterAll, filterFavorites, filterEnabled, filterInbuilt, filterExternal, filterPvp;
     private TextView moduleCountText, emptyStateText;
     private TextView compactFilterSelector, compactModuleCount;
@@ -75,6 +75,8 @@ public class ModMenuOverlay {
     private View modulesContainer;
     private FrameLayout cosmeticsContainer;
     private FrameLayout packsContainer;
+    private FrameLayout voiceContainer;
+    private VoicePanel voicePanel;
     private PackChangerPanel packChangerPanel;
     private View emptyState;
     private View menuContainer;
@@ -182,6 +184,7 @@ public class ModMenuOverlay {
     public void show() {
         if (isShowing) {
             refreshMods();
+            refreshVoiceSectionIfVisible();
             return;
         }
         showInternal();
@@ -296,6 +299,12 @@ public class ModMenuOverlay {
         if (view == null) return;
         view.setFocusable(false);
         view.setDefaultFocusHighlightEnabled(false);
+        // Clearing an already-held focus matters as much as clearing the flag. The highlight can
+        // be painted for the view that holds focus right now, and a stick nudge can hand focus to
+        // the root while the menu is already open — after this helper first ran. Dropping the flag
+        // does not retroactively remove the highlight from the currently-focused view, so focus is
+        // released here; a ViewGroup handles its children below.
+        view.clearFocus();
         clearFocusHighlightRecursive(view);
     }
 
@@ -324,6 +333,7 @@ public class ModMenuOverlay {
         clearSearchBtn = overlayView.findViewById(R.id.btn_clear_search);
         modsRecycler = overlayView.findViewById(R.id.mods_grid_recycler);
         navModules = overlayView.findViewById(R.id.nav_modules);
+        navVoice = overlayView.findViewById(R.id.nav_voice);
         navSettings = overlayView.findViewById(R.id.nav_settings);
         navHudEditor = overlayView.findViewById(R.id.nav_hud_editor);
         navCosmetics = overlayView.findViewById(R.id.nav_cosmetics);
@@ -339,6 +349,7 @@ public class ModMenuOverlay {
         modulesContainer = overlayView.findViewById(R.id.modules_container);
         cosmeticsContainer = overlayView.findViewById(R.id.cosmetics_container);
         packsContainer = overlayView.findViewById(R.id.packs_container);
+        voiceContainer = overlayView.findViewById(R.id.voice_container);
         emptyState = overlayView.findViewById(R.id.empty_state);
         emptyStateText = overlayView.findViewById(R.id.empty_state_text);
         notificationsSwitch = overlayView.findViewById(R.id.switch_notifications);
@@ -381,7 +392,8 @@ public class ModMenuOverlay {
 
         // Touch feedback on the stable chrome (nav + filter chips + close). Recycler rows get
         // their own feedback in the adapter, since they are recycled and rebound.
-        for (View v : new View[]{navModules, navSettings, navHudEditor, navCosmetics,
+        for (View v : new View[]{navVoice, navModules, navSettings, navHudEditor, navCosmetics,
+                navPacks,
                 filterAll, filterFavorites, filterEnabled, filterInbuilt, filterExternal, filterPvp,
                 closeBtn, clearSearchBtn}) {
             if (v != null) DynamicAnim.applyPressScale(v);
@@ -447,6 +459,7 @@ public class ModMenuOverlay {
         }
 
         // Navigation
+        if (navVoice != null) navVoice.setOnClickListener(v -> showVoiceSection());
         navModules.setOnClickListener(v -> showModulesSection());
         navSettings.setOnClickListener(v -> showSettingsSection());
         if (navCosmetics != null) navCosmetics.setOnClickListener(v -> showCosmeticsSection());
@@ -572,7 +585,7 @@ public class ModMenuOverlay {
     }
 
     private void showModulesSection() {
-        updateNavigationItems(true, false, false, false, false);
+        updateNavigationItems(true, false, false, false, false, false);
 
         if (modulesContainer.getVisibility() != View.VISIBLE) {
             modulesContainer.setVisibility(View.VISIBLE);
@@ -581,6 +594,7 @@ public class ModMenuOverlay {
         settingsContainer.setVisibility(View.GONE);
         hideCosmetics();
         hidePacks();
+        hideVoice();
 
         if (overlayView != null) {
             View modConfigContainer = overlayView.findViewById(R.id.mod_config_container);
@@ -594,11 +608,12 @@ public class ModMenuOverlay {
     }
 
     private void showSettingsSection() {
-        updateNavigationItems(false, false, false, true, false);
+        updateNavigationItems(false, false, false, true, false, false);
 
         modulesContainer.setVisibility(View.GONE);
         hideCosmetics();
         hidePacks();
+        hideVoice();
         if (settingsContainer.getVisibility() != View.VISIBLE) {
             settingsContainer.setVisibility(View.VISIBLE);
             crossfade(settingsContainer);
@@ -623,11 +638,12 @@ public class ModMenuOverlay {
      * decides which section is on screen.
      */
     private void showCosmeticsSection() {
-        updateNavigationItems(false, true, false, false, false);
+        updateNavigationItems(false, true, false, false, false, false);
 
         modulesContainer.setVisibility(View.GONE);
         settingsContainer.setVisibility(View.GONE);
         hidePacks();
+        hideVoice();
         if (cosmeticsContainer != null) {
             if (cosmeticsPanel == null) {
                 cosmeticsPanel = new CosmeticsPanel(activity, compactMode);
@@ -664,12 +680,13 @@ public class ModMenuOverlay {
      * panel reports itself rather than hiding the tab — a hidden destination reads as a bug.
      */
     private void showPacksSection() {
-        updateNavigationItems(false, false, false, false, true);
+        updateNavigationItems(false, false, false, false, true, false);
 
         modulesContainer.setVisibility(View.GONE);
         settingsContainer.setVisibility(View.GONE);
         hideCosmetics();
         hidePacks();
+        hideVoice();
         if (packsContainer != null) {
             packsContainer.removeAllViews();
             packChangerPanel = new PackChangerPanel(activity, compactMode);
@@ -695,15 +712,72 @@ public class ModMenuOverlay {
         }
     }
 
+    /**
+     * Voice: the proximity chat channel, its members and the public directory.
+     *
+     * The panel is built lazily and rebuilt on entry so it reflects the live channel state; it
+     * never starts the module, which is the deliberate action behind the Mods-tab switch.
+     */
+    private void showVoiceSection() {
+        updateNavigationItems(false, false, false, false, false, true);
+
+        if (modulesContainer != null) modulesContainer.setVisibility(View.GONE);
+        if (settingsContainer != null) settingsContainer.setVisibility(View.GONE);
+        hideCosmetics();
+        hidePacks();
+        hideVoice();
+        if (voiceContainer != null) {
+            voiceContainer.removeAllViews();
+            voicePanel = new VoicePanel(activity, compactMode);
+            voiceContainer.addView(voicePanel.getView(),
+                    new FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT));
+            voiceContainer.setVisibility(View.VISIBLE);
+            crossfade(voiceContainer);
+        }
+
+        if (overlayView != null) {
+            View modConfigContainer = overlayView.findViewById(R.id.mod_config_container);
+            View searchContainer = overlayView.findViewById(R.id.search_container);
+            View configHeader = overlayView.findViewById(R.id.config_header);
+            if (modConfigContainer != null) modConfigContainer.setVisibility(View.GONE);
+            if (searchContainer != null) searchContainer.setVisibility(View.GONE);
+            if (configHeader != null) configHeader.setVisibility(View.VISIBLE);
+            TextView configTitle = overlayView.findViewById(R.id.config_title);
+            if (configTitle != null) configTitle.setText(R.string.voice_chat_title);
+            if (filterBar != null) filterBar.setVisibility(View.GONE);
+            if (compactFilterBar != null) compactFilterBar.setVisibility(View.GONE);
+        }
+    }
+
+    /**
+     * Refreshes the panel if it is the section on screen.
+     *
+     * Called while the menu is open so a channel joined from elsewhere, or a peer arriving, shows
+     * up without reopening the menu.
+     */
+    void refreshVoiceSectionIfVisible() {
+        if (voicePanel != null && voiceContainer != null
+                && voiceContainer.getVisibility() == View.VISIBLE) {
+            voicePanel.refresh();
+        }
+    }
+
+    private void hideVoice() {
+        if (voiceContainer != null) voiceContainer.setVisibility(View.GONE);
+    }
+
     private void hidePacks() {
         if (packsContainer != null) packsContainer.setVisibility(View.GONE);
     }
+
     private void showConfigSection(UnifiedMod mod) {
         if (mod.openCustomConfig()) {
             hide();
             return;
         }
-        updateNavigationItems(false, false, false, false, false);
+        updateNavigationItems(false, false, false, false, false, false);
 
         modulesContainer.setVisibility(View.GONE);
         settingsContainer.setVisibility(View.GONE);
@@ -807,7 +881,7 @@ public class ModMenuOverlay {
     }
 
     private void enterHudEditorMode(View modMenuContainer, View hudEditorTools) {
-        updateNavigationItems(false, false, true, false, false);
+        updateNavigationItems(false, false, true, false, false, false);
 
         if (modMenuContainer != null) {
             modMenuContainer.setVisibility(View.GONE);
@@ -1002,7 +1076,8 @@ public class ModMenuOverlay {
         boolean settingsSelected = settingsContainer != null && settingsContainer.getVisibility() == View.VISIBLE;
         boolean cosmeticsSelected = cosmeticsContainer != null && cosmeticsContainer.getVisibility() == View.VISIBLE;
         boolean packsSelected = packsContainer != null && packsContainer.getVisibility() == View.VISIBLE;
-        updateNavigationItems(modulesSelected, cosmeticsSelected, false, settingsSelected, packsSelected);
+        boolean voiceSelected = voiceContainer != null && voiceContainer.getVisibility() == View.VISIBLE;
+        updateNavigationItems(modulesSelected, cosmeticsSelected, false, settingsSelected, packsSelected, voiceSelected);
 
         if (modsRecycler != null) {
             int padding = dp(compact ? 4 : 14);
@@ -1182,13 +1257,15 @@ public class ModMenuOverlay {
                 ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
     }
 
+    /**
+     * Tints every top-bar entry, selected or not.
+     *
+     * <p>One explicit boolean per destination, in the layout's left-to-right order, so adding a tab
+     * is a compile error at each call site rather than a silently untinted entry.
+     */
     private void updateNavigationItems(boolean modules, boolean cosmetics, boolean hudEditor,
-                                       boolean settings) {
-        updateNavigationItems(modules, cosmetics, hudEditor, settings, false);
-    }
-
-    private void updateNavigationItems(boolean modules, boolean cosmetics, boolean hudEditor,
-                                       boolean settings, boolean packs) {
+                                       boolean settings, boolean packs, boolean voice) {
+        updateNavigationItem(navVoice, voice);
         updateNavigationItem(navModules, modules);
         updateNavigationItem(navCosmetics, cosmetics);
         updateNavigationItem(navHudEditor, hudEditor);

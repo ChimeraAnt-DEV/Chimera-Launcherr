@@ -36,11 +36,9 @@ public final class OreBlockLoaderView extends View {
     private float pickaxeOffsetX;
     private float pickaxeOffsetY;
 
-    private int stoneColor = 0xFF6E7688;
-    private int stoneLight = 0xFF98A0B4;
-    private int stoneDark = 0xFF4C5264;
     private int crystalColor = 0xFF6C8CF5;
     private int crystalLight = 0xFFA9BCFF;
+    private int crystalDark = 0xFF3B4FB0;
     private int crackColor = 0xFF232630;
     private int ironColor = 0xFFB9C0CC;
     private int ironLight = 0xFFE6EBF2;
@@ -64,23 +62,21 @@ public final class OreBlockLoaderView extends View {
 
     /**
      * Sets the glyph colours from the active palette, so the loader belongs to the theme rather
-     * than sitting on it. The crystal takes the accent; the stone stays neutral so the accent ore
-     * is what the eye lands on.
+     * than sitting on it.
+     *
+     * <p>The whole block is now one material, so all three block tones derive from the accent: the
+     * body is the accent itself, the lit bevel is the accent blended toward white, and the shaded
+     * bevel and the fracture are the accent blended toward black. Deriving them instead of
+     * hardcoding greys is what keeps the cube reading as a single cut gem in any theme; the iron
+     * and the handle stay neutral so they still read as metal and wood.
      */
     public void setColors(int accent, boolean dark) {
         crystalColor = accent;
-        crystalLight = blend(accent, Color.WHITE, 0.45f);
-        if (dark) {
-            stoneColor = 0xFF4A5064;
-            stoneLight = 0xFF6B7186;
-            stoneDark = 0xFF2E3242;
-            crackColor = 0xFFE8ECF5;
-        } else {
-            stoneColor = 0xFF6E7688;
-            stoneLight = 0xFF98A0B4;
-            stoneDark = 0xFF4C5264;
-            crackColor = 0xFF232630;
-        }
+        crystalLight = blend(accent, Color.WHITE, 0.42f);
+        crystalDark = blend(accent, Color.BLACK, 0.55f);
+        // The fracture is a near-black cut in the gem in both themes: the gem itself is the same
+        // accent either way, so the crack only needs to read against that, not against the theme.
+        crackColor = blend(accent, Color.BLACK, 0.8f);
         invalidate();
     }
 
@@ -135,9 +131,14 @@ public final class OreBlockLoaderView extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int desired = (int) (84 * getResources().getDisplayMetrics().density);
-        setMeasuredDimension(resolveSize(desired, widthMeasureSpec),
-                resolveSize(desired, heightMeasureSpec));
+        // Two sprites side by side -- the pickaxe then the block -- plus the gap between them, so
+        // the tool sits beside the cube instead of on top of it. The view is wider than it is
+        // tall by design; the halves are equal so a square grid in each half stays square.
+        float density = getResources().getDisplayMetrics().density;
+        int desiredHeight = (int) (72 * density);
+        int desiredWidth = (int) (72 * density * OreLoaderLayout.groupWidthFraction());
+        setMeasuredDimension(resolveSize(desiredWidth, widthMeasureSpec),
+                resolveSize(desiredHeight, heightMeasureSpec));
     }
 
     @Override
@@ -146,22 +147,25 @@ public final class OreBlockLoaderView extends View {
         int height = getHeight();
         if (width <= 0 || height <= 0) return;
 
-        int cell = Math.max(1, (int) (Math.min(width, height) / OreCrackSprites.GRID));
-        float art = cell * OreCrackSprites.GRID;
-        float left = (width - art) / 2f;
-        float top = (height - art) / 2f;
+        // Positions come from OreLoaderLayout so the "pickaxe outside the block" invariant is
+        // unit-tested rather than re-derived (and re-broken) here.
+        int cell = OreLoaderLayout.cellSize(width);
+        float art = cell * (float) OreCrackSprites.GRID;
+        float blockLeft = OreLoaderLayout.blockLeft(width);
+        float pickaxeLeft = OreLoaderLayout.pickaxeLeft(width);
+        float top = OreLoaderLayout.top(width, height);
 
         // Block and crack share one rotation about the block's centre, so the fracture turns with
         // the surface it is breaking.
         canvas.save();
         rotation.reset();
-        rotation.setRotate(blockRotation, left + art / 2f, top + art / 2f);
+        rotation.setRotate(blockRotation, blockLeft + art / 2f, top + art / 2f);
         canvas.concat(rotation);
-        drawShadedSprite(canvas, OreCrackSprites.block(), left, top, cell);
-        drawMask(canvas, OreCrackSprites.crack(crackStage), left, top, cell, crackColor);
+        drawShadedSprite(canvas, OreCrackSprites.block(), blockLeft, top, cell);
+        drawMask(canvas, OreCrackSprites.crack(crackStage), blockLeft, top, cell, crackColor);
         canvas.restore();
 
-        drawPickaxe(canvas, width, height, cell);
+        drawPickaxe(canvas, pickaxeLeft, top, cell);
     }
 
     /** Paints a sprite whose characters select from the block palette. */
@@ -191,27 +195,31 @@ public final class OreBlockLoaderView extends View {
 
     private int shadeFor(char c) {
         switch (c) {
-            case '#': return stoneColor;
-            case '+': return stoneLight;
-            case '-': return stoneDark;
             case 'o': return crystalColor;
             case 'O': return crystalLight;
+            case 'x': return crystalDark;
             default: return 0;
         }
     }
 
-    private void drawPickaxe(Canvas canvas, int width, int height, int cell) {
+    /**
+     * Draws the pickaxe in its own half, beside the block rather than on top of it.
+     *
+     * <p>The sprite's own cell origin ({@code left}, {@code top}) is the anchor; the rotation pivot
+     * is its handle-side bottom-left corner, so rotating the sprite swings the head down toward the
+     * block the way a wrist would, rather than spinning it about the middle of the sprite. The
+     * offsets are in view fractions so the completion travel stays proportional at any view size.
+     */
+    private void drawPickaxe(Canvas canvas, float left, float top, int cell) {
         float art = cell * OreCrackSprites.GRID;
-        float baseLeft = width - art;
-        float pivotX = baseLeft + art / 2f + pickaxeOffsetX * width;
-        float pivotY = art / 2f + pickaxeOffsetY * height;
+        // Pivot near the handle's lower end, so the head arcs toward the block.
+        float pivotX = left + art * 0.45f + pickaxeOffsetX * getWidth();
+        float pivotY = top + art * 0.85f + pickaxeOffsetY * getHeight();
 
         canvas.save();
         canvas.rotate(pickaxeRotation, pivotX, pivotY);
 
         String[] sprite = OreCrackSprites.pickaxe();
-        float left = pivotX - art / 2f;
-        float top = pivotY - art / 2f;
         for (int row = 0; row < sprite.length; row++) {
             String line = sprite[row];
             for (int col = 0; col < line.length(); col++) {
