@@ -44,6 +44,7 @@ public class InbuiltOverlayManager {
     private HitTimingOverlay hitTimingOverlay;
     private HitboxOverlay hitboxOverlay;
     private VoiceChatOverlay voiceChatOverlay;
+    private VoiceNametagOverlay voiceNametagOverlay;
     private ModMenuButton modMenuButton;
     private HudOverlay hudOverlay;
     private BaseOverlayButton selectedHudEditorOverlay;
@@ -335,6 +336,13 @@ public class InbuiltOverlayManager {
                 int voiceY = manager.getOverlayPositionY(ModIds.VOICE_CHAT,
                         metrics.heightPixels - (int) (120 * metrics.density));
                 voiceChatOverlay.show(voiceX, voiceY);
+                // In-world nametag icons are part of the voice feature: they only have anything to
+                // show while the link is running, so they come and go with it.
+                if (voiceNametagOverlay == null) {
+                    voiceNametagOverlay = new VoiceNametagOverlay(activity);
+                }
+                voiceNametagOverlay.show();
+                VoiceNametagMod.setEnabled(true, manager);
                 startVoiceChat(manager);
                 break;
             }
@@ -384,6 +392,11 @@ public class InbuiltOverlayManager {
                 voiceChatOverlay.hide();
                 voiceChatOverlay = null;
             }
+            if (voiceNametagOverlay != null) {
+                voiceNametagOverlay.hide();
+                voiceNametagOverlay = null;
+            }
+            VoiceNametagMod.setEnabled(false, null);
             return;
         }
         if (modId.equals(ModIds.AIM_SETTINGS)) {
@@ -764,6 +777,11 @@ public class InbuiltOverlayManager {
             voiceChatOverlay.hide();
             voiceChatOverlay = null;
         }
+        if (voiceNametagOverlay != null) {
+            voiceNametagOverlay.hide();
+            voiceNametagOverlay = null;
+        }
+        VoiceNametagMod.setEnabled(false, null);
         if (modMenuButton != null) {
             modMenuButton.hide();
             modMenuButton = null;
@@ -988,6 +1006,8 @@ public class InbuiltOverlayManager {
         }
         if (modId.equals(ModIds.VOICE_CHAT) && voiceChatOverlay != null) {
             voiceChatOverlay.applyConfigurationChanges();
+            VoiceNametagMod.onConfigChanged(InbuiltModManager.getInstance(activity));
+            if (voiceNametagOverlay != null) voiceNametagOverlay.applyConfigurationChanges();
         }
         if (modId.equals(ModIds.MORE_BUTTONS)) {
             refreshMoreButtons();
@@ -1019,6 +1039,9 @@ public class InbuiltOverlayManager {
         }
         if (voiceChatOverlay != null) {
             voiceChatOverlay.setHudEditorMode(active);
+        }
+        if (voiceNametagOverlay != null) {
+            voiceNametagOverlay.setHudEditorMode(active);
         }
         if (hudOverlay != null) {
             hudOverlay.setHudEditorMode(active);
@@ -1349,6 +1372,13 @@ public class InbuiltOverlayManager {
                         ? android.view.View.VISIBLE
                         : android.view.View.GONE;
                 voiceChatOverlay.setOverlayVisibility(visibility);
+            }
+
+            if (voiceNametagOverlay != null) {
+                int visibility = inbuiltVisible || manager.isOverlayShowEverywhere(ModIds.VOICE_CHAT)
+                        ? android.view.View.VISIBLE
+                        : android.view.View.GONE;
+                voiceNametagOverlay.setOverlayVisibility(visibility);
             }
         });
     }

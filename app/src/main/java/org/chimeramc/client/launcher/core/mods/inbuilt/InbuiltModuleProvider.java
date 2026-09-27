@@ -77,6 +77,9 @@ public final class InbuiltModuleProvider {
     private static final String CFG_VOICE_VOLUME = "voice_volume_percent";
     private static final String CFG_VOICE_CHANNEL = "voice_channel";
     private static final String CFG_VOICE_MIC = "voice_mic_enabled";
+    private static final String CFG_VOICE_ICON_STYLE = "voice_icon_style";
+    private static final String CFG_VOICE_ICON_ANIMATE = "voice_icon_animate";
+    private static final String CFG_VOICE_ICON_NAMETAG = "voice_icon_show_nametag";
 
     private InbuiltModuleProvider() {
     }
@@ -346,9 +349,15 @@ public final class InbuiltModuleProvider {
     }
 
     /**
-     * Category layout for the proximity voice module: who you hear, and how loud.
+     * Category layout for the proximity voice module: the microphone and the icon's appearance.
      *
-     * <p>The scope note is placed in the default category so it is the first thing read — the
+     * <p><b>Scope is deliberately trimmed to mic-only.</b> Channel name, visibility, capacity and
+     * per-member mute all live on the Voice tab now, so this dialog does not duplicate them -- a
+     * control in two places is a control that can disagree with itself. What remains is global and
+     * genuinely belongs to the module: whether the mic transmits at all, and how the in-world
+     * nametag icon looks and behaves.
+     *
+     * <p>The scope note is placed in the default category so it is the first thing read -- the
      * module is named "Proximity Voice Chat" but only applies distance when a position feed
      * exists, and that distinction has to be on screen, not buried.
      */
@@ -356,20 +365,20 @@ public final class InbuiltModuleProvider {
         try {
             JSONArray categories = new JSONArray();
             JSONArray nodes = new JSONArray();
-            categories.put(configCategory(context, "channel", R.string.mod_config_category_behavior));
-            categories.put(configCategory(context, "audio", R.string.mod_config_category_appearance));
+            categories.put(configCategory(context, "mic", R.string.mod_config_category_behavior));
+            categories.put(configCategory(context, "icon", R.string.mod_config_category_appearance));
             categories.put(configCategory(context, "overlay", R.string.mod_config_category_button));
-            nodes.put(configNode(context, mod, CFG_VOICE_CHANNEL, "channel"));
-            nodes.put(configNode(context, mod, CFG_VOICE_MIC, "channel"));
-            nodes.put(configNode(context, mod, CFG_VOICE_RANGE, "audio"));
-            nodes.put(configNode(context, mod, CFG_VOICE_VOLUME, "audio"));
+            nodes.put(configNode(context, mod, CFG_VOICE_MIC, "mic"));
+            nodes.put(configNode(context, mod, CFG_VOICE_ICON_STYLE, "icon"));
+            nodes.put(configNode(context, mod, CFG_VOICE_ICON_ANIMATE, "icon"));
+            nodes.put(configNode(context, mod, CFG_VOICE_ICON_NAMETAG, "icon"));
             nodes.put(configNode(context, mod, CFG_OVERLAY_SIZE, "overlay"));
             nodes.put(configNode(context, mod, CFG_OVERLAY_OPACITY, "overlay"));
             nodes.put(configNode(context, mod, CFG_OVERLAY_LOCK, "overlay"));
             nodes.put(configNode(context, mod, CFG_OVERLAY_SHOW_EVERYWHERE, "overlay"));
-            nodes.put(scopeNoteNode(context, mod, R.string.voice_chat_scope_note, "channel"));
+            nodes.put(scopeNoteNode(context, mod, R.string.voice_chat_scope_note, "mic"));
             return RuntimeConfigSchema.parse(new JSONObject().put("version", 2)
-                    .put("default_category", "channel")
+                    .put("default_category", "mic")
                     .put("categories", categories).put("nodes", nodes).toString());
         } catch (JSONException e) {
             throw new IllegalStateException("Unable to build voice config schema", e);
@@ -430,6 +439,9 @@ public final class InbuiltModuleProvider {
             case CFG_VOICE_VOLUME: return R.string.mod_config_voice_volume_desc;
             case CFG_VOICE_CHANNEL: return R.string.mod_config_voice_channel_desc;
             case CFG_VOICE_MIC: return R.string.mod_config_voice_mic_desc;
+            case CFG_VOICE_ICON_STYLE: return R.string.mod_config_voice_icon_style_desc;
+            case CFG_VOICE_ICON_ANIMATE: return R.string.mod_config_voice_icon_animate_desc;
+            case CFG_VOICE_ICON_NAMETAG: return R.string.mod_config_voice_icon_nametag_desc;
             default: return 0;
         }
     }
@@ -766,26 +778,30 @@ public final class InbuiltModuleProvider {
                     "true", "", "",
                     String.valueOf(manager.isHitboxShowComboBox())));
         } else if (ModIds.VOICE_CHAT.equals(modId)) {
-            configs.add(config(CFG_VOICE_RANGE,
-                    context.getString(R.string.mod_config_voice_range),
-                    UnifiedMod.ConfigType.SLIDER_INT,
-                    "24", "4", "64",
-                    String.valueOf((int) manager.getVoiceRangeBlocks())));
-            configs.add(config(CFG_VOICE_VOLUME,
-                    context.getString(R.string.mod_config_voice_volume),
-                    UnifiedMod.ConfigType.SLIDER_INT,
-                    "100", "0", "200",
-                    String.valueOf(manager.getVoiceVolumePercent())));
-            configs.add(config(CFG_VOICE_CHANNEL,
-                    context.getString(R.string.mod_config_voice_channel),
-                    UnifiedMod.ConfigType.TEXT,
-                    org.chimeramc.client.core.voice.VoiceChannel.WORLD, "", "",
-                    manager.getVoiceChannel()));
+            // Trimmed to mic-only scope: the mic master switch plus the in-world icon's look and
+            // behaviour. Channel, visibility, capacity and per-member mute are owned by the Voice
+            // tab, so they are deliberately absent here to avoid a second source of truth.
             configs.add(config(CFG_VOICE_MIC,
                     context.getString(R.string.mod_config_voice_mic),
                     UnifiedMod.ConfigType.TOGGLE,
                     "true", "", "",
                     String.valueOf(manager.isVoiceMicEnabled())));
+            configs.add(config(CFG_VOICE_ICON_STYLE,
+                    context.getString(R.string.mod_config_voice_icon_style),
+                    UnifiedMod.ConfigType.TOGGLE,
+                    "false", "", "",
+                    String.valueOf(manager.getVoiceIconStyle()
+                            == org.chimeramc.client.core.mods.inbuilt.overlay.MicIconStyle.STYLE_SMOOTH)));
+            configs.add(config(CFG_VOICE_ICON_ANIMATE,
+                    context.getString(R.string.mod_config_voice_icon_animate),
+                    UnifiedMod.ConfigType.TOGGLE,
+                    "true", "", "",
+                    String.valueOf(manager.isVoiceIconAnimated())));
+            configs.add(config(CFG_VOICE_ICON_NAMETAG,
+                    context.getString(R.string.mod_config_voice_icon_nametag),
+                    UnifiedMod.ConfigType.TOGGLE,
+                    "true", "", "",
+                    String.valueOf(manager.isVoiceNametagIconEnabled())));
         }
         return configs;
     }
@@ -965,6 +981,23 @@ public final class InbuiltModuleProvider {
             case CFG_HITBOX_SHOW_COMBO_BOX:
                 manager.setHitboxShowComboBox(parseBoolean(value));
                 break;
+            case CFG_VOICE_MIC:
+                manager.setVoiceMicEnabled(parseBoolean(value));
+                break;
+            case CFG_VOICE_ICON_STYLE:
+                manager.setVoiceIconStyle(parseBoolean(value)
+                        ? org.chimeramc.client.core.mods.inbuilt.overlay.MicIconStyle.STYLE_SMOOTH
+                        : org.chimeramc.client.core.mods.inbuilt.overlay.MicIconStyle.STYLE_CLASSIC);
+                break;
+            case CFG_VOICE_ICON_ANIMATE:
+                manager.setVoiceIconAnimated(parseBoolean(value));
+                break;
+            case CFG_VOICE_ICON_NAMETAG:
+                manager.setVoiceNametagIconEnabled(parseBoolean(value));
+                break;
+            // These keys are no longer surfaced in the module dialog (they live on the Voice tab),
+            // but a config value restored from an older backup can still carry them. They are
+            // handled so an import cannot silently drop a stored preference.
             case CFG_VOICE_RANGE:
                 manager.setVoiceRangeBlocks(parseInt(value, (int) manager.getVoiceRangeBlocks()));
                 break;
@@ -972,9 +1005,6 @@ public final class InbuiltModuleProvider {
                 manager.setVoiceVolumePercent(parseInt(value, manager.getVoiceVolumePercent()));
                 break;
             case CFG_VOICE_CHANNEL: {
-                // Route the free-text field through the same join path the Voice tab uses, so the
-                // advertised name and visibility are set from one place and the directory shows
-                // the typed room name rather than falling back to its id.
                 String typed = value == null ? "" : value.trim();
                 String normalized = org.chimeramc.client.core.voice.VoiceChannel.normalize(typed);
                 boolean privateChannel =
@@ -982,9 +1012,6 @@ public final class InbuiltModuleProvider {
                 manager.joinVoiceChannel(normalized, typed, privateChannel);
                 break;
             }
-            case CFG_VOICE_MIC:
-                manager.setVoiceMicEnabled(parseBoolean(value));
-                break;
             default:
                 break;
         }

@@ -40,6 +40,7 @@ public final class VoiceChatModule {
 
     private final Context context;
     private final VoiceRegistry registry = new VoiceRegistry();
+    private final VoiceMutes mutes = new VoiceMutes();
     private final String peerId;
     private final String displayName;
     private final VoiceAudioEngine audio = new VoiceAudioEngine();
@@ -57,6 +58,10 @@ public final class VoiceChatModule {
         this.peerId = UUID.randomUUID().toString().substring(0, 8);
         this.displayName = displayName == null || displayName.trim().isEmpty()
                 ? "Chimera" : displayName.trim();
+        // Restore the local mute set once, at construction. The set never goes on the wire, so
+        // this is the only place it needs loading; toggles persist on the way out.
+        InbuiltModManager manager = InbuiltModManager.getInstance(this.context);
+        if (manager != null) manager.loadVoiceMutes(mutes);
     }
 
     public static synchronized VoiceChatModule get(Context context, String displayName) {
@@ -243,6 +248,22 @@ public final class VoiceChatModule {
         return manager == null ? 24f : manager.getVoiceRangeBlocks();
     }
 
+    /** The advertised capacity for the current channel; private channels advertise none. */
+    private int currentChannelCapacity() {
+        InbuiltModManager manager = InbuiltModManager.getInstance(context);
+        return manager == null ? VoiceProtocol.CAPACITY_NONE : manager.getVoiceChannelCapacity();
+    }
+
+    /** The local mic level to advertise: live while transmitting, 0 while listen-only. */
+    private float localLevel() {
+        return transmit ? audio.currentLevel() : 0f;
+    }
+
+    /** Whether the local mic is currently off, so peers can draw the muted icon immediately. */
+    private boolean localSelfMuted() {
+        return !transmit;
+    }
+
     private void beaconLoop() {
         while (running) {
             try {
@@ -261,7 +282,8 @@ public final class VoiceChatModule {
         if (active == null) return;
         float[] position = localPosition();
         active.send(VoiceProtocol.encodeBeacon(peerId, displayName, currentChannel(),
-                currentChannelVisibility(), currentChannelName(),
+                currentChannelVisibility(), currentChannelName(), currentChannelCapacity(),
+                localLevel(), localSelfMuted(),
                 position[0], position[1], position[2], sequence++));
     }
 
@@ -293,7 +315,8 @@ public final class VoiceChatModule {
         lastSendMs = now;
         float[] position = localPosition();
         active.send(VoiceProtocol.encodeAudio(peerId, displayName, currentChannel(),
-                currentChannelVisibility(), currentChannelName(),
+                currentChannelVisibility(), currentChannelName(), currentChannelCapacity(),
+                localLevel(), localSelfMuted(),
                 position[0], position[1], position[2], sequence++, pcm));
     }
 
@@ -309,17 +332,23 @@ public final class VoiceChatModule {
         }
 
         String channel = VoiceChannel.normalize(packet.channel);
+        VoicePeer peer = new VoicePeer(packet.peerId, packet.name,
+                packet.x, packet.y, packet.z, channel, packet.channelName, packet.visibility,
+                packet.capacity, packet.level, packet.muted, now);
         if (packet.type == VoiceProtocol.TYPE_BEACON) {
-            registry.put(new VoicePeer(packet.peerId, packet.name,
-                    packet.x, packet.y, packet.z, channel,
-                    packet.channelName, packet.visibility, now));
+            registry.put(peer);
             return;
         }
 
         if (packet.type == VoiceProtocol.TYPE_AUDIO) {
-            registry.put(new VoicePeer(packet.peerId, packet.name,
-                    packet.x, packet.y, packet.z, channel,
-                    packet.channelName, packet.visibility, now));
+            registry.put(peer);
+            // A peer the listener muted locally is not mixed in; they are never told. The beacon
+            // they keep sending already carries their self-mute state, so this only has to cover
+            // the local mute. Their self-mute needs no handling here: the microphone being off
+            // means no audio frames arrive at all.
+            if (mutes.isMuted(packet.peerId)) {
+                return;
+            }
             String listenerChannel = currentChannel();
             float gain;
             if (isChannelMode()) {
@@ -346,6 +375,47 @@ public final class VoiceChatModule {
     /** The peers on the local channel, for the "current channel" member list. */
     public List<VoicePeer> channelMembers() {
         return VoiceChannelDirectory.membersOf(registry.snapshot(), currentChannel());
+    }
+
+    /**
+     * The most recent advertisement for one peer, or null when it is not currently heard.
+     *
+     * <p>The nametag icon needs the level/mute of a peer that may be on a <em>different</em> but
+     * audible channel (the open channel reaches across, and a world listener hears everyone), so
+     * looking it up by id is required; {@link #channelMembers()} would miss those.
+     */
+    public VoicePeer findPeer(String peerId) {
+        if (peerId == null) return null;
+        for (VoicePeer peer : registry.snapshot()) {
+            if (peerId.equals(peer.id)) return peer;
+        }
+        return null;
+    }
+
+    // --- Per-member client-side mute ------------------------------------------------------
+
+    /** The local per-member mute set. Viewer-only; nothing in it is ever transmitted. */
+    public VoiceMutes mutes() {
+        return mutes;
+    }
+
+    /**
+     * Toggles a local mute on a peer and persists it.
+     *
+     * <p>Client-side only: the peer is not notified and their audio is simply not mixed in.
+     *
+     * @return the new muted state
+     */
+    public boolean toggleMute(String peerId) {
+        boolean nowMuted = mutes.toggle(peerId);
+        InbuiltModManager manager = InbuiltModManager.getInstance(context);
+        if (manager != null) manager.saveVoiceMutes(mutes);
+        return nowMuted;
+    }
+
+    /** Whether the listener has muted this peer locally. */
+    public boolean isMuted(String peerId) {
+        return mutes.isMuted(peerId);
     }
 
     /** The local channel id currently selected. */

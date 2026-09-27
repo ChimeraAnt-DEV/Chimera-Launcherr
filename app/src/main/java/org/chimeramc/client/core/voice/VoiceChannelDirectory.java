@@ -31,14 +31,22 @@ public final class VoiceChannelDirectory {
         public final String id;
         public final String name;
         public final int memberCount;
+        /** Advertised max member count, or {@link VoiceProtocol#CAPACITY_NONE} for no cap. */
+        public final int capacity;
         /** True when the local listener is currently on this channel. */
         public final boolean current;
 
-        Channel(String id, String name, int memberCount, boolean current) {
+        Channel(String id, String name, int memberCount, int capacity, boolean current) {
             this.id = id;
             this.name = name;
             this.memberCount = memberCount;
+            this.capacity = capacity;
             this.current = current;
+        }
+
+        /** Whether the channel has reached its advertised cap. */
+        public boolean isFull() {
+            return VoiceChannelCapacity.isFull(memberCount, capacity);
         }
     }
 
@@ -68,6 +76,7 @@ public final class VoiceChannelDirectory {
                 if (peer.lastSeenMs >= record.lastSeenMs) {
                     record.name = peer.channelName;
                     record.visibility = peer.visibility;
+                    record.capacity = peer.capacity;
                     record.lastSeenMs = peer.lastSeenMs;
                 }
             }
@@ -78,7 +87,7 @@ public final class VoiceChannelDirectory {
             Record record = entry.getValue();
             if (record.visibility == VoiceProtocol.VISIBILITY_PRIVATE) continue;
             listed.add(new Channel(entry.getKey(), record.name, record.count,
-                    entry.getKey().equals(listener)));
+                    record.capacity, entry.getKey().equals(listener)));
         }
         listed.sort((a, b) -> {
             if (a.memberCount != b.memberCount) return Integer.compare(b.memberCount, a.memberCount);
@@ -103,6 +112,7 @@ public final class VoiceChannelDirectory {
         int count;
         String name = "";
         byte visibility = VoiceProtocol.VISIBILITY_PUBLIC;
+        int capacity = VoiceProtocol.CAPACITY_NONE;
         long lastSeenMs = Long.MIN_VALUE;
     }
 }

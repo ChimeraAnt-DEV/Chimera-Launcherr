@@ -152,6 +152,16 @@
                         android:layout_marginTop="4dp"
                         android:orientation="vertical" />
 
+                    <TextView
+                        android:id="@+id/voice_mute_scope"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:fontFamily="@font/misans"
+                        android:text="@string/voice_mute_scope"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="10sp" />
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -236,31 +246,75 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                        android:background="@drawable/chimera_card_small"
+                        android:orientation="horizontal"
+                        android:padding="2dp">
 
                         <TextView
+                            android:id="@+id/voice_type_public"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
+                            android:gravity="center"
+                            android:minHeight="40dp"
                             android:fontFamily="@font/misans"
-                            android:text="@string/voice_channel_private"
+                            android:text="@string/voice_channel_public"
+                            android:textColor="@color/on_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/voice_type_private"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:minHeight="40dp"
+                            android:fontFamily="@font/misans"
+                            android:text="@string/voice_channel_private_short"
+                            android:textColor="@color/on_surface"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/voice_capacity_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/misans"
+                            android:text="@string/voice_capacity_label"
                             android:textColor="@color/on_surface"
                             android:textSize="14sp" />
 
-                        <com.google.android.material.switchmaterial.SwitchMaterial
-                            android:id="@+id/voice_create_private"
-                            android:layout_width="wrap_content"
+                        <LinearLayout
+                            android:id="@+id/voice_capacity_stepper"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:thumbTint="@color/primary"
-                            android:trackTint="#555555" />
+                            android:layout_marginTop="6dp"
+                            android:orientation="horizontal" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:fontFamily="@font/misans"
+                            android:text="@string/voice_capacity_hint"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="11sp" />
 
                     </LinearLayout>
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
+                        android:layout_marginTop="8dp"
                         android:fontFamily="@font/misans"
                         android:text="@string/voice_channel_private_desc"
                         android:textColor="@color/text_secondary"

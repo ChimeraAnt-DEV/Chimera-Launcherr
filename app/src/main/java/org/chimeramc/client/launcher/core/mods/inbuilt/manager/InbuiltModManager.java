@@ -74,7 +74,12 @@ public class InbuiltModManager {
     private static final String KEY_VOICE_CHANNEL = "voice_channel";
     private static final String KEY_VOICE_CHANNEL_NAME = "voice_channel_name";
     private static final String KEY_VOICE_CHANNEL_PRIVATE = "voice_channel_private";
+    private static final String KEY_VOICE_CAPACITY = "voice_channel_capacity";
     private static final String KEY_VOICE_MIC = "voice_mic_enabled";
+    private static final String KEY_VOICE_MUTES = "voice_member_mutes";
+    private static final String KEY_VOICE_ICON_STYLE = "voice_icon_style";
+    private static final String KEY_VOICE_ICON_ANIMATE = "voice_icon_animate";
+    private static final String KEY_VOICE_ICON_SHOW_NAMETAG = "voice_icon_show_nametag";
     private static final String KEY_VOICE_REFRESH_MS = "voice_chatter_refresh_ms";
     private static final int DEFAULT_AIM_SMOOTHING = 40;
     private static final int DEFAULT_AIM_SENSITIVITY = 100;
@@ -701,6 +706,71 @@ public class InbuiltModManager {
     /** Whether the current channel is private (join-by-code, never listed). */
     public boolean isVoiceChannelPrivate() {
         return prefs.getBoolean(KEY_VOICE_CHANNEL_PRIVATE, false);
+    }
+
+    /**
+     * The current channel's advertised capacity, or {@code CAPACITY_NONE} for no cap.
+     *
+     * <p>Private channels never carry a capacity: the code is the cap. Reading it through this
+     * method (rather than the raw pref) keeps that rule in one place, so a private channel left
+     * over from a public one cannot advertise a stale number.
+     */
+    public int getVoiceChannelCapacity() {
+        if (isVoiceChannelPrivate()) return org.chimeramc.client.core.voice.VoiceProtocol.CAPACITY_NONE;
+        return org.chimeramc.client.core.voice.VoiceChannelCapacity.clampHostCapacity(
+                prefs.getInt(KEY_VOICE_CAPACITY,
+                        org.chimeramc.client.core.voice.VoiceProtocol.CAPACITY_NONE));
+    }
+
+    /** Sets the advertised capacity for a public channel; ignored for private channels. */
+    public void setVoiceChannelCapacity(int capacity) {
+        prefs.edit().putInt(KEY_VOICE_CAPACITY,
+                org.chimeramc.client.core.voice.VoiceChannelCapacity.clampHostCapacity(capacity)).apply();
+    }
+
+    /** Restores the persisted local per-member mute set into {@code target}. */
+    public void loadVoiceMutes(org.chimeramc.client.core.voice.VoiceMutes target) {
+        if (target == null) return;
+        String raw = prefs.getString(KEY_VOICE_MUTES, "");
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        if (raw != null && !raw.isEmpty()) {
+            for (String part : raw.split(",")) ids.add(part);
+        }
+        target.restoreFrom(ids);
+    }
+
+    /** Persists the local per-member mute set. Nothing here goes on the wire; it is viewer-only. */
+    public void saveVoiceMutes(org.chimeramc.client.core.voice.VoiceMutes mutes) {
+        prefs.edit().putString(KEY_VOICE_MUTES, mutes == null ? "" : mutes.serialize()).apply();
+    }
+
+    /** The mic-icon sprite style for the in-world nametag icon; see {@code MicIconStyle}. */
+    public int getVoiceIconStyle() {
+        return prefs.getInt(KEY_VOICE_ICON_STYLE,
+                org.chimeramc.client.core.mods.inbuilt.overlay.MicIconStyle.STYLE_CLASSIC);
+    }
+
+    public void setVoiceIconStyle(int style) {
+        prefs.edit().putInt(KEY_VOICE_ICON_STYLE,
+                org.chimeramc.client.core.mods.inbuilt.overlay.MicIconStyle.clamp(style)).apply();
+    }
+
+    /** Whether the speaking state animates (rings/glow) or stays a static glyph. */
+    public boolean isVoiceIconAnimated() {
+        return prefs.getBoolean(KEY_VOICE_ICON_ANIMATE, true);
+    }
+
+    public void setVoiceIconAnimated(boolean animated) {
+        prefs.edit().putBoolean(KEY_VOICE_ICON_ANIMATE, animated).apply();
+    }
+
+    /** Whether the in-world nametag mic icon is drawn at all. */
+    public boolean isVoiceNametagIconEnabled() {
+        return prefs.getBoolean(KEY_VOICE_ICON_SHOW_NAMETAG, true);
+    }
+
+    public void setVoiceNametagIconEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_VOICE_ICON_SHOW_NAMETAG, enabled).apply();
     }
 
     /** The beacon visibility byte for the current channel. */

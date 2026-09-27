@@ -1456,7 +1456,13 @@ Migration must complete before Chimera Client can continue.</string>
     <string name="mod_config_voice_channel">Voice Channel</string>
     <string name="mod_config_voice_channel_desc">A private channel hears only players on the same channel, plus anyone on the open \"world\" channel</string>
     <string name="mod_config_voice_mic">Transmit Microphone</string>
-    <string name="mod_config_voice_mic_desc">Off means listen-only: you hear others but nobody hears you</string>
+    <string name="mod_config_voice_mic_desc">Off means listen-only: you hear others but nobody hears you. Channels, capacity and per-member mute live on the Voice tab.</string>
+    <string name="mod_config_voice_icon_style">Smooth mic icon</string>
+    <string name="mod_config_voice_icon_style_desc">Draw the in-world nametag microphone as smooth line art instead of the blocky pixel-art sprite</string>
+    <string name="mod_config_voice_icon_animate">Animate the speaking icon</string>
+    <string name="mod_config_voice_icon_animate_desc">While a player is talking, their mic icon fills toward green with their live volume. Off leaves it a static glyph.</string>
+    <string name="mod_config_voice_icon_nametag">Show mic icon over nametags</string>
+    <string name="mod_config_voice_icon_nametag_desc">Draw a small microphone beside the nametag of each player who is in the same world and on your voice channel</string>
     <string name="voice_chat_scope_note">This links Chimera launcher users in the same world over the local network. It cannot give a vanilla client without the launcher a voice channel, and the game\'s own friends-only worlds still apply.</string>
     <string name="voice_chat_title">Voice</string>
     <string name="voice_chat_status_off">Voice chat is off.</string>
@@ -1482,10 +1488,20 @@ Migration must complete before Chimera Client can continue.</string>
     <string name="voice_directory_row" formatted="false">%1$s - %2$s</string>
     <string name="voice_current_channel">Your channel</string>
     <string name="voice_channel_kind_public">Public - listed for nearby players, anyone can join</string>
+    <string name="voice_channel_kind_public_capped" formatted="false">Public - up to %1$d players, listed for nearby players</string>
     <string name="voice_channel_kind_private" formatted="false">Private - code %1$s, share it to invite</string>
     <string name="voice_channel_name_hint">Channel name</string>
+    <string name="voice_channel_public">Public</string>
+    <string name="voice_channel_private_short">Private</string>
     <string name="voice_channel_private">Private (join by code)</string>
     <string name="voice_channel_private_desc">A private channel is not listed. Share its generated code with the people you want in it.</string>
+    <string name="voice_capacity_label">Max members (public rooms)</string>
+    <string name="voice_capacity_hint">The cap is shown in the directory and a full room is declined. There is no server, so it cannot eject anyone already inside.</string>
+    <string name="voice_channel_full" formatted="false">%1$s is full</string>
+    <string name="voice_directory_capacity" formatted="false">%1$s members</string>
+    <string name="voice_mute">Mute</string>
+    <string name="voice_unmute">Unmute</string>
+    <string name="voice_mute_scope">Muting is local to you. The other player is not told and stays in the channel.</string>
     <string name="voice_channel_created" formatted="false">Created channel %1$s</string>
     <string name="voice_channel_name_required">Enter a name for the channel</string>
     <string name="voice_create_channel">Create a channel</string>

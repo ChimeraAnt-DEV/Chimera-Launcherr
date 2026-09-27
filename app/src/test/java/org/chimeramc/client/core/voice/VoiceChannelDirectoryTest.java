@@ -100,4 +100,24 @@ public class VoiceChannelDirectoryTest {
         assertTrue(VoiceChannelDirectory.build(new ArrayList<>(), "world").isEmpty());
         assertTrue(VoiceChannelDirectory.membersOf(null, "world").isEmpty());
     }
+
+    @Test
+    public void aChannelAdvertisementCarriesItsCapacityToTheListing() {
+        VoicePeer capped = new VoicePeer("a", "A", 0f, 0f, 0f, "team", "Team",
+                VoiceProtocol.VISIBILITY_PUBLIC, 8, 0f, false, 1);
+        List<VoiceChannelDirectory.Channel> listed =
+                VoiceChannelDirectory.build(Arrays.asList(capped), "world");
+        assertEquals(1, listed.size());
+        assertEquals(8, listed.get(0).capacity);
+        assertEquals("3/8", VoiceChannelCapacity.describe(3, listed.get(0).capacity));
+    }
+
+    @Test
+    public void membersCarryTheirCapForTheCurrentChannelPanel() {
+        VoicePeer peer = new VoicePeer("a", "A", 0f, 0f, 0f, "team", "Team",
+                VoiceProtocol.VISIBILITY_PUBLIC, VoiceProtocol.CAPACITY_NONE, 0.4f, false, 1);
+        List<VoicePeer> members = VoiceChannelDirectory.membersOf(Arrays.asList(peer), "team");
+        assertEquals(1, members.size());
+        assertEquals(0.4f, members.get(0).level, 0.0001f);
+    }
 }

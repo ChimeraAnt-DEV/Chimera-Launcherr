@@ -122,8 +122,8 @@
   - **`shouldHandleNavKeys()`** (default true) — override to `false` on any screen that needs raw button presses. `CustomizeActivity` does, so `ControllerSettingsFragment`'s illustration can highlight the pressed button.
   - **`LauncherTab.shouldHandleKey(code, navBarPresent, gameSessionActive)`** — tab switching is suppressed while `LowLatencyNetworkManager.isGameSessionActive()`. Note `MinecraftActivity` extends the *game's* `com.mojang.minecraftpe.MainActivity`, NOT the launcher's, so gameplay never had the nav bar or this handler — but the session guard is kept as defence in depth.
 - `BaseActivity.NAV_TAB_IDS` is the single id array shared by `setupBaseNavBar()` and `setActiveNavTab()`; adding a tab means updating the layout, that array, the click handler, and `LauncherTab`. `LauncherTabTest` covers ordering, activity mapping, wraparound, the key map and both guards.
-- **There are seven tabs.** `LAUNCH, VERSIONS, INSTALLATIONS, MODS, VOICE, CUSTOMIZE, SETTINGS`. About is *not* a tab — it is reached from Settings (`SettingsActivity` `openAbout`). Controller and Skins are *not* tabs either; both live inside `CustomizeActivity` as `ControllerSettingsFragment` / `SkinsSettingsFragment` swapped behind `customize_tab_controller` / `customize_tab_skins`. Do not re-promote About/Controller/Skins to top-level tabs; add a new destination inside an existing tab instead.
-- **VOICE is its own tab** (`VoiceChatActivity`), because proximity voice is a whole feature with a master switch, a channel directory and join-by-code, not a settings pane. It drives `VoiceChatModule` directly (the module singleton is shared with the in-game overlay) rather than going through `InbuiltOverlayManager`, which only exists during a game session.
+- **There are six tabs.** `LAUNCH, VERSIONS, INSTALLATIONS, MODS, CUSTOMIZE, SETTINGS`. About is *not* a tab — it is reached from Settings (`SettingsActivity` `openAbout`). Controller and Skins are *not* tabs either; both live inside `CustomizeActivity` as `ControllerSettingsFragment` / `SkinsSettingsFragment` swapped behind `customize_tab_controller` / `customize_tab_skins`. Do not re-promote About/Controller/Skins to top-level tabs; add a new destination inside an existing tab instead.
+- **VOICE is not a launcher nav tab; it is a Mod Menu section.** `VoiceChatActivity` exists and is reachable (the Mod Menu's Voice entry and the mod's own screen), but the launcher's top bar is navigation, and a communication feature does not belong in that row — `LauncherTab` documents this and `nav_bar.xml` has six tabs. The in-game home is the Mod Menu's Voice section (`nav_voice`), which is the first entry ahead of Modules
 - **Screens that tint the rail themselves must touch all three pieces.** `SettingsActivity` re-applies a freshly chosen accent to the Settings entry directly (indicator + icon + label); the old text-view+compound-drawable path no longer applies. `MainActivity`/`InstancesActivity` still swallow a click on their own row via `nav_item_*`.
 - `ControllerSettingsFragment` is the live home of the controller illustration and profile editor. It exposes `wantsRawKeyEvents()`, `handleHardwareKey(keyCode, down)` and `handleHardwareMotion(event)`, which `CustomizeActivity.dispatchKeyEvent` / `dispatchGenericMotionEvent` forward. The old standalone `ControllerActivity` was deleted — do not reintroduce it.
 - `focus_ring` was prototyped and removed — no focus system consumes it; do not re-add a token without a consumer. Nav rows get touch feedback from `DynamicAnim.applyPressScale(row)`.
@@ -404,10 +404,12 @@ conclusions.
   Android host plumbing (MainActivity, PlayIntegrity, FilePicker, Braze, WorldRecovery). There is
   no player/entity/position/camera API and no `native` method declaring one -- all game state lives
   in `libminecraftpe.so`.
-- **`WorldSource` / `DataSource` / `EntitySource` have no provider and are never installed**
-  (`setWorldSource`/`setDataSource`/`setEntitySource` have zero callers). Crystal Optimizer, Armor
-  HUD and Hitboxes therefore cannot produce output; they correctly show their "awaiting game data"
-  state. Implement one only with a verified signature set, and keep the honest empty state.
+- **`WorldSource` / `DataSource` / `EntitySource` / `TagSource` have no provider and are never
+  installed**
+  (`setWorldSource`/`setDataSource`/`setEntitySource`/`setTagSource` have zero callers). Crystal
+  Optimizer, Armor HUD, Hitboxes and the in-world Voice nametag icons therefore cannot produce
+  output; they correctly show their "awaiting game data" state (or draw nothing, for the icon).
+  Implement one only with a verified signature set, and keep the honest empty state.
 - **A cape feature is not reachable through this.** The in-game cape is a resource pack (see the
   cosmetics section), a supported mechanism rather than a native hook.
 - Static-analysis caution: RTTI pointers in this PIE binary live in `.data.rel.ro` as
@@ -496,6 +498,41 @@ conclusions.
   / slow release so it reacts on the first syllable and does not flicker. Use RMS, not peak (a meter
   tracks loudness); a muted mic drops the level to zero rather than freezing it. `rms`/`sprite` are
   package-visible so `VoiceAudioEngineLevelTest`/`MicIndicatorViewTest` can pin them.
+- **Protocol v3 adds capacity, live level and self-mute to the beacon/audio packets, and keeps v2
+  and v1 decodable.** `VoiceProtocol.VERSION = 3`; `decode` accepts `VERSION_LEGACY..VERSION`
+  (`version < VERSION_LEGACY || version > VERSION` rejects), and a v2 datagram decodes with
+  `capacity = CAPACITY_NONE`, `level = 0`, `muted = false` rather than being dropped -- a newer peer
+  must not silence an older one. `capacity` clamps to `MAX_CAPACITY`, `level` is clamped by
+  `clampLevel` (NaN reads as 0). Pinned by `VoiceProtocolV3Test`.
+- **Capacity is advisory, never enforcement.** `VoiceChannelCapacity` holds the rule: a public room
+  is full at/above its cap, `CAPACITY_NONE` (<= 0) never reads as full, and a **private channel
+  always admits by code** (`canJoin(..., private=true)` ignores the cap) because the code already
+  bounds who can join. There is no server, so a host cannot eject anyone; the cap is advertised in
+  the directory and a would-be joiner declines a full room. `clampHostCapacity` bounds the settings
+  stepper. Pinned by `VoiceChannelCapacityTest`.
+- **Per-member mute is viewer-only.** `VoiceMutes` is a local id set on `VoiceChatModule`
+  (`toggleMute`/`isMuted`/`mutes()`); muting a peer drops their AUDIO frames from the mix
+  (`onDatagram` returns before mixing) and is **never transmitted**, so the peer is never told. The
+  beacon already carries their self-mute, so no extra signalling is needed for that half. Pinned by
+  `VoiceMutesTest`.
+- **The module's config dialog is trimmed to mic-only scope.** `InbuiltModuleProvider`'s voice
+  schema is now just the mic master switch plus the in-world icon's look and behaviour. Channel,
+  visibility, capacity and per-member mute were removed from the dialog because the Voice tab owns
+  them -- two places to set the same value is how they drift. The icon keys are
+  `CFG_VOICE_ICON_STYLE`/`CFG_VOICE_ICON_ANIMATE`/`CFG_VOICE_ICON_NAMETAG`.
+- **`VoiceUiKit` is the shared premium treatment** for both the in-game `VoicePanel` and
+  `VoiceChatActivity`, so the two views of the same feature cannot look like different apps.
+  `MicIconStyle` (classic/smooth) and `NametagMicState` (muted/speaking/idle) are the icon's
+  pure state, kept Android-free for the JVM tests.
+- **The in-world nametag icon is a seam, exactly like the Hitboxes module's boxes.**
+  `VoiceNametagMod.TagSource` supplies where each audible player's nametag is; it has **no
+  provider** (`setTagSource` has zero callers) because world/nametag positions live in
+  `libminecraftpe.so`, so `readTags()` returns empty and nothing is drawn -- never an icon at a
+  guessed position. The level and mute state are *not* seams: they come from `VoiceChatModule`
+  (with `findPeer(id)` looking across audible channels, not just the local one). `NametagIconProjector`
+  is pure and shares `HitboxProjector.Camera` on purpose -- a second camera convention is how one
+  drifts. Icons sit right of the label, project far-to-near, and drop when the label is too small
+  to read. Pinned by `NametagIconProjectorTest`/`NametagMicStateTest`/`VoiceNametagModTest`.
 
 ## In-game pack changer (core.content.InGamePackChanger + PackChangerPanel)
 - Per-instance opt-in toggle in Instance Settings (`GameVersion.inGamePackChangerEnabled`,
