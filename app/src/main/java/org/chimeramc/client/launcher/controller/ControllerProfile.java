@@ -7,7 +7,16 @@ import java.util.Map;
 
 public class ControllerProfile {
     public static final int MAX_SLOTS = 5;
-    public static final float DEFAULT_DEAD_ZONE = 0.15f;
+    /**
+     * Default dead zone, as a radius of the stick's travel.
+     *
+     * This is a radial threshold, so it is deliberately lower than the per-axis 0.15 an earlier
+     * build used: a per-axis test required 0.15 on <em>each</em> axis, i.e. about 0.21 combined
+     * on a diagonal, which the player felt as having to shove the stick before the camera moved.
+     * 0.08 on the radius is comfortably above the resting noise of a healthy pad while leaving
+     * small deliberate movements responsive.
+     */
+    public static final float DEFAULT_DEAD_ZONE = 0.08f;
     public static final float DEFAULT_SENSITIVITY = 1.0f;
     public static final float MIN_SENSITIVITY = 0.25f;
     public static final float MAX_SENSITIVITY = 3.0f;

@@ -228,23 +228,26 @@ public final class ControllerInputProcessor {
         int pointerCount = event.getPointerCount();
         if (pointerCount <= 0) return event;
 
-        // With anti-drift on, the stick axes are shaped as two pairs so the dead-zone decision
-        // can use the combined magnitude. The gate is consulted for the same timestamp it saw
-        // during the dead-zone check, so a stick that was held back reads back as held back
-        // here rather than being let through by the rewrite. Restricted to single-pointer
-        // events: getAxisValue reports pointer 0, so pair shaping would be wrong for a
-        // multi-touch event, and advancing the gates for one would be misleading.
-        boolean antiDrift = response.isAntiDriftEnabled() && pointerCount == 1;
+        // The stick axes are always shaped as two pairs so the dead-zone decision uses the
+        // combined magnitude. The radial test is the *correct* dead zone on its own: a per-axis
+        // test cannot see a stick resting off-centre on one axis, and it demands more travel on
+        // a diagonal than on an axis (each axis must clear the threshold separately), which the
+        // player feels as having to shove the stick before the camera moves.
+        //
+        // The hysteresis gate is the separate, opt-in anti-drift feature: it needs the magnitude
+        // too, so the pair shaping is shared and only the gate is conditional.
+        boolean pairShaping = pointerCount == 1;
+        boolean antiDrift = response.isAntiDriftEnabled() && pairShaping;
         float[] leftPair = null;
         float[] rightPair = null;
-        if (antiDrift) {
+        if (pairShaping) {
             float x = event.getAxisValue(MotionEvent.AXIS_X);
             float y = event.getAxisValue(MotionEvent.AXIS_Y);
             float z = event.getAxisValue(MotionEvent.AXIS_Z);
             float rz = event.getAxisValue(MotionEvent.AXIS_RZ);
             long time = event.getEventTime();
-            leftPair = shapePair(response, leftDriftGate, true, x, y, time, leftPairScratch);
-            rightPair = shapePair(response, rightDriftGate, false, z, rz, time, rightPairScratch);
+            leftPair = shapePair(response, leftDriftGate, true, x, y, time, antiDrift, leftPairScratch);
+            rightPair = shapePair(response, rightDriftGate, false, z, rz, time, antiDrift, rightPairScratch);
         }
 
         // Read through PointerCoords rather than MotionEvent.getAxisValue(axis, pointerIndex),
@@ -255,7 +258,7 @@ public final class ControllerInputProcessor {
         // path. MotionEvent.obtain copies their contents, so reuse after the call is safe. Only
         // touched from the UI thread, hence plain fields.
         if (pointerCount > MAX_POOLED_POINTERS) {
-            return transformWithAllocation(event, response, antiDrift, leftPair, rightPair, pointerCount);
+            return transformWithAllocation(event, response, pairShaping, leftPair, rightPair, pointerCount);
         }
         if (rewrittenScratch == null) {
             rewrittenScratch = new float[MAX_POOLED_POINTERS][TRANSFORM_AXES.length];
@@ -274,7 +277,7 @@ public final class ControllerInputProcessor {
             for (int a = 0; a < TRANSFORM_AXES.length; a++) {
                 int axis = TRANSFORM_AXES[a];
                 float original = pooledReadCoords.getAxisValue(axis);
-                float updated = rewrittenAxis(response, antiDrift, leftPair, rightPair, axis, original);
+                float updated = rewrittenAxis(response, pairShaping, leftPair, rightPair, axis, original);
                 rewrittenScratch[p][a] = updated;
                 if (updated != original) {
                     changed = true;
@@ -308,10 +311,10 @@ public final class ControllerInputProcessor {
                 event.getFlags());
     }
 
-    /** Resolves one axis through the profile, honouring the anti-drift pair result. */
-    private static float rewrittenAxis(ControllerResponse response, boolean antiDrift,
+    /** Resolves one axis through the profile, honouring the pair result when there is one. */
+    private static float rewrittenAxis(ControllerResponse response, boolean pairShaping,
                                        float[] leftPair, float[] rightPair, int axis, float original) {
-        if (antiDrift && leftPair != null) {
+        if (pairShaping && leftPair != null) {
             if (axis == MotionEvent.AXIS_X) return leftPair[0];
             if (axis == MotionEvent.AXIS_Y) return leftPair[1];
             if (axis == MotionEvent.AXIS_Z) return rightPair[0];
@@ -322,7 +325,7 @@ public final class ControllerInputProcessor {
 
     /** Rare path for pads reporting more pointers than the pool holds; allocates as before. */
     private static MotionEvent transformWithAllocation(
-            MotionEvent event, ControllerResponse response, boolean antiDrift,
+            MotionEvent event, ControllerResponse response, boolean pairShaping,
             float[] leftPair, float[] rightPair, int pointerCount) {
         boolean changed = false;
         float[][] rewritten = new float[pointerCount][TRANSFORM_AXES.length];
@@ -332,7 +335,7 @@ public final class ControllerInputProcessor {
             for (int a = 0; a < TRANSFORM_AXES.length; a++) {
                 int axis = TRANSFORM_AXES[a];
                 float original = scratch.getAxisValue(axis);
-                float updated = rewrittenAxis(response, antiDrift, leftPair, rightPair, axis, original);
+                float updated = rewrittenAxis(response, pairShaping, leftPair, rightPair, axis, original);
                 rewritten[p][a] = updated;
                 if (updated != original) {
                     changed = true;
@@ -431,10 +434,30 @@ public final class ControllerInputProcessor {
         if (response.isAntiDriftEnabled() && event.getPointerCount() == 1) {
             return isDriftSuppressed(response, event);
         }
+        // The radial test, matching the shaping path. Judging each axis separately here would
+        // swallow an event whose diagonal push the radial dead zone legitimately lets through,
+        // so the check and the rewrite would disagree about the same event.
+        if (event.getPointerCount() == 1) {
+            return isPairFlattened(response, event);
+        }
         return isFlattened(response, event, MotionEvent.AXIS_X)
                 || isFlattened(response, event, MotionEvent.AXIS_Y)
                 || isFlattened(response, event, MotionEvent.AXIS_Z)
                 || isFlattened(response, event, MotionEvent.AXIS_RZ);
+    }
+
+    /** True when both stick pairs sit inside the radial dead zone, i.e. the event is all drift. */
+    private static boolean isPairFlattened(ControllerResponse response, MotionEvent event) {
+        return isPairInsideDeadZone(response, true, event.getAxisValue(MotionEvent.AXIS_X),
+                event.getAxisValue(MotionEvent.AXIS_Y))
+                && isPairInsideDeadZone(response, false, event.getAxisValue(MotionEvent.AXIS_Z),
+                event.getAxisValue(MotionEvent.AXIS_RZ));
+    }
+
+    private static boolean isPairInsideDeadZone(ControllerResponse response, boolean left,
+                                                float x, float y) {
+        if (x == 0f && y == 0f) return true;
+        return !response.isPairOutsideThreshold(left, x, y);
     }
 
     /**
@@ -489,15 +512,18 @@ public final class ControllerInputProcessor {
     }
 
     /**
-     * Shapes one stick pair, honouring the hysteresis gate.
+     * Shapes one stick pair, honouring the hysteresis gate when anti-drift is on.
      *
-     * A stick the gate is still holding back is reported as centred rather than shaped, so a
-     * wobbling stick cannot leak a small push just because it nominally cleared the dead zone.
-     * The gate is consulted at the event's own timestamp, which is what lets the dead-zone
-     * check and this rewrite agree about a single event without double-counting it.
+     * The gate is opt-in: with it off the stick is shaped purely by the radial dead zone, which
+     * is the behaviour the player expects from the profile's own setting. A stick the gate is
+     * still holding back is reported as centred rather than shaped, so a wobbling stick cannot
+     * leak a small push just because it nominally cleared the dead zone. The gate is consulted
+     * at the event's own timestamp, which is what lets the dead-zone check and this rewrite
+     * agree about a single event without double-counting it.
      */
     private static float[] shapePair(ControllerResponse response, StickDriftGate gate,
-                                     boolean left, float x, float y, long time, float[] out) {
+                                     boolean left, float x, float y, long time, boolean antiDrift,
+                                     float[] out) {
         if (x == 0f && y == 0f) {
             gate.reset();
             out[0] = 0f;
@@ -505,11 +531,12 @@ public final class ControllerInputProcessor {
             return out;
         }
         float magnitude = (float) Math.sqrt(x * x + y * y);
-        if (!gate.allow(magnitude, response.driftThreshold(left), time)) {
+        if (antiDrift && !gate.allow(magnitude, response.driftThreshold(left), time)) {
             out[0] = 0f;
             out[1] = 0f;
             return out;
         }
+        if (!antiDrift) gate.reset();
         response.adjustStickPair(left, x, y, magnitude, out);
         // The right stick is the look stick, so hit-registration shaping applies there and not
         // to movement. Reuses the caller's buffer so the hot path still allocates nothing.
