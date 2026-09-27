@@ -1,0 +1,45 @@
+name: Send Changelog to Discord
+
+on:
+  release:
+    types: [published] # Triggers automatically when you publish a release
+
+jobs:
+  send-changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Release Notes to Discord
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }} # Uses your existing secret
+        run: |
+          if [ -z "$WEBHOOK_URL" ] || [ "$WEBHOOK_URL" == "RL" ]; then
+            echo "Webhook secret is empty or invalid!"
+            exit 1
+          fi
+
+          # Extract release details
+          TAG="${{ github.event.release.tag_name }}"
+          NAME="${{ github.event.release.name }}"
+          BODY="${{ github.event.release.body }}"
+          URL="${{ github.event.release.html_url }}"
+
+          # If the release notes are empty, provide a fallback
+          if [ -z "$BODY" ]; then
+            BODY="No detailed changelog provided. Click the link below to view the release."
+          fi
+
+          # Truncate the body to 1500 characters to fit Discord's 2000-character limit
+          # The link at the bottom makes up the rest of the characters.
+          TRUNCATED_BODY=$(echo "$BODY" | head -c 1500)
+
+          # Construct the message
+          MESSAGE="🚀 **ChimeraClient Update: $NAME ($TAG)** 🚀\n\n$TRUNCATED_BODY\n\n🔗 **[View Full Release on GitHub]($URL)**"
+
+          # Use jq to safely format the JSON payload
+          PAYLOAD=$(jq -n --arg content "$MESSAGE" '{content: $content}')
+
+          # Send to Discord
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "$PAYLOAD" \
+               "$WEBHOOK_URL"
