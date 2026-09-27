@@ -62,6 +62,28 @@ public final class PlayerSkinProvider {
         prefs(context).edit().putString(KEY_CUSTOM_SKIN_PATH, path).apply();
     }
 
+    /**
+     * Records the skin pack the player activated for the selected instance.
+     *
+     * <p>Written by the Skins screen when it activates or removes a pack. Without it the lookup
+     * below has no pack name to match against, so an applied pack was never found and the
+     * preview silently fell back to the placeholder — the pack was active in the game but the
+     * character on screen was still a stranger's.
+     */
+    public static void setAppliedSkinPackName(Context context, String packName) {
+        SharedPreferences.Editor editor = skinsPrefs(context).edit();
+        if (packName == null || packName.isEmpty()) {
+            editor.remove(KEY_APPLIED_NAME);
+        } else {
+            editor.putString(KEY_APPLIED_NAME, packName);
+        }
+        editor.apply();
+    }
+
+    public static String getAppliedSkinPackName(Context context) {
+        return skinsPrefs(context).getString(KEY_APPLIED_NAME, null);
+    }
+
     public static String getCustomSkinPath(Context context) {
         return prefs(context).getString(KEY_CUSTOM_SKIN_PATH, null);
     }
@@ -96,6 +118,10 @@ public final class PlayerSkinProvider {
         return context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
+    private static SharedPreferences skinsPrefs(Context context) {
+        return context.getApplicationContext().getSharedPreferences(SKINS_PREFS, Context.MODE_PRIVATE);
+    }
+
     /**
      * Locates the texture belonging to the applied skin pack.
      *
@@ -105,8 +131,7 @@ public final class PlayerSkinProvider {
      */
     private static File findAppliedSkinFile(Context context) {
         try {
-            SharedPreferences skins = context.getApplicationContext()
-                    .getSharedPreferences(SKINS_PREFS, Context.MODE_PRIVATE);
+            SharedPreferences skins = skinsPrefs(context);
             String appliedName = skins.getString(KEY_APPLIED_NAME, null);
             if (appliedName == null || appliedName.isEmpty()) return null;
 
@@ -186,11 +211,14 @@ public final class PlayerSkinProvider {
     }
 
     /**
-     * Copies a skin into a 64x64 atlas, preserving nearest-neighbour pixels.
+     * Copies a skin into a 64x64 atlas at its native scale.
      *
-     * A 64x32 legacy skin is placed at the top so its regions line up with the modern layout; a
-     * 128x128 skin is scaled down, which loses detail but keeps the preview correct rather than
-     * sampling a quadrant of an HD skin as if it were a face.
+     * <p>The atlas is a 64x32 grid, so the source is scaled by a whole factor of its width and
+     * drawn at the top-left: a 64x32 legacy skin lands in the top half (where the modern UV
+     * layout expects those regions) and an HD 128x128 skin is halved to 64x64. Stretching the
+     * source to fill 64x64 instead would vertically double a legacy skin, putting the arms and
+     * legs regions where the hat and body overlay belong — the character then renders with its
+     * own textures in the wrong places.
      */
     public static Bitmap normalise(Bitmap source) {
         if (source == null) return fallbackSkin();
@@ -199,9 +227,29 @@ public final class PlayerSkinProvider {
         Canvas canvas = new Canvas(out);
         Paint paint = new Paint();
         paint.setFilterBitmap(false);
-        Rect dst = new Rect(0, 0, SkinModel.ATLAS_SIZE, SkinModel.ATLAS_SIZE);
-        canvas.drawBitmap(source, new Rect(0, 0, source.getWidth(), source.getHeight()), dst, paint);
+        int[] dst = atlasDrawSize(source.getWidth(), source.getHeight());
+        canvas.drawBitmap(source, new Rect(0, 0, source.getWidth(), source.getHeight()),
+                new Rect(0, 0, dst[0], dst[1]), paint);
         return out;
+    }
+
+    /**
+     * Where a source texture lands in the 64x64 atlas, as {width, height} in atlas pixels.
+     *
+     * <p>Pure so the sizing rule is testable without a Bitmap: the atlas is a 64x32 grid, so the
+     * source is divided by a whole factor of its width and never scaled up. A 64x32 legacy skin
+     * therefore keeps its height and occupies the top half, and a 128x128 HD skin becomes
+     * 64x64. Filling the whole atlas instead would stretch a legacy skin vertically and sample
+     * the wrong region for every limb.
+     */
+    public static int[] atlasDrawSize(int sourceWidth, int sourceHeight) {
+        if (sourceWidth <= 0 || sourceHeight <= 0) {
+            return new int[]{SkinModel.ATLAS_SIZE, SkinModel.ATLAS_SIZE};
+        }
+        int scale = Math.max(1, sourceWidth / SkinModel.ATLAS_SIZE);
+        int dstW = Math.max(1, Math.min(SkinModel.ATLAS_SIZE, sourceWidth / scale));
+        int dstH = Math.max(1, Math.min(SkinModel.ATLAS_SIZE, sourceHeight / scale));
+        return new int[]{dstW, dstH};
     }
 
     /**

@@ -22,6 +22,7 @@ import org.chimeramc.client.core.content.ContentImporter;
 import org.chimeramc.client.core.content.ResourcePackItem;
 import org.chimeramc.client.core.content.ResourcePackManager;
 import org.chimeramc.client.core.content.SkinPackActivator;
+import org.chimeramc.client.core.cosmetics.PlayerSkinProvider;
 import org.chimeramc.client.core.versions.GameVersion;
 import org.chimeramc.client.core.versions.VersionManager;
 import org.chimeramc.client.ui.adapter.SkinsAdapter;
@@ -38,7 +39,6 @@ public class SkinsSettingsFragment extends Fragment {
 
     private static final String PREFS_NAME = "skins_state";
     private static final String KEY_APPLIED_TYPE = "applied_type";
-    private static final String KEY_APPLIED_NAME = "applied_name";
 
     private RecyclerView recycler;
     private SkinsAdapter adapter;
@@ -204,6 +204,11 @@ public class SkinsSettingsFragment extends Fragment {
         Toast.makeText(requireContext(),
                 getString(applied ? R.string.skins_removed : R.string.skins_applied, pack.getPackName()),
                 Toast.LENGTH_SHORT).show();
+        // Record the pack so the cosmetics preview can find its texture. The game's resource
+        // pack list says the pack is active; it does not say which pack that is, so without this
+        // the preview has no name to match against and falls back to the placeholder.
+        PlayerSkinProvider.setAppliedSkinPackName(requireContext(),
+                applied ? null : pack.getPackName());
         loadSkins();
     }
 
