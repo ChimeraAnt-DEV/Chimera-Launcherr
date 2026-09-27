@@ -209,6 +209,52 @@ import okhttp3.OkHttpClient;
 
         initAccountHeader();
         binding.getRoot().post(this::showPostEulaFlow);
+        binding.getRoot().post(this::playArrivalAnimations);
+    }
+
+    /**
+     * The arrival motion for a cold start launched through the splash.
+     *
+     * <p>Gated strictly behind the splash extra so it plays once per cold start and never replays
+     * when the user returns to the Launch tab: a tab switch recreates this activity, and an
+     * animation that re-ran every time would read as the app reloading rather than the user moving.
+     */
+    private void playArrivalAnimations() {
+        Intent intent = getIntent();
+        if (intent == null || !intent.getBooleanExtra(SplashActivity.EXTRA_FROM_SPLASH, false)) {
+            return;
+        }
+        // Consume the extra so a configuration change or a return to this tab cannot replay it.
+        intent.removeExtra(SplashActivity.EXTRA_FROM_SPLASH);
+
+        animateNavTabsArrival();
+        animateHomeCardsArrival();
+    }
+
+    /**
+     * Home screen entrance stagger: hero card, then the quick-action row, then the content/stats
+     * block, each a beat apart.
+     *
+     * <p>Same overshoot language as the nav tabs, so the whole screen arrives as one motion system.
+     * Reduced motion is handled inside {@link DynamicAnim#overshootScaleIn}, which snaps the views
+     * straight to full.
+     */
+    private void animateHomeCardsArrival() {
+        int[] order = {
+                R.id.last_played_card,
+                R.id.quick_versions_card,
+                R.id.quick_mods_card,
+                R.id.quick_content_card,
+        };
+        for (int i = 0; i < order.length; i++) {
+            View view = findViewById(order[i]);
+            if (view == null) continue;
+            DynamicAnim.overshootScaleIn(view, i * DynamicAnim.ARRIVAL_STEP_MS);
+        }
+        View statsBlock = findViewById(R.id.contentViewAll);
+        if (statsBlock != null) {
+            DynamicAnim.overshootScaleIn(statsBlock, order.length * DynamicAnim.ARRIVAL_STEP_MS);
+        }
     }
 
     @Override
@@ -1851,7 +1897,12 @@ import okhttp3.OkHttpClient;
         }
         TextView instancesStat = findViewById(R.id.last_played_instances_stat);
         if (instancesStat != null) {
-            setAnimatedStatText(instancesStat, getString(R.string.stat_instances_count, installedCount));
+            // Count up from zero rather than appearing at the final value: the hero card is the
+            // first thing drawn after the splash, so the numbers should settle, not blink in.
+            final int count = installedCount;
+            DynamicAnim.countUp(count, 400L,
+                    value -> setAnimatedStatText(instancesStat,
+                            getString(R.string.stat_instances_count, (int) value)));
         }
         // The mods count comes from the live mod list, not from a count captured here: the list
         // loads asynchronously per instance, so reading it at bind time would report the previous
@@ -2044,7 +2095,9 @@ import okhttp3.OkHttpClient;
     private void refreshActiveModsStat(List<Mod> mods) {
         TextView modsStat = findViewById(R.id.last_played_mods_stat);
         if (modsStat == null) return;
-        setAnimatedStatText(modsStat, getString(R.string.stat_mods_count, Mod.countEnabled(mods)));
+        int count = Mod.countEnabled(mods);
+        DynamicAnim.countUp(count, 400L,
+                value -> setAnimatedStatText(modsStat, getString(R.string.stat_mods_count, (int) value)));
     }
 
     private void setupNavBar() {

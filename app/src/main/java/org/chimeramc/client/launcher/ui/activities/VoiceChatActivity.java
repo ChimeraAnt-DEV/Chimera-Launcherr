@@ -75,6 +75,7 @@ public class VoiceChatActivity extends BaseActivity {
     private Button joinButton;
     private TextView directoryEmpty;
     private LinearLayout directoryContainer;
+    private org.chimeramc.client.ui.animation.OverscrollRefreshLayout refreshLayout;
 
     private final Runnable refreshRunnable = new Runnable() {
         @Override
@@ -121,6 +122,22 @@ public class VoiceChatActivity extends BaseActivity {
         joinButton = findViewById(R.id.voice_join_button);
         directoryEmpty = findViewById(R.id.voice_directory_empty);
         directoryContainer = findViewById(R.id.voice_directory_container);
+        refreshLayout = findViewById(R.id.voice_directory_refresh);
+        if (refreshLayout != null) {
+            refreshLayout.setOnRefreshListener(this::refreshFromPull);
+        }
+    }
+
+    /**
+     * A pulled refresh: re-reads the directory from the peers heard so far.
+     *
+     * <p>There is no server query to make, so the honest behaviour is to re-render from the live
+     * registry and say so. The subtle vibration is the confirmation that the pull registered,
+     * since the gesture deliberately has no spinner.
+     */
+    private void refreshFromPull() {
+        renderDirectory();
+        org.chimeramc.client.ui.animation.UiTouchFeedback.pressView(refreshLayout);
     }
 
     private void wireControls() {

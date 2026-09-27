@@ -363,21 +363,29 @@
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
 
-                <ScrollView
+                <!-- Pull-to-refresh with the launcher's overshoot physics; no spinner. -->
+                <org.chimeramc.client.ui.animation.OverscrollRefreshLayout
+                    android:id="@+id/voice_directory_refresh"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1"
-                    android:layout_marginTop="6dp"
-                    android:scrollbars="none"
-                    android:overScrollMode="never">
+                    android:layout_marginTop="6dp">
 
-                    <LinearLayout
-                        android:id="@+id/voice_directory_container"
+                    <ScrollView
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical" />
+                        android:layout_height="match_parent"
+                        android:scrollbars="none"
+                        android:overScrollMode="never">
 
-                </ScrollView>
+                        <LinearLayout
+                            android:id="@+id/voice_directory_container"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical" />
+
+                    </ScrollView>
+
+                </org.chimeramc.client.ui.animation.OverscrollRefreshLayout>
 
             </LinearLayout>
 

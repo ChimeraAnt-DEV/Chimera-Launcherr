@@ -231,6 +231,10 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             toggleStates.put(mod.getStableKey(), newState);
             updateStatusView(modHolder, newState);
             updateAccentBar(modHolder, mod.getGroupId(), newState);
+            // Per-icon behaviour on flip, not a generic bounce: Armor HUD "equips", the Voice mic
+            // pulses. Only modules with distinct iconography animate; the rest fall through.
+            org.chimeramc.client.ui.animation.ModToggleAnim.play(
+                    modHolder.icon, mod.getId(), newState);
             if (listener != null) {
                 listener.onToggle(mod, newState);
             }
