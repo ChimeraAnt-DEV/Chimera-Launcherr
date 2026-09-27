@@ -40,10 +40,12 @@ jobs:
             fi
 
             TRUNCATED_BODY=$(echo "$BODY" | head -c 1500)
+            
             MESSAGE=$(printf "🚀 **%s (%s)** 🚀\n\n%s\n\n🔗 **[View Full Release on GitHub](%s)**" "$NAME" "$TAG" "$TRUNCATED_BODY" "$URL")
           else
             TITLE="${{ github.event.inputs.title }}"
             BODY="${{ github.event.inputs.message }}"
+            
             MESSAGE=$(printf "📢 **%s** 📢\n\n%s" "$TITLE" "$BODY")
           fi
 
