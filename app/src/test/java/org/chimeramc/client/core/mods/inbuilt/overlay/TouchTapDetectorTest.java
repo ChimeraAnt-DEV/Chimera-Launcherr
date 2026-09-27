@@ -82,4 +82,37 @@ public class TouchTapDetectorTest {
         d.onMove(0, 100f, 100f, SLOP);
         assertFalse(d.onUp(0, 1050L));
     }
+
+    /**
+     * A pointer that never reports its UP must not swallow the next tap.
+     *
+     * <p>This is the regression that made Select Hit under-count on the touch path. The activity
+     * classified gestures <em>after</em> the preloader, so an event the preloader consumed
+     * returned early and {@code onUp} was never delivered for that pointer. The following DOWN
+     * then re-armed tracking, its UP paired against the <em>new</em> down time — so a tap made
+     * right after a consumed gesture was timed from the wrong start and read as a hold. Feeding
+     * every event to the detector first (which the activity now does) keeps the UP/​DOWN pairing
+     * consistent; this test pins the state machine's side of that contract.
+     */
+    @Test
+    public void aSwallowedUpDoesNotPoisonTheNextTap() {
+        TouchTapDetector d = new TouchTapDetector();
+        // First gesture: DOWN seen, UP swallowed by whoever consumed the event.
+        d.onDown(0, 100f, 100f, 1000L);
+        // Second gesture starts while the first is still "tracking".
+        d.onDown(0, 100f, 100f, 2000L);
+        // Its UP is a quick tap relative to the second DOWN, so it must count.
+        assertTrue(d.onUp(0, 2000L + TouchTapDetector.MAX_TAP_MS - 20L));
+    }
+
+    /** The detector must not latch: a completed tap leaves it ready for the next gesture. */
+    @Test
+    public void theNextGestureAfterATapIsClassifiedIndependently() {
+        TouchTapDetector d = new TouchTapDetector();
+        d.onDown(0, 50f, 50f, 0L);
+        assertTrue(d.onUp(0, 100L));
+        d.onDown(0, 50f, 50f, 1000L);
+        d.onMove(0, 500f, 50f, SLOP);
+        assertFalse(d.onUp(0, 1050L));
+    }
 }

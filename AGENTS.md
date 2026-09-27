@@ -373,3 +373,51 @@ only, like the other overlays.
 ## Combat module empty states
 - A module that needs a native feed (Crystal Optimizer's `WorldSource`, Armor HUD's `DataSource`, Hitboxes' `EntitySource`) must distinguish **"no data source"** from **"data source says nothing is there"**. Crystal Optimizer's `isAwaitingGameData()` renders "waiting for game data"; without it the readout said "no safe spot", blaming the player's aim for a feed that does not exist. `HitboxOverlay` shows an equivalent "awaiting data" state.
 - `TouchTapDetector` classifies a touch attack for the Select Hit metronome. A `POINTER_UP` for a *different* pointer must not end the gesture — ending there dropped the real tap the moment a jump/sneak button was released. Fixed and pinned by `TouchTapDetectorTest`.
+
+## Native entity/camera feed — what is and is not reachable (verified against 1.26.50.04_RC3)
+Verified by downloading the real `lib/arm64-v8a/libminecraftpe.so` for `26-50-arm64-v8a`
+(363,050,262-byte APK; the `.so` is stored deflated at 98,404,093 bytes so only that range needs
+fetching, then inflate with a raw zlib stream). Do not re-run this RE from scratch; these are the
+conclusions.
+
+- **Game classes are stripped of exported symbols.** The 90,653 defined dynamic symbols are
+  third-party only (Xbl, v8, cohtml, leveldb, mbedtls, astc). There is no `_ZN...Actor...`,
+  `_ZTV...Level...` or any Minecraft method symbol, so `dlsym`/`resolveSignature`-by-name cannot
+  reach game state.
+- **RTTI *name strings* exist, and `resolveVtableFunction` does resolve them.** Standalone
+  `11LocalPlayer`, `5Level`, `14ClientInstance`, `11BlockSource` strings are present in `.rodata`
+  (each exactly once) and each has exactly one RELATIVE relocation resolving its address, so the
+  typeinfo and its vtable are found. But the vtables reached this way are the pure-virtual
+  *interface* bases (confirmed: `11LocalPlayer`'s slot[1] and slot[3] are **identical** to
+  `11Mob`'s, the classic shared-base pattern). Slot indices are also version-fragile --
+  `isShowingMenuVtableIndex: 151` in the shipped rules is exactly that kind of hardcoded index.
+- **The entity feed a hitbox/crystal/armor module needs is therefore not derivable statically.**
+  A `dynamic_cast` on a live `Actor*` would identify `LocalPlayer`, but there is no way to obtain
+  the `Level*`/`ClientInstance*` to start from without either a byte-pattern signature per build
+  or a `_ZTI...`-style mangled symbol, and this build exports neither for game classes. The
+  in-repo `resolveSignature` is the right mechanism but needs patterns derived from the binary.
+- **The game's Java layer is no help.** The dex contains 68 `com/mojang/minecraftpe/*` classes, all
+  Android host plumbing (MainActivity, PlayIntegrity, FilePicker, Braze, WorldRecovery). There is
+  no player/entity/position/camera API and no `native` method declaring one -- all game state lives
+  in `libminecraftpe.so`.
+- **`WorldSource` / `DataSource` / `EntitySource` have no provider and are never installed**
+  (`setWorldSource`/`setDataSource`/`setEntitySource` have zero callers). Crystal Optimizer, Armor
+  HUD and Hitboxes therefore cannot produce output; they correctly show their "awaiting game data"
+  state. Implement one only with a verified signature set, and keep the honest empty state.
+- **A cape feature is not reachable through this.** The in-game cape is a resource pack (see the
+  cosmetics section), a supported mechanism rather than a native hook.
+- Static-analysis caution: RTTI pointers in this PIE binary live in `.data.rel.ro` as
+  `R_AARCH64_RELATIVE` relocation addends, so a plain byte scan for the pointer finds **nothing**
+  and produces a false "RTTI is absent" conclusion. Read `.rela.dyn` instead. Equally,
+  `re.finditer` over a 328 MB `.so` is unusable -- extract `strings` once and work from that.
+
+## Select Hit touch ordering
+- **`dispatchTouchEvent` must classify the attack tap before the preloader can consume the event.**
+  `PreloaderInput.onTouch` returning true means a registered callback claimed the touch, and the
+  old code returned early -- so `TouchTapDetector.onUp` was never delivered for that pointer. The
+  next DOWN re-armed tracking from a fresh timestamp, and a tap made right after a consumed
+  gesture was timed from the wrong start, read as a hold, and was dropped. The detector is a
+  passive observer of the gesture the game already acted on, so it sees every event regardless of
+  who consumes it -- the same reason `dispatchKeyEvent` records the mouse-button press before the
+  preloader may consume it. `overlayManager.handleTouchEvent` moved up with it (it also maintains
+  gesture state). Pinned by `TouchTapDetectorTest.aSwallowedUpDoesNotPoisonTheNextTap`.
