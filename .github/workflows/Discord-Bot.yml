@@ -30,7 +30,6 @@ jobs:
           # Sanitize the URL (removes accidental spaces)
           SANITIZED_URL=$(echo "$WEBHOOK_URL" | tr -d '[:space:]')
 
-          # Check trigger type
           if [ "${{ github.event_name }}" == "release" ]; then
             TAG="${{ github.event.release.tag_name }}"
             NAME="${{ github.event.release.name }}"
@@ -43,7 +42,7 @@ jobs:
 
             TRUNCATED_BODY=$(echo "$BODY" | head -c 1500)
             
-            # Build message with clickable link
+            # Build the message with title, changelog, and clickable link
             MESSAGE=$(printf "🚀 **%s (%s)** 🚀\n\n%s\n\n🔗 **[View Full Release on GitHub](%s)**" "$NAME" "$TAG" "$TRUNCATED_BODY" "$URL")
           else
             TITLE="${{ github.event.inputs.title }}"
