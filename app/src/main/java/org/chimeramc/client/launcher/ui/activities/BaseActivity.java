@@ -212,7 +212,7 @@ public class BaseActivity extends AppCompatActivity {
     /** Top-bar tabs, in declaration order. Order matches LauncherTab and nav_bar.xml. */
     private static final int[] NAV_TAB_IDS = {
             R.id.nav_tab_launch, R.id.nav_tab_instances, R.id.nav_tab_installations,
-            R.id.nav_tab_mods, R.id.nav_tab_customize, R.id.nav_tab_settings
+            R.id.nav_tab_mods, R.id.nav_tab_voice, R.id.nav_tab_customize, R.id.nav_tab_settings
     };
 
     private void setupBaseNavBar() {
@@ -298,6 +298,11 @@ public class BaseActivity extends AppCompatActivity {
         findViewById(R.id.nav_tab_mods).setOnClickListener(v -> {
             if (!(this instanceof ModsFullscreenActivity)) {
                 switchNavTab(new Intent(this, ModsFullscreenActivity.class));
+            }
+        });
+        findViewById(R.id.nav_tab_voice).setOnClickListener(v -> {
+            if (!(this instanceof VoiceChatActivity)) {
+                switchNavTab(new Intent(this, VoiceChatActivity.class));
             }
         });
         findViewById(R.id.nav_tab_customize).setOnClickListener(v -> {

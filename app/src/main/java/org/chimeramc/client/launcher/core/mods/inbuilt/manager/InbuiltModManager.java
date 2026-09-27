@@ -72,6 +72,8 @@ public class InbuiltModManager {
     private static final String KEY_VOICE_RANGE = "voice_range_blocks";
     private static final String KEY_VOICE_VOLUME = "voice_volume_percent";
     private static final String KEY_VOICE_CHANNEL = "voice_channel";
+    private static final String KEY_VOICE_CHANNEL_NAME = "voice_channel_name";
+    private static final String KEY_VOICE_CHANNEL_PRIVATE = "voice_channel_private";
     private static final String KEY_VOICE_MIC = "voice_mic_enabled";
     private static final String KEY_VOICE_REFRESH_MS = "voice_chatter_refresh_ms";
     private static final int DEFAULT_AIM_SMOOTHING = 40;
@@ -665,8 +667,47 @@ public class InbuiltModManager {
     }
 
     public void setVoiceChannel(String channel) {
-        prefs.edit().putString(KEY_VOICE_CHANNEL,
-                org.chimeramc.client.core.voice.VoiceChannel.normalize(channel)).apply();
+        String normalized = org.chimeramc.client.core.voice.VoiceChannel.normalize(channel);
+        // A typed code is a private, join-by-code channel; anything else is a public named room.
+        // Deriving visibility from the id keeps the free-text channel field and the directory
+        // from disagreeing about the same channel.
+        boolean privateChannel = org.chimeramc.client.core.voice.VoiceChannel.isJoinCode(normalized);
+        prefs.edit()
+                .putString(KEY_VOICE_CHANNEL, normalized)
+                .putBoolean(KEY_VOICE_CHANNEL_PRIVATE, privateChannel)
+                .apply();
+    }
+
+    /**
+     * Joins a channel by its id, recording the display name and visibility to advertise.
+     *
+     * <p>Joining by code is the same operation as picking a channel: the id is the join key, so
+     * the only extra state is the name/visibility other peers need to build their directory.
+     */
+    public void joinVoiceChannel(String channel, String displayName, boolean isPrivate) {
+        prefs.edit()
+                .putString(KEY_VOICE_CHANNEL,
+                        org.chimeramc.client.core.voice.VoiceChannel.normalize(channel))
+                .putString(KEY_VOICE_CHANNEL_NAME, displayName == null ? "" : displayName.trim())
+                .putBoolean(KEY_VOICE_CHANNEL_PRIVATE, isPrivate)
+                .apply();
+    }
+
+    /** The display name for the current channel, or "" when on the open, unnamed channel. */
+    public String getVoiceChannelName() {
+        return prefs.getString(KEY_VOICE_CHANNEL_NAME, "");
+    }
+
+    /** Whether the current channel is private (join-by-code, never listed). */
+    public boolean isVoiceChannelPrivate() {
+        return prefs.getBoolean(KEY_VOICE_CHANNEL_PRIVATE, false);
+    }
+
+    /** The beacon visibility byte for the current channel. */
+    public byte getVoiceChannelVisibility() {
+        return isVoiceChannelPrivate()
+                ? org.chimeramc.client.core.voice.VoiceProtocol.VISIBILITY_PRIVATE
+                : org.chimeramc.client.core.voice.VoiceProtocol.VISIBILITY_PUBLIC;
     }
 
     /** Whether the player's own microphone is transmitted. Off means listen-only. */

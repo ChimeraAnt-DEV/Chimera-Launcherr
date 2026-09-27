@@ -134,4 +134,64 @@ public class VoiceProtocolTest {
         // The open channel reaches across; only the out-of-range peer is omitted.
         assertEquals(2, registry.audible(0f, 0f, 0f, VoiceChannel.WORLD, 12f).size());
     }
+
+    @Test
+    public void beaconCarriesVisibilityAndChannelName() {
+        byte[] encoded = VoiceProtocol.encodeBeacon("id", "Name", "chimera-7f2q",
+                VoiceProtocol.VISIBILITY_PRIVATE, "Squad", 1f, 2f, 3f, 4);
+        VoiceProtocol.Packet packet = VoiceProtocol.decode(encoded);
+        assertEquals(VoiceProtocol.VISIBILITY_PRIVATE, packet.visibility);
+        assertEquals("Squad", packet.channelName);
+        assertEquals("chimera-7f2q", packet.channel);
+        assertTrue(packet.isPrivate());
+    }
+
+    @Test
+    public void publicIsTheDefaultVisibilityOnTheWire() {
+        byte[] encoded = VoiceProtocol.encodeBeacon("id", "Name", "world", 0f, 0f, 0f, 0);
+        VoiceProtocol.Packet packet = VoiceProtocol.decode(encoded);
+        assertEquals(VoiceProtocol.VISIBILITY_PUBLIC, packet.visibility);
+        assertEquals("", packet.channelName);
+    }
+
+    @Test
+    public void aVersionOneDatagramStillDecodesAsPublicWorld() {
+        // Hand-build a v1 beacon: magic, version 1, type, three strings, three floats, seq, len.
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream out = new java.io.DataOutputStream(buffer);
+        try {
+            out.write(new byte[]{'C', 'V'});
+            out.writeByte(1);
+            out.writeByte(VoiceProtocol.TYPE_BEACON);
+            writeLegacyString(out, "oldpeer");
+            writeLegacyString(out, "Old Phone");
+            writeLegacyString(out, "world");
+            out.writeFloat(1f);
+            out.writeFloat(2f);
+            out.writeFloat(3f);
+            out.writeInt(9);
+            out.writeInt(0);
+        } catch (java.io.IOException e) {
+            throw new AssertionError(e);
+        }
+        VoiceProtocol.Packet packet = VoiceProtocol.decode(buffer.toByteArray());
+        assertEquals("oldpeer", packet.peerId);
+        assertEquals("world", packet.channel);
+        assertEquals(VoiceProtocol.VISIBILITY_PUBLIC, packet.visibility);
+        assertEquals("", packet.channelName);
+        assertTrue(packet.sequence == 9);
+    }
+
+    private static void writeLegacyString(java.io.DataOutputStream out, String value)
+            throws java.io.IOException {
+        byte[] bytes = value.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        out.writeByte(bytes.length);
+        out.write(bytes);
+    }
+
+    @Test
+    public void normalizeVisibilityClampsUnknownBytesToPublic() {
+        assertEquals(VoiceProtocol.VISIBILITY_PUBLIC, VoiceProtocol.normalizeVisibility((byte) 9));
+        assertEquals(VoiceProtocol.VISIBILITY_PRIVATE, VoiceProtocol.normalizeVisibility((byte) 1));
+    }
 }

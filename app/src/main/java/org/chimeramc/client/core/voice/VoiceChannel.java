@@ -1,6 +1,7 @@
 package org.chimeramc.client.core.voice;
 
 import java.util.Locale;
+import java.util.Random;
 
 /**
  * Decides which speakers a listener can hear and at what gain.
@@ -28,10 +29,62 @@ public final class VoiceChannel {
     /** The open channel: audible to everyone within range, whichever channel they are on. */
     public static final String WORLD = "world";
 
+    /** Prefix of a generated private-channel join code. */
+    public static final String CODE_PREFIX = "CHIMERA-";
+
+    /**
+     * Code alphabet. Every character is a digit or an unambiguously-shaped uppercase letter, so a
+     * code read aloud or copied off a screen cannot be mistyped as {@code O}/{@code 0} or
+     * {@code I}/{@code 1}/{@code L}.
+     */
+    private static final char[] CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".toCharArray();
+    private static final int CODE_LENGTH = 4;
+
     /** A listener hears a talker at or inside this fraction of the range at full gain. */
     public static final float FULL_GAIN_FRACTION = 0.35f;
 
     private VoiceChannel() {
+    }
+
+    /**
+     * Generates a short, human-readable join code: {@code CHIMERA-XXXX}.
+     *
+     * <p>A private channel's id <em>is</em> its join code, so "invite a friend" is nothing more
+     * than sharing this string -- typing it in selects the same channel id and the existing
+     * {@link #canHear} match takes over. No new networking is involved.
+     */
+    public static String generateCode() {
+        return generateCode(new Random());
+    }
+
+    /** Generates a code from a supplied source, so tests can pin the alphabet and shape. */
+    public static String generateCode(Random random) {
+        StringBuilder code = new StringBuilder(CODE_PREFIX.length() + CODE_LENGTH);
+        code.append(CODE_PREFIX);
+        for (int i = 0; i < CODE_LENGTH; i++) {
+            code.append(CODE_ALPHABET[random.nextInt(CODE_ALPHABET.length)]);
+        }
+        return code.toString();
+    }
+
+    /** Whether an id is a generated private-channel code. */
+    public static boolean isJoinCode(String channel) {
+        if (channel == null) return false;
+        String trimmed = channel.trim().toUpperCase(Locale.ROOT);
+        if (!trimmed.startsWith(CODE_PREFIX) || trimmed.length() != CODE_PREFIX.length() + CODE_LENGTH) {
+            return false;
+        }
+        for (int i = CODE_PREFIX.length(); i < trimmed.length(); i++) {
+            if (indexOf(CODE_ALPHABET, trimmed.charAt(i)) < 0) return false;
+        }
+        return true;
+    }
+
+    private static int indexOf(char[] alphabet, char value) {
+        for (int i = 0; i < alphabet.length; i++) {
+            if (alphabet[i] == value) return i;
+        }
+        return -1;
     }
 
     /** Normalises a channel id, treating null/blank as {@link #WORLD}. */

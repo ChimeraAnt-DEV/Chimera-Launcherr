@@ -78,4 +78,42 @@ public class VoiceChannelTest {
         assertFalse(VoiceChannel.inRange(-1f, 12f));
         assertFalse(VoiceChannel.inRange(1f, 0f));
     }
+
+    @Test
+    public void generatedCodeHasTheAdvertisedShape() {
+        String code = VoiceChannel.generateCode(new java.util.Random(7));
+        assertTrue(code.startsWith(VoiceChannel.CODE_PREFIX));
+        assertEquals(VoiceChannel.CODE_PREFIX.length() + 4, code.length());
+        assertTrue(VoiceChannel.isJoinCode(code));
+    }
+
+    @Test
+    public void codeAlphabetHasNoAmbiguousCharacters() {
+        // A code is read aloud and typed by hand, so O/0 and I/1/L must never appear.
+        java.util.Random random = new java.util.Random(1);
+        for (int i = 0; i < 200; i++) {
+            String body = VoiceChannel.generateCode(random).substring(VoiceChannel.CODE_PREFIX.length());
+            for (char c : body.toCharArray()) {
+                assertFalse("ambiguous character " + c, "O0IL1".indexOf(c) >= 0);
+            }
+        }
+    }
+
+    @Test
+    public void isJoinCodeRejectsPlainNamesAndMalformedCodes() {
+        assertFalse(VoiceChannel.isJoinCode("team"));
+        assertFalse(VoiceChannel.isJoinCode("CHIMERA-TOOLONG"));
+        assertFalse(VoiceChannel.isJoinCode("CHIMERA-"));
+        assertFalse(VoiceChannel.isJoinCode("CHIMERA-OOOO")); // ambiguous letters are not in the alphabet
+        assertTrue(VoiceChannel.isJoinCode(" chimera-7f2q "));
+    }
+
+    @Test
+    public void joinCodeIsJustAChannelIdSoTypingItJoinsTheSameRoom() {
+        String code = VoiceChannel.generateCode(new java.util.Random(3));
+        // Normalising then comparing is exactly what both peers do, so the code is the whole
+        // invite: no other state has to travel for the two to land in the same channel.
+        assertEquals(code.toLowerCase(java.util.Locale.ROOT), VoiceChannel.normalize(code));
+        assertTrue(VoiceChannel.canHear(code, VoiceChannel.normalize(code)));
+    }
 }

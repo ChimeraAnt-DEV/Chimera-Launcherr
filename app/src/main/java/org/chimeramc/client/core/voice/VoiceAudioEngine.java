@@ -34,6 +34,10 @@ public final class VoiceAudioEngine {
     /** Frames whose peak is below this are silence and are not transmitted. */
     private static final int SILENCE_PEAK = 220;
 
+    /** Exponential smoothing coefficients: fast attack, slower release, so the meter cannot flicker. */
+    private static final float LEVEL_ATTACK = 0.6f;
+    private static final float LEVEL_RELEASE = 0.12f;
+
     /** What a captured frame triggers; runs on the capture thread. */
     public interface FrameSink {
         void onFrame(byte[] pcm, int length);
@@ -41,12 +45,64 @@ public final class VoiceAudioEngine {
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicInteger volumePercent = new AtomicInteger(100);
+    private final AtomicInteger levelBits = new AtomicInteger(Float.floatToIntBits(0f));
     private AudioRecord record;
     private AudioTrack track;
     private Thread captureThread;
     private Thread playThread;
     private FrameSink sink;
     private volatile boolean micEnabled = true;
+
+    /**
+     * The smoothed microphone level in {@code [0,1]}, for the talking indicator.
+     *
+     * <p>Driven from the capture loop, where the raw PCM is already in hand, rather than by a
+     * timed animation: the number the meter draws is the audio that is actually being sent.
+     */
+    public float currentLevel() {
+        return Float.intBitsToFloat(levelBits.get());
+    }
+
+    /**
+     * Updates the smoothed level from one frame's RMS, applying the attack/release.
+     *
+     * <p>RMS (not peak) because the meter should track perceived loudness; the smoothing because
+     * a per-frame value jumps far enough between 20 ms frames to strobe. A rising level follows
+     * quickly so the meter reacts on the first syllable, and a falling one decays gently so it
+     * does not chatter through the gaps inside a word.
+     */
+    void updateLevel(byte[] pcm, int length) {
+        float rms = rms(pcm, length);
+        float target = Math.min(1f, rms * LEVEL_HEADROOM);
+        float previous = currentLevel();
+        float coefficient = target > previous ? LEVEL_ATTACK : LEVEL_RELEASE;
+        float next = previous + (target - previous) * coefficient;
+        if (next < 0.0005f) next = 0f;
+        levelBits.set(Float.floatToIntBits(next));
+    }
+
+    /** One frame's normalised RMS, as a pure helper so the meter maths is unit-testable. */
+    static float rms(byte[] pcm, int length) {
+        if (pcm == null || length < 2) return 0f;
+        double sum = 0;
+        int samples = 0;
+        for (int i = 0; i + 1 < length; i += 2) {
+            int sample = (short) ((pcm[i] & 0xFF) | (pcm[i + 1] << 8));
+            sum += (double) sample * sample;
+            samples++;
+        }
+        if (samples == 0) return 0f;
+        return (float) (Math.sqrt(sum / samples) / 32768.0);
+    }
+
+    /**
+     * Scales a raw RMS into a meter fraction.
+     *
+     * <p>Speech at a normal distance sits around 0.1-0.2 RMS, so a linear map would leave the
+     * meter in its bottom fifth for most talking. The gain lifts that into the visible range
+     * while still clipping at full scale.
+     */
+    private static final float LEVEL_HEADROOM = 6f;
 
     /** Opens the device; returns false when a capture or playback stream cannot be created. */
     public boolean start(boolean transmit) {
@@ -174,7 +230,14 @@ public final class VoiceAudioEngine {
                 break;
             }
             if (read <= 0) continue;
-            if (!micEnabled) continue;
+            if (!micEnabled) {
+                // Muted: the meter must fall to zero, not freeze at the last level.
+                levelBits.set(Float.floatToIntBits(0f));
+                continue;
+            }
+            // Update the level before the silence gate: a frame that is too quiet to send is
+            // still audio the meter has to decay through, or it would stick at the last value.
+            updateLevel(frame, read);
             if (isSilent(frame, read)) continue;
             FrameSink currentSink = sink;
             if (currentSink != null) {
