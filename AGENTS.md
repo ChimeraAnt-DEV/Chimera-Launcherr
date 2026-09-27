@@ -122,7 +122,8 @@
   - **`shouldHandleNavKeys()`** (default true) — override to `false` on any screen that needs raw button presses. `CustomizeActivity` does, so `ControllerSettingsFragment`'s illustration can highlight the pressed button.
   - **`LauncherTab.shouldHandleKey(code, navBarPresent, gameSessionActive)`** — tab switching is suppressed while `LowLatencyNetworkManager.isGameSessionActive()`. Note `MinecraftActivity` extends the *game's* `com.mojang.minecraftpe.MainActivity`, NOT the launcher's, so gameplay never had the nav bar or this handler — but the session guard is kept as defence in depth.
 - `BaseActivity.NAV_TAB_IDS` is the single id array shared by `setupBaseNavBar()` and `setActiveNavTab()`; adding a tab means updating the layout, that array, the click handler, and `LauncherTab`. `LauncherTabTest` covers ordering, activity mapping, wraparound, the key map and both guards.
-- **There are six tabs.** `LAUNCH, VERSIONS, INSTALLATIONS, MODS, CUSTOMIZE, SETTINGS`. About is *not* a tab — it is reached from Settings (`SettingsActivity` `openAbout`). Controller and Skins are *not* tabs either; both live inside `CustomizeActivity` as `ControllerSettingsFragment` / `SkinsSettingsFragment` swapped behind `customize_tab_controller` / `customize_tab_skins`. Do not re-promote About/Controller/Skins to top-level tabs; add a new destination inside an existing tab instead.
+- **There are seven tabs.** `LAUNCH, VERSIONS, INSTALLATIONS, MODS, VOICE, CUSTOMIZE, SETTINGS`. About is *not* a tab — it is reached from Settings (`SettingsActivity` `openAbout`). Controller and Skins are *not* tabs either; both live inside `CustomizeActivity` as `ControllerSettingsFragment` / `SkinsSettingsFragment` swapped behind `customize_tab_controller` / `customize_tab_skins`. Do not re-promote About/Controller/Skins to top-level tabs; add a new destination inside an existing tab instead.
+- **VOICE is its own tab** (`VoiceChatActivity`), because proximity voice is a whole feature with a master switch, a channel directory and join-by-code, not a settings pane. It drives `VoiceChatModule` directly (the module singleton is shared with the in-game overlay) rather than going through `InbuiltOverlayManager`, which only exists during a game session.
 - **Screens that tint the rail themselves must touch all three pieces.** `SettingsActivity` re-applies a freshly chosen accent to the Settings entry directly (indicator + icon + label); the old text-view+compound-drawable path no longer applies. `MainActivity`/`InstancesActivity` still swallow a click on their own row via `nav_item_*`.
 - `ControllerSettingsFragment` is the live home of the controller illustration and profile editor. It exposes `wantsRawKeyEvents()`, `handleHardwareKey(keyCode, down)` and `handleHardwareMotion(event)`, which `CustomizeActivity.dispatchKeyEvent` / `dispatchGenericMotionEvent` forward. The old standalone `ControllerActivity` was deleted — do not reintroduce it.
 - `focus_ring` was prototyped and removed — no focus system consumes it; do not re-add a token without a consumer. Nav rows get touch feedback from `DynamicAnim.applyPressScale(row)`.
@@ -468,6 +469,30 @@ conclusions.
   starts (`InbuiltOverlayManager.REQUEST_VOICE_MIC`); if denied the module still starts listen-only.
 - The module is `ModIds.VOICE_CHAT` in `GROUP_VOICE` (the `Voice` section), a non-PvP module, so
   `groupPvpLast` keeps it a single contiguous run. `VoiceModuleGroupingTest` pins the grouping.
+- **Protocol v2 adds a visibility byte and a human-readable channel name, and keeps v1 decodable.**
+  `VoiceProtocol.VERSION = 2`; a v1 datagram still decodes as PUBLIC on channel `world` (what v1
+  described, since v1 had no private room). An unknown visibility byte clamps to PUBLIC so a
+  malformed packet cannot hide a channel. Pinned by `VoiceProtocolTest`.
+- **A private channel's id _is_ its join code** (`VoiceChannel.generateCode` -> `CHIMERA-7F2Q`).
+  There is no invite protocol: typing the code normalises to the same channel id and the existing
+  `canHear` match does the rest, so sharing the string is the whole mechanism. The alphabet excludes
+  `O/0/I/1/L` because a code is read aloud and typed by hand. `isJoinCode` distinguishes a code from
+  a plain public room name.
+- **`VoiceChannelDirectory` is built client-side from the registry snapshot** -- no server, no
+  query. Private channels are filtered out of the listing (a browsable list is public by
+  definition); the latest advertisement wins for name/visibility, so a rename or a switch to public
+  shows immediately. Pure and pinned by `VoiceChannelDirectoryTest`.
+- **The Voice tab (`VoiceChatActivity`) is a view onto existing state.** It drives `VoiceChatModule`
+  directly -- the singleton is shared with the in-game overlay -- because `InbuiltOverlayManager`
+  only exists during a game session. Channel selection writes the same preference the module
+  beacons; there is no second source of truth. The module dialog's free-text channel field routes
+  through the same `joinVoiceChannel(...)` path, so a typed room name is advertised rather than
+  falling back to the id.
+- **The in-game indicator is `MicIndicatorView`**, a blocky 12x12 pixel-art meter (anti-aliasing
+  off) driven by the real smoothed microphone RMS (`VoiceAudioEngine.updateLevel`), with fast attack
+  / slow release so it reacts on the first syllable and does not flicker. Use RMS, not peak (a meter
+  tracks loudness); a muted mic drops the level to zero rather than freezing it. `rms`/`sprite` are
+  package-visible so `VoiceAudioEngineLevelTest`/`MicIndicatorViewTest` can pin them.
 
 ## In-game pack changer (core.content.InGamePackChanger + PackChangerPanel)
 - Per-instance opt-in toggle in Instance Settings (`GameVersion.inGamePackChangerEnabled`,
