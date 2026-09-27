@@ -1,0 +1,62 @@
+name: Discord Update Bot
+
+on:
+  release:
+    types: [published] # Automatically triggers when you publish a release
+  
+  workflow_dispatch: # Allows you to trigger manually with a custom message
+    inputs:
+      title:
+        description: 'Update Title'
+        required: true
+        default: 'New ChimeraClient Update!'
+      message:
+        description: 'Update Message'
+        required: true
+        default: 'Check out the new features!'
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Notification to Discord
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }} # Use ONE unified secret
+        run: |
+          if [ -z "$WEBHOOK_URL" ] || [ "$WEBHOOK_URL" == "RL" ]; then
+            echo "Webhook secret is empty or invalid!"
+            exit 1
+          fi
+
+          if [ "${{ github.event_name }}" == "release" ]; then
+            # Automatic Release logic
+            TAG="${{ github.event.release.tag_name }}"
+            NAME="${{ github.event.release.name }}"
+            BODY="${{ github.event.release.body }}"
+            URL="${{ github.event.release.html_url }}"
+
+            if [ -z "$BODY" ]; then
+              BODY="No detailed changelog provided. Click the link below to view the release."
+            fi
+
+            TRUNCATED_BODY=$(echo "$BODY" | head -c 1500)
+            
+            # Using printf to fix the glitched \n formatting
+            MESSAGE=$(printf "🚀 **%s (%s)** 🚀\n\n%s\n\n🔗 **[View Full Release on GitHub](%s)**" "$NAME" "$TAG" "$TRUNCATED_BODY" "$URL")
+          else
+            # Manual Dispatch logic
+            TITLE="${{ github.event.inputs.title }}"
+            BODY="${{ github.event.inputs.message }}"
+            
+            # Using printf to fix the glitched \n formatting
+            MESSAGE=$(printf "📢 **%s** 📢\n\n%s" "$TITLE" "$BODY")
+          fi
+
+          # Safely encode the JSON payload
+          PAYLOAD=$(jq -n --arg content "$MESSAGE" '{content: $content}')
+
+          # Send to Discord
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "$PAYLOAD" \
+               "$WEBHOOK_URL"
