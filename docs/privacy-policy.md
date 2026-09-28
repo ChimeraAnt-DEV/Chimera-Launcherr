@@ -1,6 +1,6 @@
 # Privacy Policy
 
-This privacy policy applies to the Chimera Client app for mobile devices, together with any related services operated by LiteLDev (collectively, the "Application"). LiteLDev is hereby referred to as the "Service Provider".
+This privacy policy applies to the GlowberryClient app for mobile devices, together with any related services operated by LiteLDev (collectively, the "Application"). LiteLDev is hereby referred to as the "Service Provider".
 
 ## Information Collection and Use
 

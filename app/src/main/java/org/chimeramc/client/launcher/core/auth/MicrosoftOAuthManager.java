@@ -25,7 +25,7 @@ import java.util.List;
 
 /**
  * Microsoft OAuth Integration using official MSAL library
- * Provides official Microsoft login flows for Chimera Client
+ * Provides official Microsoft login flows for GlowberryClient
  */
 public class MicrosoftOAuthManager {
     private static final String TAG = "MicrosoftOAuth";

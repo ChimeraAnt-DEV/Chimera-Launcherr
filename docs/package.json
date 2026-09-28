@@ -2,7 +2,7 @@
   "name": "chimeraclient-docs",
   "private": true,
   "version": "0.0.0",
-  "description": "Documentation site for the ChimeraClient Android launcher",
+  "description": "Documentation site for the GlowberryClient Android launcher",
   "scripts": {
     "docs:dev": "vitepress dev .",
     "docs:build": "vitepress build .",

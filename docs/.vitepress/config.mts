@@ -102,8 +102,8 @@ function buildChineseNav(): DefaultTheme.NavItem[] {
 }
 
 export default defineConfig({
-  title: "Chimera Client",
-  description: "Documentation for the ChimeraClient Android Minecraft Bedrock launcher.",
+  title: "GlowberryClient",
+  description: "Documentation for the GlowberryClient Android Minecraft Bedrock launcher.",
   lang: "en-US",
   base,
   cleanUrls: true,

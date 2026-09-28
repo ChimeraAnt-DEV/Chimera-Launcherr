@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "headline": "Introducing Chimera Client",
-  "summary": "The launcher is now Chimera Client, with a rebuilt interface, a new Installations tab for one-tap Bedrock installs, and three PvP combat modules.",
+  "headline": "Introducing GlowberryClient",
+  "summary": "The launcher is now GlowberryClient, with a rebuilt interface, a new Installations tab for one-tap Bedrock installs, and three PvP combat modules.",
   "sections": [
     {
       "title": "Rebrand",
       "items": [
         {
-          "text": "Chimera Launcher is now Chimera Client, with a new name, package and app identity.",
+          "text": "Chimera Launcher is now GlowberryClient, with a new name, package and app identity.",
           "url": "https://github.com/ChimeraAnt-DEV/ChimeraLauncher/commit/c2ceda5ff78b0798df468d66654599dad99b6532"
         }
       ]

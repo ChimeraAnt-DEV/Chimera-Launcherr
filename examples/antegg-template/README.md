@@ -1,6 +1,6 @@
 # .AntEgg mod format
 
-`.AntEgg` is the Chimera Client mod packaging format. It is a ZIP archive with the `.antegg`
+`.AntEgg` is the GlowberryClient mod packaging format. It is a ZIP archive with the `.antegg`
 extension, so a package is one file a user can download and import, and its contents are
 inspectable with any ZIP tool.
 

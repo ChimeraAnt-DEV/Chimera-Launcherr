@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Adaptive launcher icon. The foreground art is already scaled inside
-    ic_launcher_foreground, so no <inset> is applied here: stacking a 26% inset on top of
-    pre-scaled art shrank the mark twice and left it stranded mid-tile.
+    Adaptive launcher icon. The foreground art is pre-scaled into the 66dp safe zone of the
+    108dp canvas, so no <inset> is applied here: stacking an inset on top of pre-scaled art
+    would shrink the mark twice and leave it stranded mid-tile.
 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
   <background android:drawable="@color/ic_launcher_adaptive_back" />

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Common -->
-    <string name="app_name">Chimera Client</string>
+    <string name="app_name">GlowberryClient</string>
     <string name="minecraft">Minecraft</string>
     <string name="launch">Iniciar</string>
     <string name="beta_badge">Beta</string>
@@ -23,7 +23,7 @@
 
     <!-- About -->
     <string name="about_title">☕ Sobre</string>
-    <string name="copyright">©2024–2026 ChimeraMC. Todos os direitos reservados.</string>
+    <string name="copyright">©2024–2026 GlowberryClient. Todos os direitos reservados.</string>
     <string name="font_license">Este aplicativo usa a fonte Misans.</string>
     <string name="about_footer_github">GitHub: https://github.com/ChimeraAnt-DEV/ChimeraLauncher</string>
     <string name="quick_actions_title">Ações Rápidas</string>
@@ -61,7 +61,7 @@
 
     <!-- Permissions -->
     <string name="storage_permission_title">Permissão para Migração de Armazenamento</string>
-    <string name="storage_permission_message">Conceda permissão de armazenamento para que o Chimera Client copie os dados do antigo diretório games/org.chimeramc. Esta permissão é usada apenas na migração.</string>
+    <string name="storage_permission_message">Conceda permissão de armazenamento para que o GlowberryClient copie os dados do antigo diretório games/org.chimeramc. Esta permissão é usada apenas na migração.</string>
     <string name="grant_permission">Conceder</string>
     <string name="cancel">Cancelar</string>
 
@@ -160,7 +160,7 @@
     <string name="repair_processing">Extraindo bibliotecas…</string>
     <string name="repair_finalizing">Finalizando reparo…</string>
     <string name="storage_migration_title">Migração de Armazenamento Necessária</string>
-    <string name="storage_migration_message">O Chimera Client deve migrar os dados de games/org.chimeramc para %1$s antes de continuar.
+    <string name="storage_migration_message">O GlowberryClient deve migrar os dados de games/org.chimeramc para %1$s antes de continuar.
 
 Essa mudança de armazenamento é necessária para cumprir os requisitos de publicação na Google Play. O diretório antigo será mantido intacto, mas não será mais usado após a migração.
 
@@ -182,11 +182,11 @@ A migração pode demorar. Você pode deixar o app em segundo plano enquanto ela
 
 O diretório antigo games/org.chimeramc não foi excluído e não é mais usado.</string>
     <string name="storage_migration_partial_title">Migração Incompleta</string>
-    <string name="storage_migration_partial_message">%1$d de %2$d arquivos não puderam ser copiados. A migração deve ser concluída antes que o Chimera Client continue.</string>
+    <string name="storage_migration_partial_message">%1$d de %2$d arquivos não puderam ser copiados. A migração deve ser concluída antes que o GlowberryClient continue.</string>
     <string name="storage_migration_failed_title">Falha na Migração</string>
     <string name="storage_migration_failed_message">A migração não pôde continuar: %1$s
 
-A migração deve ser concluída antes que o Chimera Client continue.</string>
+A migração deve ser concluída antes que o GlowberryClient continue.</string>
     <string name="migration_cleanup_title">Limpar diretório histórico</string>
     <string name="migration_cleanup_desc">Remova o antigo diretório games/org.chimeramc somente depois de confirmar que todas as instâncias iniciam normalmente e que mundos, pacotes de recursos, pacotes de comportamento e configurações não estão ausentes. Dados históricos excluídos não poderão ser restaurados a partir desse diretório.</string>
     <string name="migration_cleanup_button">Limpar diretório histórico</string>
@@ -211,8 +211,8 @@ A migração deve ser concluída antes que o Chimera Client continue.</string>
 
     <string name="error_no_browser">Nenhum navegador disponível</string>
 
-    <string name="eula_title">Contrato de Licença Chimera Client</string>
-    <string name="eula_message"><b>Bem-vindo ao Chimera Client</b>\n\nAo usar este software, você concorda que:\n\n• Este é um launcher <b>não oficial</b>\n• Você deve possuir uma cópia <b>licenciada</b> do Minecraft\n• Qualquer pirataria ou trapaça é proibida\n• O uso de mods/pacotes é por sua conta e risco\n• Não afiliado à Mojang/Microsoft\n\nO uso contínuo constitui concordância</string>
+    <string name="eula_title">Contrato de Licença GlowberryClient</string>
+    <string name="eula_message"><b>Bem-vindo ao GlowberryClient</b>\n\nAo usar este software, você concorda que:\n\n• Este é um launcher <b>não oficial</b>\n• Você deve possuir uma cópia <b>licenciada</b> do Minecraft\n• Qualquer pirataria ou trapaça é proibida\n• O uso de mods/pacotes é por sua conta e risco\n• Não afiliado à Mojang/Microsoft\n\nO uso contínuo constitui concordância</string>
     <string name="eula_agree">Aceitar</string>
     <string name="eula_exit">Recusar</string>
 
@@ -440,7 +440,7 @@ A migração deve ser concluída antes que o Chimera Client continue.</string>
     <string name="ms_active_badge">Ativa</string>
     <string name="ms_account_subtitle_format">ID do Usuário: %1$s • Atualizado: %2$s</string>
     <string name="xbox_avatar">Avatar do Xbox</string>
-    <string name="launcher_managed_mc_login">Entre no Minecraft usando o Chimera Client</string>
+    <string name="launcher_managed_mc_login">Entre no Minecraft usando o GlowberryClient</string>
     <string name="dialog_title_login_required">Login necessário</string>
     <string name="dialog_message_login_required">O login está ativado, mas nenhuma conta está conectada. Vá em Contas para entrar.</string>
     <string name="go_to_accounts">Contas</string>
@@ -645,15 +645,15 @@ A migração deve ser concluída antes que o Chimera Client continue.</string>
     <string name="vanilla_prefix">Vanilla %s</string>
 
     <string name="about_page_title">Sobre</string>
-    <string name="about_subtitle">Chimera Client — Um launcher moderno para Minecraft Bedrock</string>
+    <string name="about_subtitle">GlowberryClient — Um launcher moderno para Minecraft Bedrock</string>
     <string name="about_authors_title">👥 Autores e Colaboradores</string>
     <string name="about_author_name">DreamGuXiang</string>
     <string name="about_author_badge">Autor</string>
-    <string name="about_author_role">Autores do Chimera Client</string>
+    <string name="about_author_role">Autores do GlowberryClient</string>
     <string name="about_afdian">Afdian</string>
     <string name="about_patreon">Patreon</string>
     <string name="about_source_title">Código Fonte e Open Source</string>
-    <string name="about_github_repo">GitHub · Chimera Client</string>
+    <string name="about_github_repo">GitHub · GlowberryClient</string>
     <string name="about_github_org">ChimeraAnt-DEV</string>
     <string name="about_license_note">Veja LICENSE no repositório para detalhes.</string>
     <string name="about_contribute_title">Contribuir</string>
@@ -663,7 +663,7 @@ A migração deve ser concluída antes que o Chimera Client continue.</string>
 
     <string-array name="launcher_tips">
         <item>As Configurações permitem que você ajuste tema, cor, fundo e outras opções para combinar com você.</item>
-        <item>O Chimera Client é open source. Use o GitHub para relatar problemas ou sugerir melhorias.</item>
+        <item>O GlowberryClient é open source. Use o GitHub para relatar problemas ou sugerir melhorias.</item>
         <item>Use o menu suspenso para alternar a instância atual rapidamente.</item>
         <item>As pessoas realmente leem isso?</item>
         <item>Você pode arrastar os mods para alterar a prioridade de carregamento.</item>
@@ -771,7 +771,7 @@ A migração deve ser concluída antes que o Chimera Client continue.</string>
     <string name="delete_account_title">Excluir conta</string>
     <string name="delete_account_confirm">Tem certeza de que deseja excluir esta conta?</string>
     <string name="instance_backup_title">Backup da instância</string>
-    <string name="instance_backup_desc">Crie um backup completo desta instância em Download/Chimera Client/Backups.</string>
+    <string name="instance_backup_desc">Crie um backup completo desta instância em Download/GlowberryClient/Backups.</string>
     <string name="instance_backup_button">Fazer backup da instância</string>
     <string name="instance_backup_confirm_message">Criar um backup completo desta instância agora? Feche o Minecraft primeiro se ele estiver em execução para evitar alterações nos arquivos durante o backup.</string>
     <string name="instance_backup_in_progress">Fazendo backup da instância…</string>
@@ -810,9 +810,9 @@ A migração deve ser concluída antes que o Chimera Client continue.</string>
     <string name="ms_device_code_login_desc">Abra uma sessão privada do navegador com o código do dispositivo já preenchido.</string>
     <string name="ms_webview_login">Abrir login incorporado</string>
     <string name="ms_webview_option_title">WebView incorporada</string>
-    <string name="ms_webview_login_desc">Entre sem sair do Chimera Client. Use esta opção quando o fluxo pelo navegador não estiver disponível.</string>
+    <string name="ms_webview_login_desc">Entre sem sair do GlowberryClient. Use esta opção quando o fluxo pelo navegador não estiver disponível.</string>
     <string name="ms_device_code_title">Entrar com código do dispositivo</string>
-    <string name="ms_device_code_instructions">Abra a página de login por dispositivo da Microsoft, digite este código e aprove o acesso. O Chimera Client concluirá automaticamente.</string>
+    <string name="ms_device_code_instructions">Abra a página de login por dispositivo da Microsoft, digite este código e aprove o acesso. O GlowberryClient concluirá automaticamente.</string>
     <string name="ms_device_code_label">Código do dispositivo Microsoft</string>
     <string name="ms_device_code_requesting">Solicitando um código seguro…</string>
     <string name="ms_device_code_waiting_code">--------</string>
@@ -826,7 +826,7 @@ A migração deve ser concluída antes que o Chimera Client continue.</string>
     <string name="ms_device_code_copied">Código copiado</string>
     <string name="ms_device_code_open_browser">Abrir login da Microsoft</string>
     <string name="ms_device_code_step_title">Conclua o login no navegador</string>
-    <string name="ms_device_code_browser_note">O Chimera Client abre seu navegador padrão em uma sessão privada, preenche o código automaticamente e solicita um novo login da Microsoft.</string>
+    <string name="ms_device_code_browser_note">O GlowberryClient abre seu navegador padrão em uma sessão privada, preenche o código automaticamente e solicita um novo login da Microsoft.</string>
     <string name="ms_choose_other_method">Outro método</string>
     <string name="ms_no_browser">Nenhum navegador está disponível neste dispositivo.</string>
     <string name="ms_default_browser_no_private_mode">Seu navegador padrão não oferece suporte a login privado. Atualize-o ou use o login por WebView.</string>
@@ -834,7 +834,7 @@ A migração deve ser concluída antes que o Chimera Client continue.</string>
     <string name="ms_login_state_failed">Não foi possível verificar a resposta de login da Microsoft. Inicie o login novamente.</string>
     <string name="ms_login_missing_code">A Microsoft não retornou um código de login. Inicie o login novamente ou use o login por Código do dispositivo.</string>
     <string name="ms_feature_disabled_title">Recurso desativado</string>
-    <string name="ms_feature_disabled_desc">Ative “Entrar no Minecraft com Chimera Client” nas Configurações para gerenciar contas da Microsoft.</string>
+    <string name="ms_feature_disabled_desc">Ative “Entrar no Minecraft com GlowberryClient” nas Configurações para gerenciar contas da Microsoft.</string>
     <string name="ms_activated">Ativado</string>
     <string name="inbuilt_mod_gyro">Giroscópio</string>
     <string name="inbuilt_mod_gyro_desc">Use o giroscópio do dispositivo para controlar a rotação da câmera</string>

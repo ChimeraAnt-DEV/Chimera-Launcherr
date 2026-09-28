@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * The catalogue of Chimera Client cosmetics: capes and accessories.
+ * The catalogue of GlowberryClient cosmetics: capes and accessories.
  *
  * This class is pure data plus pure selection logic, so "which cape is equipped" and "is the
  * first cape animated" are unit-testable without an Android context or a running overlay.
@@ -27,7 +27,7 @@ public final class CosmeticCatalog {
         public final int trimColor;
         /** Whether the brand mark crawls across the cape. */
         public final boolean animated;
-        /** Whether the cape carries the Chimera Client brand mark at all. */
+        /** Whether the cape carries the GlowberryClient brand mark at all. */
         public final boolean branded;
 
         public Cape(String id, String name, int color, int trimColor, boolean animated, boolean branded) {
@@ -60,7 +60,7 @@ public final class CosmeticCatalog {
 
     static {
         List<Cape> capes = new ArrayList<>();
-        // The first cape is the animated Chimera Client cape: the brand mark crawls across the
+        // The first cape is the animated GlowberryClient cape: the brand mark crawls across the
         // cloth, which is the one piece of motion this section is meant to show off.
         capes.add(new Cape("chimera", "Chimera Cape", 0xFF6236E8, 0xFFA88CFF, true, true));
         capes.add(new Cape("void_black", "Void Black", 0xFF141418, 0xFF3A3A44, false, false));

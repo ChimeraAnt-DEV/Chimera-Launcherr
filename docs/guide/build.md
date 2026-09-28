@@ -1,6 +1,6 @@
 # Build from Source
 
-This page is for contributors who want to build ChimeraClient itself. Native mod build notes live in [Native Mod Quick Start](/guide/developer).
+This page is for contributors who want to build GlowberryClient itself. Native mod build notes live in [Native Mod Quick Start](/guide/developer).
 
 ## Prerequisites
 
@@ -14,10 +14,10 @@ This page is for contributors who want to build ChimeraClient itself. Native mod
 
 ```bash
 git clone https://github.com/ChimeraAnt-DEV/ChimeraLauncher.git
-cd ChimeraClient
+cd GlowberryClient
 ```
 
-Open the project directory in Android Studio and allow Gradle sync to finish. The project root is named `chimeralauncher` in Gradle settings, while the repository remains `ChimeraClient`.
+Open the project directory in Android Studio and allow Gradle sync to finish. The project root is named `chimeralauncher` in Gradle settings, while the repository remains `GlowberryClient`.
 
 ## Build and Run
 

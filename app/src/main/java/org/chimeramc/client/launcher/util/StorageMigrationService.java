@@ -352,7 +352,7 @@ public class StorageMigrationService extends Service {
 
     private Notification buildProgressNotification(MigrationState state) {
         Notification.Builder builder = newNotificationBuilder()
-                .setSmallIcon(R.drawable.ic_leaf_logo_mono)
+                .setSmallIcon(R.drawable.ic_glowberry_mono)
                 .setContentTitle(getString(R.string.storage_migration_progress_title))
                 .setContentText(getNotificationText(state))
                 .setStyle(new Notification.BigTextStyle().bigText(getNotificationText(state)))
@@ -393,7 +393,7 @@ public class StorageMigrationService extends Service {
         }
 
         return newNotificationBuilder()
-                .setSmallIcon(R.drawable.ic_leaf_logo_mono)
+                .setSmallIcon(R.drawable.ic_glowberry_mono)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setStyle(new Notification.BigTextStyle().bigText(text))

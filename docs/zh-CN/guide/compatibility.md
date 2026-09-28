@@ -2,12 +2,12 @@
 
 ## 支持设备
 
-Chimera Client 面向 Android 9.0 或更高版本的 ARM64 设备。可用内存和存储越多，管理
+GlowberryClient 面向 Android 9.0 或更高版本的 ARM64 设备。可用内存和存储越多，管理
 多个版本、大型世界或资源包时体验越好。
 
 ## Minecraft 要求
 
-Chimera Client 需要 Google Play 安装的正版 Minecraft Bedrock Edition。它面向合法
+GlowberryClient 需要 Google Play 安装的正版 Minecraft Bedrock Edition。它面向合法
 玩家，不提供 Minecraft 授权。
 
 如果没有安装 Minecraft、安装来源不受支持，或版本过旧，启动器可能会在启动游戏前停止。
@@ -30,7 +30,7 @@ Native 模块会在游戏进程中运行原生代码。只安装可信来源的�
 
 ### 为什么启动器提示找不到 Minecraft？
 
-请从 Google Play 安装或更新官方 Minecraft，然后重新打开 Chimera Client。
+请从 Google Play 安装或更新官方 Minecraft，然后重新打开 GlowberryClient。
 
 ### 为什么导入版本启动失败？
 

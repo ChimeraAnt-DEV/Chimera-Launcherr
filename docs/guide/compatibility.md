@@ -2,13 +2,13 @@
 
 ## Supported Devices
 
-Chimera Client targets Android 9.0 or later on ARM64 devices. Devices with more
+GlowberryClient targets Android 9.0 or later on ARM64 devices. Devices with more
 available RAM and storage will have a better experience, especially when
 managing multiple versions or large worlds.
 
 ## Minecraft Requirement
 
-Chimera Client requires the official Minecraft Bedrock Edition app from Google
+GlowberryClient requires the official Minecraft Bedrock Edition app from Google
 Play. It is designed for legitimate players and does not provide a Minecraft
 license.
 
@@ -41,7 +41,7 @@ sources you trust, and test them with an isolated version first.
 ### Why does the launcher say Minecraft is missing?
 
 Install or update the official Minecraft app from Google Play, then open
-Chimera Client again.
+GlowberryClient again.
 
 ### Why can an imported version fail to launch?
 
