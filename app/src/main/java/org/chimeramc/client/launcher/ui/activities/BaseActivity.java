@@ -14,6 +14,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Pair;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
@@ -155,7 +156,24 @@ public class BaseActivity extends AppCompatActivity {
      * effect never appears over Minecraft.
      */
     private View attachFireworkLayer(View root) {
-        FrameLayout holder = new FrameLayout(this);
+        // The holder observes every touch that reaches it (it is on top), then passes the event
+        // down itself. The firework view cannot return true for a DOWN without swallowing the
+        // gesture, and a view that returns false never receives the MOVE stream, so a drag trail
+        // was impossible from inside the child. Observing here is what makes the trail work while
+        // the screen below still gets a completely normal gesture.
+        FrameLayout holder = new FrameLayout(this) {
+            @Override
+            public boolean onInterceptTouchEvent(MotionEvent ev) {
+                if (fireworkLayer != null) fireworkLayer.observe(ev);
+                return false;
+            }
+
+            @Override
+            public boolean onTouchEvent(MotionEvent ev) {
+                if (fireworkLayer != null) fireworkLayer.observe(ev);
+                return false;
+            }
+        };
         holder.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         holder.addView(root, new FrameLayout.LayoutParams(
@@ -163,6 +181,8 @@ public class BaseActivity extends AppCompatActivity {
         fireworkLayer = new FireworkTouchLayer(this);
         holder.addView(fireworkLayer, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        fireworkLayer.setClickable(false);
+        fireworkLayer.setFocusable(false);
         return holder;
     }
 
@@ -628,9 +648,11 @@ public class BaseActivity extends AppCompatActivity {
             unregisterReceiver(newsReceiver);
             newsReceiverRegistered = false;
         }
-        ControllerConnectionMonitor monitor = controllerMonitor();
-        monitor.setListener(null);
-        monitor.stop();
+        // Detach only this screen's listener. The monitor's device registration is process-wide
+        // and deliberately left running: stopping it here unregistered the listener while the
+        // incoming screen (or the game) was already in front, so a pad plugged in during a tab
+        // change was never seen.
+        controllerMonitor().clearListener(controllerListener);
         super.onStop();
     }
 

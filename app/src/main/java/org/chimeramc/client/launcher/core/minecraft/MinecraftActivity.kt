@@ -361,28 +361,40 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
      * Listens for controllers while gameplay is in front, so the connection pill appears over
      * Minecraft and the pad's profile is loaded the moment it is plugged in mid-session.
      */
+    private var controllerMonitorListener:
+        org.chimeramc.client.launcher.controller.ControllerConnectionMonitor.Listener? = null
+
     private fun attachControllerMonitor() {
         val monitor = org.chimeramc.client.launcher.controller.ControllerConnectionMonitor.get(this)
-        monitor.setListener(object : org.chimeramc.client.launcher.controller.ControllerConnectionMonitor.Listener {
-            override fun onControllerConnected(
-                name: String,
-                type: org.chimeramc.client.launcher.controller.ControllerType,
-                profileName: String?
-            ) {
-                org.chimeramc.client.launcher.controller.ControllerToastView.showConnected(
-                    this@MinecraftActivity, name, profileName, type)
-            }
+        if (controllerMonitorListener == null) {
+            controllerMonitorListener =
+                object : org.chimeramc.client.launcher.controller.ControllerConnectionMonitor.Listener {
+                    override fun onControllerConnected(
+                        name: String,
+                        type: org.chimeramc.client.launcher.controller.ControllerType,
+                        profileName: String?
+                    ) {
+                        org.chimeramc.client.launcher.controller.ControllerToastView.showConnected(
+                            this@MinecraftActivity, name, profileName, type)
+                    }
 
-            override fun onControllerDisconnected(name: String) {
-                org.chimeramc.client.launcher.controller.ControllerToastView.showDisconnected(
-                    this@MinecraftActivity, name)
-            }
-        })
+                    override fun onControllerDisconnected(name: String) {
+                        org.chimeramc.client.launcher.controller.ControllerToastView.showDisconnected(
+                            this@MinecraftActivity, name)
+                    }
+                }
+        }
+        monitor.setListener(controllerMonitorListener)
         monitor.start()
     }
 
     private fun detachControllerMonitor() {
-        org.chimeramc.client.launcher.controller.ControllerConnectionMonitor.get(this).setListener(null)
+        // Keep the listener in a field so the detach can be identity-checked against it. A bare
+        // clear could drop a listener the game had already re-attached on resume.
+        org.chimeramc.client.launcher.controller.ControllerConnectionMonitor
+            .get(this)
+            .clearListener(controllerMonitorListener)
+        controllerMonitorListener = null
     }
 
     private fun isMouseSource(source: Int): Boolean {

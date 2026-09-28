@@ -35,7 +35,7 @@ public class FireworkTouchLayer extends View {
     /** Blue default palette; the accent palette is derived per burst when enabled. */
     private static final int BLUE_CORE = 0xFF4FA3FF;
     private static final int BLUE_MID = 0xFF8CCBFF;
-    private static final int WHITE = 0xFFFFFFFF;
+
 
     /** How long a burst lives. */
     private static final long BURST_MS = 450L;
@@ -50,6 +50,9 @@ public class FireworkTouchLayer extends View {
     private static final long TRAIL_INTERVAL_MS = 90L;
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    private long lastObservedMs = -1L;
+    private int lastObservedAction = -1;
 
     /** One particle; pooled, so a burst never allocates. */
     private static final class Spark {
@@ -158,6 +161,26 @@ public class FireworkTouchLayer extends View {
         }
     }
 
+    /**
+     * Reacts to a touch observed by a parent, without consuming it.
+     *
+     * <p>This view is non-clickable, so it never receives its own MOVE stream; the screen that
+     * hosts it forwards the events here. Nothing is consumed at any point, which is what lets the
+     * gesture continue to the content underneath.
+     */
+    public void observe(MotionEvent event) {
+        // A ViewGroup's onInterceptTouchEvent and onTouchEvent can both be invoked for the same
+        // DOWN when no child claims it, so the same event would spawn two bursts. Ignore an event
+        // we have already seen; a later event always has a strictly greater uptime.
+        long stamp = event.getEventTime();
+        if (stamp == lastObservedMs && event.getActionMasked() == lastObservedAction) {
+            return;
+        }
+        lastObservedMs = stamp;
+        lastObservedAction = event.getActionMasked();
+        onTouchEvent(event);
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (!enabled) return false;
@@ -171,7 +194,7 @@ public class FireworkTouchLayer extends View {
                     lastTrailMs = event.getEventTime();
                     // A smaller trail while dragging, so a swipe sparkles without obscuring.
                     spawnBurst(event.getX(), event.getY(),
-                            Math.max(4, SPARKS_BY_INTENSITY[intensity] / 3));
+                            Math.max(6, SPARKS_BY_INTENSITY[intensity] / 3));
                 }
                 return false;
             default:
@@ -189,32 +212,42 @@ public class FireworkTouchLayer extends View {
         for (int i = 0; i < count; i++) {
             Spark s = next();
             double angle = (Math.PI * 2 * i) / count + rng.nextDouble() * 0.25;
-            float speed = (2.2f + rng.nextFloat() * 2.4f) * density;
+            // Faster than before: a burst that only travels a few dp reads as static dots, which
+            // is what "barely works and leaves white dots" described. The radial throw is what
+            // makes it look like an explosion rather than speckle.
+            float speed = (3.4f + rng.nextFloat() * 3.6f) * density;
             s.x = x;
             s.y = y;
             s.vx = (float) Math.cos(angle) * speed;
             s.vy = (float) Math.sin(angle) * speed;
             s.life = 1f;
             s.decay = (1f / (BURST_MS / 1000f)) * (0.85f + rng.nextFloat() * 0.4f);
-            s.size = (1.6f + rng.nextFloat() * 1.8f) * density;
+            s.size = (2.2f + rng.nextFloat() * 2.6f) * density;
             s.color = pickColor(i, count);
             s.alive = true;
         }
-        // A bright white core flash on the burst centre.
+        // A short core flash, tinted blue-white so additive blending brightens the centre instead
+        // of leaving a hard white disc sitting on screen.
         Spark core = next();
         core.x = x;
         core.y = y;
         core.vx = 0f;
         core.vy = 0f;
         core.life = 1f;
-        core.decay = (1f / (BURST_MS / 1000f)) * 2.6f;
-        core.size = 6f * density;
-        core.color = WHITE;
+        core.decay = (1f / (BURST_MS / 1000f)) * 4.5f;
+        core.size = 5f * density;
+        core.color = 0xFFEAF4FF;
         core.alive = true;
         postInvalidateOnAnimation();
     }
 
-    /** Blue palette by default, or a wash of the accent when the user opts in. */
+    /**
+     * Blue palette by default, or a wash of the accent when the user opts in.
+     *
+     * <p>Every spark keeps blue in it. The palette used to include plain white, and because the
+     * blend is additive a wash of white sparks saturated to flat white dots that read as clutter
+     * rather than a firework. White is now only the brief core flash, tinted at the edges.
+     */
     private int pickColor(int index, int count) {
         if (followAccent && accentColor != -1) {
             return (index % 2 == 0) ? accentColor : lighten(accentColor, 0.45f);
@@ -222,7 +255,7 @@ public class FireworkTouchLayer extends View {
         switch (index % 3) {
             case 0: return BLUE_CORE;
             case 1: return BLUE_MID;
-            default: return dark ? WHITE : 0xFFDCEBFF;
+            default: return 0xFFBFE0FF;
         }
     }
 
