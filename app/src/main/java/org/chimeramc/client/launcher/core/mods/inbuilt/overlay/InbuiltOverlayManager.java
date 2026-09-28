@@ -811,6 +811,11 @@ public class InbuiltOverlayManager {
             }
             org.chimeramc.client.core.voice.VoiceChatModule module =
                     org.chimeramc.client.core.voice.VoiceChatModule.get(activity, deviceName());
+            // Fill the position/camera seams from the local player so beacons carry a real
+            // position and the in-world nametag icons can be projected. Fail-closed: with no
+            // native read the module stays in channel mode and the icons draw nothing.
+            LocalPlayerFeed.install();
+            VoiceNametagMod.setTagSource(new VoiceNametagTagFeed());
             module.start(manager);
         } catch (Throwable t) {
             android.util.Log.w("InbuiltOverlayManager", "Could not start voice chat", t);

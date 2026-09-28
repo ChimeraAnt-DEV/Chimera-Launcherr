@@ -48,7 +48,7 @@ public final class VoiceNametagOverlay {
 
     /** Supplies the current camera, or null when the world is not visible. */
     public interface CameraSource {
-        HitboxProjector.Camera camera();
+        HitboxProjector.Camera camera(int screenWidth, int screenHeight);
     }
 
     private final Activity activity;
@@ -176,7 +176,7 @@ public final class VoiceNametagOverlay {
             if (source == null) return;
             HitboxProjector.Camera camera;
             try {
-                camera = source.camera();
+                camera = source.camera(getWidth(), getHeight());
             } catch (Throwable t) {
                 return;
             }

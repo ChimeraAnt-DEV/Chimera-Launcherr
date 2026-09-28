@@ -5,6 +5,7 @@ import android.util.Log;
 
 import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -375,6 +376,17 @@ public final class VoiceChatModule {
     /** The peers on the local channel, for the "current channel" member list. */
     public List<VoicePeer> channelMembers() {
         return VoiceChannelDirectory.membersOf(registry.snapshot(), currentChannel());
+    }
+
+    /**
+     * The peers the listener can currently hear, for the in-world nametag icons.
+     *
+     * <p>Unlike {@link #channelMembers()} this includes peers on a different but audible
+     * channel (the open channel reaches across), which is exactly the set whose icons must
+     * be drawn. The caller filters further per tag.
+     */
+    public List<VoicePeer> audiblePeers() {
+        return new ArrayList<>(registry.snapshot());
     }
 
     /**

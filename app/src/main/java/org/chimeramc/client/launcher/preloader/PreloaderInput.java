@@ -31,6 +31,9 @@ public class PreloaderInput {
     public static native boolean nativeIsHudScreenOpen();
     public static native boolean nativeIsShowingMenu();
     public static native boolean nativeShouldForceGlobalModMenu();
+    public static native boolean nativeIsLocalPlayerAvailable();
+    public static native float[] nativeReadLocalPlayerPosition();
+    public static native float[] nativeReadLocalPlayerRotation();
     public static native void nativeConfigureSignatureRules(String rulesPath, String minecraftVersion);
 
     public static void configureSignatureRules(File rulesFile, String minecraftVersion) {
@@ -72,6 +75,40 @@ public class PreloaderInput {
             return nativeShouldForceGlobalModMenu();
         } catch (UnsatisfiedLinkError e) {
             return false;
+        }
+    }
+
+    /**
+     * True once the game has handed us a live local player this session.
+     *
+     * <p>Fail-closed: an unavailable native library reads as "no player", so the
+     * callers that project in-world icons draw nothing rather than guessing.
+     */
+    public static boolean isLocalPlayerAvailable() {
+        try {
+            return nativeIsLocalPlayerAvailable();
+        } catch (UnsatisfiedLinkError e) {
+            return false;
+        }
+    }
+
+    /** The local player's world position, or null when no live read is possible. */
+    public static float[] readLocalPlayerPosition() {
+        try {
+            float[] value = nativeReadLocalPlayerPosition();
+            return value != null && value.length >= 3 ? value : null;
+        } catch (UnsatisfiedLinkError e) {
+            return null;
+        }
+    }
+
+    /** The local player's view rotation as {yaw, pitch} degrees, or null when unavailable. */
+    public static float[] readLocalPlayerRotation() {
+        try {
+            float[] value = nativeReadLocalPlayerRotation();
+            return value != null && value.length >= 2 ? value : null;
+        } catch (UnsatisfiedLinkError e) {
+            return null;
         }
     }
 
