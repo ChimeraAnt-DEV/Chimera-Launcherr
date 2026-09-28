@@ -28,6 +28,27 @@
     <style name="Widget.Chimera" parent="" />
 
     <!--
+        One tab in the top navigation bar. A single TextView carrying its icon via
+        drawableStart, so the icon tints with the label (see BaseActivity.setActiveNavTab).
+        paddingHorizontal sits in a dimen where a w600dp override widens it: on a phone the
+        icon-only tabs need generous padding to stay tappable, while a tablet with full labels
+        wants them tighter so six entries fit without scrolling.
+    -->
+    <style name="Widget.Chimera.NavTab" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingHorizontal">@dimen/nav_tab_padding</item>
+        <item name="android:fontFamily">@font/misans</item>
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:drawablePadding">@dimen/nav_tab_drawable_padding</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+    </style>
+
+    <!--
         The single card style. Every card surface uses one of these three variants so the
         radius, border and elevation cannot drift screen to screen.
 

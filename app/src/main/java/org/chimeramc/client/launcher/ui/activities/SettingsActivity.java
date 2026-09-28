@@ -41,6 +41,7 @@ import org.chimeramc.client.ui.animation.DynamicAnim;
 import org.chimeramc.client.ui.dialogs.LogcatOverlayManager;
 import org.chimeramc.client.util.GithubReleaseUpdater;
 import org.chimeramc.client.util.LanguageManager;
+import org.chimeramc.client.util.LauncherFonts;
 import org.chimeramc.client.util.LauncherSettingsBackup;
 import org.chimeramc.client.util.LauncherStorage;
 import org.chimeramc.client.util.PermissionsHandler;
@@ -49,6 +50,7 @@ import org.chimeramc.client.util.ThemeManager;
 
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 public class SettingsActivity extends BaseActivity {
@@ -310,6 +312,56 @@ public class SettingsActivity extends BaseActivity {
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
+
+        // Font Family dropdown — each row is rendered in its own face so the choice is obvious
+        // before applying, and the preview line below shows a full sentence in the selection.
+        Spinner fontSpinner = findViewById(R.id.font_family_spinner);
+        final TextView fontPreview = findViewById(R.id.font_family_preview);
+        if (fontSpinner != null) {
+            final List<LauncherFonts.Entry> fontEntries = LauncherFonts.entries();
+            ArrayAdapter<LauncherFonts.Entry> fontAdapter =
+                    new ArrayAdapter<LauncherFonts.Entry>(this, R.layout.spinner_font_item, fontEntries) {
+                        @Override
+                        public View getView(int position, View convertView, android.view.ViewGroup parent) {
+                            View v = super.getView(position, convertView, parent);
+                            bindFontRow(v, fontEntries.get(position));
+                            return v;
+                        }
+
+                        @Override
+                        public View getDropDownView(int position, View convertView,
+                                                    android.view.ViewGroup parent) {
+                            View v = super.getDropDownView(position, convertView, parent);
+                            bindFontRow(v, fontEntries.get(position));
+                            return v;
+                        }
+                    };
+            fontAdapter.setDropDownViewResource(R.layout.spinner_font_item);
+            fontSpinner.setAdapter(fontAdapter);
+            fontSpinner.setPopupBackgroundResource(R.drawable.bg_popup_menu_rounded);
+            fontSpinner.setSelection(LauncherFonts.indexOf(personalizationManager.getFontFamily()));
+            updateFontPreview(fontPreview, personalizationManager.getFontFamily());
+            fontSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                private boolean first = true;
+
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    if (first) {
+                        // The Spinner fires once on layout; applying then would "change" the font
+                        // to the value it already holds and trigger a needless recreate.
+                        first = false;
+                        return;
+                    }
+                    LauncherFonts.Entry entry = fontEntries.get(position);
+                    personalizationManager.setFontFamily(entry.key);
+                    updateFontPreview(fontPreview, entry.key);
+                }
+
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {
+                }
+            });
+        }
 
         SwitchMaterial switchLogcat = findViewById(R.id.switch_logcat);
         switchLogcat.setChecked(fs.isLogcatOverlayEnabled());
@@ -649,6 +701,52 @@ public class SettingsActivity extends BaseActivity {
             });
         }
 
+        // Firework touch effect
+        SwitchMaterial switchFirework = findViewById(R.id.switch_firework_touch);
+        SwitchMaterial switchFireworkAccent = findViewById(R.id.switch_firework_accent);
+        Spinner spinnerFirework = findViewById(R.id.spinner_firework_intensity);
+        View rowFireworkIntensity = findViewById(R.id.row_firework_intensity);
+        View rowFireworkAccent = findViewById(R.id.row_firework_accent);
+        if (switchFirework != null) {
+            switchFirework.setChecked(personalizationManager.isFireworkTouchEnabled());
+            applyFireworkEnabledState(rowFireworkIntensity, rowFireworkAccent, switchFirework.isChecked());
+            switchFirework.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                personalizationManager.setFireworkTouchEnabled(isChecked);
+                applyFireworkEnabledState(rowFireworkIntensity, rowFireworkAccent, isChecked);
+                refreshFireworkLayer();
+            });
+        }
+        if (spinnerFirework != null) {
+            String[] levels = {
+                    getString(R.string.firework_low),
+                    getString(R.string.firework_medium),
+                    getString(R.string.firework_high),
+            };
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                    android.R.layout.simple_spinner_item, levels);
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spinnerFirework.setAdapter(adapter);
+            spinnerFirework.setSelection(personalizationManager.getFireworkIntensity());
+            spinnerFirework.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    personalizationManager.setFireworkIntensity(position);
+                    refreshFireworkLayer();
+                }
+
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {
+                }
+            });
+        }
+        if (switchFireworkAccent != null) {
+            switchFireworkAccent.setChecked(personalizationManager.isFireworkFollowAccent());
+            switchFireworkAccent.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                personalizationManager.setFireworkFollowAccent(isChecked);
+                refreshFireworkLayer();
+            });
+        }
+
         // Haptic Feedback Toggle
         SwitchMaterial switchHaptics = findViewById(R.id.switch_haptic_feedback);
         if (switchHaptics != null) {
@@ -721,6 +819,19 @@ public class SettingsActivity extends BaseActivity {
         }
     }
 
+    /** Renders a dropdown row's label in that row's own face. */
+    private void bindFontRow(View row, LauncherFonts.Entry entry) {
+        if (!(row instanceof TextView)) return;
+        TextView tv = (TextView) row;
+        tv.setText(entry.labelRes);
+        tv.setTypeface(LauncherFonts.typeface(this, entry.key));
+    }
+
+    private void updateFontPreview(TextView preview, String key) {
+        if (preview == null) return;
+        preview.setTypeface(LauncherFonts.typeface(this, key));
+    }
+
     private void updateBlurIntensityValue(int intensity) {
         if (blurIntensityValue != null) {
             blurIntensityValue.setText(getString(R.string.blur_intensity_value, intensity));
@@ -759,6 +870,47 @@ public class SettingsActivity extends BaseActivity {
         if (iconSystem != null) iconSystem.setImageTintList(android.content.res.ColorStateList.valueOf(currentMode == 0 ? selectedColor : unselectedColor));
         if (iconLight != null) iconLight.setImageTintList(android.content.res.ColorStateList.valueOf(currentMode == 1 ? selectedColor : unselectedColor));
         if (iconDark != null) iconDark.setImageTintList(android.content.res.ColorStateList.valueOf(currentMode == 2 ? selectedColor : unselectedColor));
+    }
+
+    /**
+     * Greys out the intensity/accent rows while the effect is off, so the dependency is obvious.
+     */
+    private void applyFireworkEnabledState(View intensityRow, View accentRow, boolean enabled) {
+        float alpha = enabled ? 1f : 0.4f;
+        if (intensityRow != null) {
+            intensityRow.setAlpha(alpha);
+            intensityRow.setEnabled(enabled);
+        }
+        if (accentRow != null) {
+            accentRow.setAlpha(alpha);
+            accentRow.setEnabled(enabled);
+        }
+    }
+
+    /** Pushes a changed firework setting to the live layer without recreating the activity. */
+    private void refreshFireworkLayer() {
+        View root = findViewById(android.R.id.content);
+        if (root instanceof ViewGroup) {
+            org.chimeramc.client.ui.views.FireworkTouchLayer layer =
+                    findFireworkLayer((ViewGroup) root);
+            if (layer != null) layer.refresh(this);
+        }
+    }
+
+    /** Finds the shared firework layer in a view tree, or null. */
+    private static org.chimeramc.client.ui.views.FireworkTouchLayer findFireworkLayer(ViewGroup group) {
+        for (int i = 0; i < group.getChildCount(); i++) {
+            View child = group.getChildAt(i);
+            if (child instanceof org.chimeramc.client.ui.views.FireworkTouchLayer) {
+                return (org.chimeramc.client.ui.views.FireworkTouchLayer) child;
+            }
+            if (child instanceof ViewGroup) {
+                org.chimeramc.client.ui.views.FireworkTouchLayer found =
+                        findFireworkLayer((ViewGroup) child);
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
     private void setupColorPicker() {

@@ -98,6 +98,40 @@ public class ModMenuOverlay {
     private boolean compactMode = false;
     private GridLayoutManager modsLayoutManager;
 
+    /** Live keybind labels on the Settings tab, refreshed when a bind is set or cleared. */
+    private TextView keyboardBindText;
+    private TextView controllerBindText;
+    /** The connected pad's 2D illustration shown beside the controller bind row. */
+    private org.chimeramc.client.ui.views.ControllerIllustrationView controllerBindIllustration;
+
+    /** Delivers a hardware key to an open bind picker. Returns true when one consumed it. */
+    public interface BindCapture {
+        void onKey(int keyCode);
+    }
+
+    /**
+     * The picker currently waiting for a button, or null.
+     *
+     * <p>The in-game activity dispatches keys through the preloader first, which can consume the
+     * very press the picker is waiting for, so the picker registers here and the activity offers
+     * each key before anything else may swallow it. Static because the overlay is not the object
+     * that receives the event.
+     */
+    private static volatile BindCapture sBindCapture;
+
+    /** Called by the game activity on the raw key code; true when a bind picker took the key. */
+    public static boolean deliverBindKey(int keyCode) {
+        BindCapture capture = sBindCapture;
+        if (capture == null) return false;
+        capture.onKey(keyCode);
+        return true;
+    }
+
+    static boolean isCapturingBind() {
+        return sBindCapture != null;
+    }
+
+
     private List<UnifiedMod> allMods = new ArrayList<>();
     private List<UnifiedMod> filteredMods = new ArrayList<>();
     private final Set<String> favoriteKeys = new HashSet<>();
@@ -532,6 +566,8 @@ public class ModMenuOverlay {
 
         applyMenuOpacity();
 
+        setupKeybindSettings(modManager);
+
         adapter = new ModMenuAdapter(new ModMenuTheme(activity));
         adapter.setCompactMode(compactMode);
         modsLayoutManager = new GridLayoutManager(activity, compactMode ? 1 : 4);
@@ -629,6 +665,226 @@ public class ModMenuOverlay {
             if (filterBar != null) filterBar.setVisibility(View.GONE);
             if (compactFilterBar != null) compactFilterBar.setVisibility(View.GONE);
         }
+    }
+
+    /**
+     * Wires the Settings tab's keybind rows.
+     *
+     * Keyboard capture listens on the row itself (the row is focusable and grabs the key), while
+     * the controller capture opens a dialog carrying a live illustration — a control that opens a
+     * "press a button" prompt only works if the prompt can actually receive the button, so the
+     * dialog takes focus and forwards every key/motion event to the illustration.
+     */
+    private void setupKeybindSettings(InbuiltModManager modManager) {
+        keyboardBindText = overlayView.findViewById(R.id.text_keyboard_bind);
+        controllerBindText = overlayView.findViewById(R.id.text_controller_bind);
+        controllerBindIllustration = overlayView.findViewById(R.id.bind_controller_illustration);
+        View keyboardRow = overlayView.findViewById(R.id.setting_keyboard_bind);
+        View controllerRow = overlayView.findViewById(R.id.setting_controller_bind);
+
+        refreshKeyboardBindLabel(modManager);
+        refreshControllerBindLabel(modManager);
+        refreshControllerBindIllustration(modManager);
+
+        if (keyboardRow != null) {
+            keyboardRow.setFocusableInTouchMode(true);
+            keyboardRow.setOnClickListener(v -> openKeyboardBindCapture(modManager));
+        }
+        if (controllerRow != null) {
+            controllerRow.setOnClickListener(v -> openControllerBindPicker(modManager));
+        }
+    }
+
+    private void refreshKeyboardBindLabel(InbuiltModManager modManager) {
+        if (keyboardBindText == null) return;
+        keyboardBindText.setText(bindLabel(modManager.getModMenuKeybind()));
+    }
+
+    private void refreshControllerBindLabel(InbuiltModManager modManager) {
+        if (controllerBindText == null) return;
+        int code = modManager.getModMenuControllerBind();
+        controllerBindText.setText(code == 0
+                ? activity.getString(R.string.mod_menu_bind_none)
+                : bindLabel(code));
+        refreshControllerBindIllustration(modManager);
+    }
+
+    /**
+     * Shows the connected pad's 2D map beside the bind row, with the bound button lit green.
+     *
+     * A bare key name ("BUTTON L1") does not tell a player which physical button that is, so the
+     * whole controller is drawn and the bound control highlighted. Hidden until a bind exists —
+     * an unlit controller would read as a decorate nobody asked for.
+     */
+    private void refreshControllerBindIllustration(InbuiltModManager modManager) {
+        if (controllerBindIllustration == null) return;
+        int code = modManager.getModMenuControllerBind();
+        if (code == 0) {
+            controllerBindIllustration.setVisibility(View.GONE);
+            return;
+        }
+        android.view.InputDevice device = firstGamepad();
+        if (device == null) {
+            controllerBindIllustration.setVisibility(View.GONE);
+            return;
+        }
+        org.chimeramc.client.launcher.controller.ControllerType type =
+                org.chimeramc.client.launcher.controller.ControllerType.from(device);
+        if (type == null) type = org.chimeramc.client.launcher.controller.ControllerType.XBOX;
+        controllerBindIllustration.setType(type);
+        controllerBindIllustration.clearConfirmed();
+        controllerBindIllustration.setRegionConfirmed(
+                controllerBindIllustration.regionIdForKey(code), true);
+        controllerBindIllustration.setVisibility(View.VISIBLE);
+    }
+
+    private String bindLabel(int keyCode) {
+        if (keyCode == 0) return activity.getString(R.string.mod_menu_bind_none);
+        String name = android.view.KeyEvent.keyCodeToString(keyCode);
+        return name.startsWith("KEYCODE_") ? name.substring(8).replace('_', ' ') : name;
+    }
+
+    /** Captures the next key press (including the mouse buttons) on a focusable dialog. */
+    private void openKeyboardBindCapture(InbuiltModManager modManager) {
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(activity)
+                .setTitle(R.string.mod_menu_keyboard_bind)
+                .setMessage(R.string.mod_menu_bind_press_key)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setNeutralButton(R.string.mod_menu_bind_clear, (d, w) -> {
+                    modManager.setModMenuKeybind(0);
+                    refreshKeyboardBindLabel(modManager);
+                })
+                .create();
+        dialog.setCanceledOnTouchOutside(false);
+
+        Runnable commit = () -> {
+            sBindCapture = null;
+            dialog.dismiss();
+        };
+        Runnable capture = () -> {
+            sBindCapture = keyCode -> {
+                if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+                    commit.run();
+                    return;
+                }
+                modManager.setModMenuKeybind(keyCode);
+                refreshKeyboardBindLabel(modManager);
+                commit.run();
+            };
+        };
+        dialog.setOnDismissListener(d -> sBindCapture = null);
+        // The dialog's own key listener covers the launcher-side receiver; the static capture
+        // covers the in-game path where the preloader dispatches keys first.
+        dialog.setOnKeyListener((d, keyCode, event) -> {
+            if (event.getAction() != android.view.KeyEvent.ACTION_DOWN) return false;
+            if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+                d.dismiss();
+                return true;
+            }
+            modManager.setModMenuKeybind(keyCode);
+            refreshKeyboardBindLabel(modManager);
+            d.dismiss();
+            return true;
+        });
+        capture.run();
+        dialog.show();
+    }
+
+    /**
+     * The controller bind picker.
+     *
+     * Shows the connected pad's illustration (a cached vector, not a live render, so nothing on
+     * the game's frame budget is touched) and highlights the pressed button green for a moment
+     * before closing, so the player sees exactly which control was captured.
+     */
+    private void openControllerBindPicker(InbuiltModManager modManager) {
+        android.view.InputDevice device = firstGamepad();
+        if (device == null) {
+            android.widget.Toast.makeText(activity, R.string.mod_menu_bind_no_controller,
+                    android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final org.chimeramc.client.launcher.controller.ControllerType type =
+                org.chimeramc.client.launcher.controller.ControllerType.from(device) != null
+                        ? org.chimeramc.client.launcher.controller.ControllerType.from(device)
+                        : org.chimeramc.client.launcher.controller.ControllerType.XBOX;
+
+        View content = LayoutInflater.from(activity).inflate(R.layout.dialog_mod_menu_bind, null);
+        final org.chimeramc.client.ui.views.ControllerIllustrationView illustration =
+                content.findViewById(R.id.bind_dialog_illustration);
+        final TextView statusText = content.findViewById(R.id.bind_dialog_status);
+        illustration.setType(type);
+
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(activity)
+                .setView(content)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.setOnDismissListener(d -> sBindCapture = null);
+
+        content.findViewById(R.id.bind_dialog_clear).setOnClickListener(v -> {
+            modManager.setModMenuControllerBind(0);
+            refreshControllerBindLabel(modManager);
+            dialog.dismiss();
+        });
+
+        // The in-game activity offers every raw key here first, so a controller press is captured
+        // even when the preloader would otherwise consume it.
+        sBindCapture = keyCode -> {
+            illustration.handleKeyEvent(keyCode, true);
+            String region = illustration.regionIdForKey(keyCode);
+            if (region == null) return;
+            illustration.setRegionConfirmed(region, true);
+            statusText.setText(activity.getString(R.string.mod_menu_bind_detected, bindLabel(keyCode)));
+            modManager.setModMenuControllerBind(keyCode);
+            refreshControllerBindLabel(modManager);
+            content.postDelayed(dialog::dismiss, 550);
+        };
+
+        // Every key and stick movement is mirrored on the illustration; a click on a pad button is
+        // what commits the bind, after which the button flashes green and the dialog closes.
+        dialog.setOnKeyListener((d, keyCode, event) -> {
+            illustration.handleKeyEvent(keyCode, event.getAction() == android.view.KeyEvent.ACTION_DOWN);
+            if (event.getAction() != android.view.KeyEvent.ACTION_DOWN) return false;
+            if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+                d.dismiss();
+                return true;
+            }
+            String region = illustration.regionIdForKey(keyCode);
+            if (region == null) return true; // a gamepad key we do not map: swallow, keep waiting
+            illustration.setRegionConfirmed(region, true);
+            statusText.setText(activity.getString(R.string.mod_menu_bind_detected, bindLabel(keyCode)));
+            modManager.setModMenuControllerBind(keyCode);
+            refreshControllerBindLabel(modManager);
+            android.view.View target = content;
+            (target != null ? target : content).postDelayed(dialog::dismiss, 550);
+            return true;
+        });
+
+        View.OnGenericMotionListener motionListener = (v, event) -> {
+            illustration.handleMotionEvent(event);
+            return true;
+        };
+        content.setOnGenericMotionListener(motionListener);
+        if (illustration != null) {
+            illustration.requestFocus();
+        }
+
+        dialog.show();
+    }
+
+    private android.view.InputDevice firstGamepad() {
+        android.hardware.input.InputManager im =
+                (android.hardware.input.InputManager) activity.getSystemService(android.content.Context.INPUT_SERVICE);
+        if (im == null) return null;
+        for (int id : im.getInputDeviceIds()) {
+            android.view.InputDevice device = im.getInputDevice(id);
+            if (org.chimeramc.client.launcher.controller.ControllerConnectionMonitor
+                    .isGamepad(device)) {
+                return device;
+            }
+        }
+        return null;
     }
 
     /**

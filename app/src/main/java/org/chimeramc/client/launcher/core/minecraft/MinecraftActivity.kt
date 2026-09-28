@@ -354,6 +354,35 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
         if (overlayManager == null) {
             startInbuiltModServices()
         }
+        attachControllerMonitor()
+    }
+
+    /**
+     * Listens for controllers while gameplay is in front, so the connection pill appears over
+     * Minecraft and the pad's profile is loaded the moment it is plugged in mid-session.
+     */
+    private fun attachControllerMonitor() {
+        val monitor = org.chimeramc.client.launcher.controller.ControllerConnectionMonitor.get(this)
+        monitor.setListener(object : org.chimeramc.client.launcher.controller.ControllerConnectionMonitor.Listener {
+            override fun onControllerConnected(
+                name: String,
+                type: org.chimeramc.client.launcher.controller.ControllerType,
+                profileName: String?
+            ) {
+                org.chimeramc.client.launcher.controller.ControllerToastView.showConnected(
+                    this@MinecraftActivity, name, profileName, type)
+            }
+
+            override fun onControllerDisconnected(name: String) {
+                org.chimeramc.client.launcher.controller.ControllerToastView.showDisconnected(
+                    this@MinecraftActivity, name)
+            }
+        })
+        monitor.start()
+    }
+
+    private fun detachControllerMonitor() {
+        org.chimeramc.client.launcher.controller.ControllerConnectionMonitor.get(this).setListener(null)
     }
 
     private fun isMouseSource(source: Int): Boolean {
@@ -385,6 +414,14 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // A bind picker in the Mod Menu must see the raw press before the preloader can consume
+        // it, otherwise the button the player presses never reaches the picker.
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            if (org.chimeramc.client.core.mods.inbuilt.overlay.ModMenuOverlay
+                    .deliverBindKey(event.keyCode)) {
+                return true
+            }
+        }
         val mouseButton = getMouseButton(event)
         if (mouseButton != 0 &&
             (event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_UP) &&
@@ -399,6 +436,17 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
 
         val unicodeChar = event.unicodeChar
         val remappedKey = ControllerInputProcessor.processKeyEvent(event.keyCode)
+        // Per-button CPS limit and hold-to-repeat. The limit only drops the press the game sees
+        // when the button is over its cap; the real press still drives hit-timing above.
+        if (event.repeatCount == 0) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (ControllerInputProcessor.onKeyDown(remappedKey, event.eventTime)) {
+                    return true
+                }
+            } else if (event.action == KeyEvent.ACTION_UP) {
+                ControllerInputProcessor.onKeyUp(remappedKey)
+            }
+        }
         if (event.action == KeyEvent.ACTION_UP) {
             if (org.chimeramc.client.preloader.PreloaderInput.onKeyEvent(remappedKey, unicodeChar, false)) {
                 return true
@@ -412,7 +460,7 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
         }
 
         overlayManager?.let { manager ->
-            if (manager.handleKeyEvent(remappedKey, event.action)) {
+            if (manager.handleKeyEvent(remappedKey, event.action, event.keyCode)) {
                 return true
             }
         }
@@ -565,6 +613,7 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
     }
 
     override fun onDestroy() {
+        detachControllerMonitor()
         PreloaderInput.cancelDocumentRequest("Minecraft closed")
         ModManager.disableAndUnloadLoadedMods()
         val shouldPrepareNormalExit = shouldRestartAfterNormalExit()

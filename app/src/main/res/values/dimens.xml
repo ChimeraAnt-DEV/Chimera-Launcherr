@@ -20,4 +20,11 @@
     <dimen name="chimera_card_gutter">8dp</dimen>
 
     <!-- Navigation rail -->
+    <!--
+        Top-bar tab metrics. The phone (icon-only) values are generous so each tab is a large
+        touch target with no label; the w600dp override shrinks the padding because six entries
+        plus their labels must share the row.
+    -->
+    <dimen name="nav_tab_padding">14dp</dimen>
+    <dimen name="nav_tab_drawable_padding">0dp</dimen>
 </resources>

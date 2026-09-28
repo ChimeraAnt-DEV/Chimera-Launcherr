@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Import dialog for turning a flat skin PNG into a skin pack. Shows a rendered preview of the
+    first selected image so the user can see the result and the chosen arm model before the pack
+    is written, then asks for a name and the arm model.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="4dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/misans"
+            android:text="@string/skins_import_preview_title"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:minHeight="120dp">
+
+            <ImageView
+                android:id="@+id/skin_import_preview"
+                android:layout_width="120dp"
+                android:layout_height="240dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/skins_import_preview_title"
+                android:scaleType="fitCenter" />
+
+            <ProgressBar
+                android:id="@+id/skin_import_preview_progress"
+                style="?android:attr/progressBarStyle"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="center"
+                android:indeterminate="true" />
+        </FrameLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:fontFamily="@font/misans"
+            android:text="@string/skins_arm_model_title"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <RadioGroup
+            android:id="@+id/skin_import_arm_model"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/skin_import_arm_classic"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:fontFamily="@font/misans"
+                android:text="@string/skins_arm_classic" />
+
+            <RadioButton
+                android:id="@+id/skin_import_arm_slim"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:fontFamily="@font/misans"
+                android:text="@string/skins_arm_slim" />
+        </RadioGroup>
+
+        <EditText
+            android:id="@+id/skin_import_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="@string/skins_name_hint"
+            android:fontFamily="@font/misans"
+            android:inputType="text"
+            android:maxLines="1" />
+
+    </LinearLayout>
+</ScrollView>

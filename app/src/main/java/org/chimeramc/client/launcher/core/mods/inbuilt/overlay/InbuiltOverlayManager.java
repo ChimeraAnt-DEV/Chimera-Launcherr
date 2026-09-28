@@ -867,8 +867,30 @@ public class InbuiltOverlayManager {
     }
 
     public boolean handleKeyEvent(int keyCode, int action) {
+        return handleKeyEvent(keyCode, action, keyCode);
+    }
+
+    /**
+     * @param keyCode the key after profile remapping, used by the mods' own binds
+     * @param rawKeyCode the hardware key before remapping
+     *
+     * <p>The Mod Menu bind is checked against both, so a pad button a profile remapped still
+     * opens the menu when it is the one the player captured.
+     */
+    public boolean handleKeyEvent(int keyCode, int action, int rawKeyCode) {
         InbuiltModManager manager = InbuiltModManager.getInstance(activity);
-        
+
+        // Mod Menu open bind. Honoured for both the keyboard and controller codes, and only on
+        // the press so a held button does not flap the panel open and shut.
+        if (action == android.view.KeyEvent.ACTION_DOWN && modMenuButton != null) {
+            if (InbuiltModManager.matchesModMenuBind(
+                    manager.getModMenuKeybind(), manager.getModMenuControllerBind(),
+                    keyCode, rawKeyCode)) {
+                modMenuButton.toggleMenuFromBind();
+                return true;
+            }
+        }
+
         boolean zoomEnabled = modActiveStates.getOrDefault(ModIds.ZOOM, false);
         
         int zoomKeybind = manager.getZoomKeybind();
@@ -1241,6 +1263,10 @@ public class InbuiltOverlayManager {
     }
 
     public void tick() {
+        // Hold-to-repeat runs off the game's own frame tick, so a held button injects at a
+        // steady rate rather than in bursts when some other timer happened to fire.
+        org.chimeramc.client.launcher.controller.ControllerInputProcessor
+                .tickCpsRepeats(android.os.SystemClock.uptimeMillis());
         InbuiltModManager manager = InbuiltModManager.getInstance(activity);
         boolean isPauseOnly = manager.isPauseMenuOnly();
         boolean isPauseOpen = org.chimeramc.client.preloader.PreloaderInput.isPauseMenuOpen();

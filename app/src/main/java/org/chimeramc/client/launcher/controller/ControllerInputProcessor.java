@@ -31,6 +31,13 @@ public final class ControllerInputProcessor {
     private static volatile ControllerType activeType;
 
     /**
+     * The active profile itself, kept alongside the response so the CPS limiter can read the
+     * per-button limits. Volatile for the same reason the response is: published whole on
+     * profile change, never mutated per event.
+     */
+    private static volatile ControllerProfile activeProfile;
+
+    /**
      * Hysteresis gates for the two sticks, published together with the response.
      *
      * These hold per-stick run state and advance once per event, so they cannot live in the
@@ -81,10 +88,13 @@ public final class ControllerInputProcessor {
         // into a different profile could let a suppressed crossing count toward the new one.
         leftDriftGate.reset();
         rightDriftGate.reset();
+        resetCpsState();
         if (profile == null) {
             active = null;
+            activeProfile = null;
             return;
         }
+        activeProfile = profile;
         ControllerProfile effective = lowInputDelay ? tightenDeadZone(profile) : profile;
         // Single volatile publication: the response is fully built before it is visible.
         active = new ControllerResponse(effective, lowInputDelay);
@@ -552,5 +562,74 @@ public final class ControllerInputProcessor {
             return keyCode;
         }
         return response.remapKey(keyCode);
+    }
+
+    /**
+     * The per-button click limiter and hold-to-repeat scheduler for the active profile.
+     *
+     * Held here rather than in the profile because it carries run state (the rolling window and
+     * the repeat schedule) that must not be persisted; the profile only carries the user's
+     * limits. Plain field, UI-thread only, like the drift gates.
+     */
+    private static final CpsLimiter cpsLimiter = new CpsLimiter();
+
+    /** Buttons currently held down with a repeat configured, for {@link #tickCpsRepeats}. */
+    private static final java.util.Set<Integer> repeatingButtons = new java.util.HashSet<>();
+
+    /**
+     * Applies the CPS limit to a button press, and arms hold-to-repeat on a press.
+     *
+     * @return true when the press is over the cap and should be dropped. Callers must only drop
+     *         the injected event; the real hardware press is still recorded for timing.
+     */
+    public static boolean onKeyDown(int keyCode, long nowMs) {
+        ControllerProfile profile = activeProfile;
+        if (profile == null || keyCode <= 0) return false;
+        int repeat = profile.getRepeatRate(keyCode);
+        if (repeat > CpsLimiter.OFF) {
+            if (cpsLimiter.beginHold(keyCode, repeat, nowMs)) {
+                repeatingButtons.add(keyCode);
+            }
+        }
+        int limit = profile.getClickLimit(keyCode);
+        return !cpsLimiter.allowPress(keyCode, limit, nowMs);
+    }
+
+    /** Ends hold-to-repeat for a button when it is released. */
+    public static void onKeyUp(int keyCode) {
+        if (keyCode <= 0) return;
+        cpsLimiter.endHold(keyCode);
+        repeatingButtons.remove(keyCode);
+    }
+
+    /**
+     * Fires hold-to-repeat down/up pairs for every held button that is due.
+     *
+     * Called from the overlay tick while a session runs. The injected pair goes through the same
+     * {@code PreloaderInput.onKeyEvent} path a real press uses, so a repeat is indistinguishable
+     * to the game from the player clicking again.
+     */
+    public static void tickCpsRepeats(long nowMs) {
+        ControllerProfile profile = activeProfile;
+        if (profile == null || repeatingButtons.isEmpty()) return;
+        java.util.Iterator<Integer> it = repeatingButtons.iterator();
+        while (it.hasNext()) {
+            int keyCode = it.next();
+            int rate = profile.getRepeatRate(keyCode);
+            if (rate <= CpsLimiter.OFF) {
+                it.remove();
+                cpsLimiter.endHold(keyCode);
+                continue;
+            }
+            if (!cpsLimiter.pollRepeat(keyCode, rate, nowMs)) continue;
+            org.chimeramc.client.preloader.PreloaderInput.onKeyEvent(keyCode, 0, true);
+            org.chimeramc.client.preloader.PreloaderInput.onKeyEvent(keyCode, 0, false);
+        }
+    }
+
+    /** Clears CPS run state, e.g. when the profile changes or a session ends. */
+    public static void resetCpsState() {
+        cpsLimiter.reset();
+        repeatingButtons.clear();
     }
 }

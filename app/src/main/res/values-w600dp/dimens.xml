@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tablet: labels are shown, so the icon needs a gap and the padding tightens. -->
+    <dimen name="nav_tab_padding">12dp</dimen>
+    <dimen name="nav_tab_drawable_padding">5dp</dimen>
+</resources>

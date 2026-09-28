@@ -19,6 +19,7 @@ import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -36,6 +37,10 @@ import org.chimeramc.client.core.auth.MsftAccountStore;
 import org.chimeramc.client.core.news.NewsFeed;
 import org.chimeramc.client.core.news.NewsRepository;
 import org.chimeramc.client.core.news.NewsState;
+import org.chimeramc.client.launcher.controller.ControllerConnectionMonitor;
+import org.chimeramc.client.launcher.controller.ControllerToastView;
+import org.chimeramc.client.ui.views.FireworkTouchLayer;
+import org.chimeramc.client.launcher.controller.ControllerType;
 import org.chimeramc.client.ui.animation.DynamicAnim;
 import org.chimeramc.client.ui.navigation.LauncherTab;
 import org.chimeramc.client.util.AccountTextUtils;
@@ -53,6 +58,22 @@ import okhttp3.Response;
 public class BaseActivity extends AppCompatActivity {
     private int appliedThemeGeneration = -1;
     private int appliedPersonalizationGeneration = -1;
+
+    /** Shows the connection pill for whichever screen is in front. */
+    private final ControllerConnectionMonitor.Listener controllerListener =
+            new ControllerConnectionMonitor.Listener() {
+                @Override
+                public void onControllerConnected(String name, ControllerType type, String profileName) {
+                    if (isFinishing()) return;
+                    ControllerToastView.showConnected(BaseActivity.this, name, profileName, type);
+                }
+
+                @Override
+                public void onControllerDisconnected(String name) {
+                    if (isFinishing()) return;
+                    ControllerToastView.showDisconnected(BaseActivity.this, name);
+                }
+            };
     private boolean navBarInjected = false;
     private final OkHttpClient navAvatarClient = BaseActivity.buildLatencyTunedClient();
 
@@ -122,6 +143,29 @@ public class BaseActivity extends AppCompatActivity {
         wrapWithNavBar(view);
     }
 
+    /** The firework touch layer for this screen, or null when the nav bar is skipped. */
+    private FireworkTouchLayer fireworkLayer;
+
+    /**
+     * Installs the shared firework touch layer over the screen.
+     *
+     * It is a sibling drawn on top, non-clickable and never consuming a touch, so it can decorate
+     * the whole screen without intercepting a gesture meant for the content underneath. It is
+     * skipped where the nav bar is skipped (the game activity, dialogs hosted elsewhere), so the
+     * effect never appears over Minecraft.
+     */
+    private View attachFireworkLayer(View root) {
+        FrameLayout holder = new FrameLayout(this);
+        holder.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        holder.addView(root, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        fireworkLayer = new FireworkTouchLayer(this);
+        holder.addView(fireworkLayer, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        return holder;
+    }
+
     private void wrapWithNavBar(View contentView) {
         if (shouldSkipNavBar()) {
             super.setContentView(contentView);
@@ -147,7 +191,7 @@ public class BaseActivity extends AppCompatActivity {
         contentView.setAlpha(0f);
         contentView.setTranslationY(8f * getResources().getDisplayMetrics().density);
 
-        super.setContentView(wrapper);
+        super.setContentView(attachFireworkLayer(wrapper));
         navBarInjected = true;
         setupBaseNavBar();
 
@@ -215,8 +259,53 @@ public class BaseActivity extends AppCompatActivity {
             R.id.nav_tab_mods, R.id.nav_tab_customize, R.id.nav_tab_settings
     };
 
+    /** Labels for {@link #NAV_TAB_IDS}, same order, so compact mode can restore the active one. */
+    private static final int[] NAV_TAB_LABELS = {
+            R.string.nav_launch, R.string.nav_instances, R.string.nav_installations,
+            R.string.nav_mods, R.string.nav_customize, R.string.nav_settings
+    };
+
+    /** True on a narrow window, where only the selected tab shows its label. */
+    private boolean compactNavTabs;
+
+    /**
+     * Applies the narrow-window navigation configuration.
+     *
+     * On a phone the wordmark is hidden (the bar has no room for it beside six tabs and the
+     * account controls without the two colliding) and the tabs are icon-only, with the selected
+     * tab's label restored by {@link #setActiveNavTab}. On a tablet both are reversed by the
+     * w600dp overrides, so this method reads the same booleans in both cases rather than
+     * measuring the window at runtime.
+     */
+    private void applyNavCompactMode() {
+        View appName = findViewById(R.id.nav_app_name);
+        if (appName != null) {
+            appName.setVisibility(getResources().getBoolean(R.bool.nav_show_app_name)
+                    ? View.VISIBLE : View.GONE);
+        }
+        compactNavTabs = getResources().getBoolean(R.bool.nav_compact_tabs);
+        if (compactNavTabs) {
+            // Default the visible label to this screen's own tab so a screen that never calls
+            // setActiveNavTab still shows one label rather than six bare icons. Activities that
+            // do call it (most of them, to tint the entry) override this with the same answer.
+            LauncherTab own = LauncherTab.forActivity(getClass());
+            int ownTabId = own != null && own.index() < NAV_TAB_IDS.length
+                    ? NAV_TAB_IDS[own.index()] : 0;
+            for (int id : NAV_TAB_IDS) {
+                TextView tab = findViewById(id);
+                if (tab != null) tab.setText(id == ownTabId ? getString(labelForTab(id)) : "");
+            }
+        }
+    }
+
     private void setupBaseNavBar() {
         PersonalizationManager pm = new PersonalizationManager(this);
+
+        // The wordmark is dropped entirely on a narrow window rather than left to shrink, and
+        // the tab strips are icon-only there with just the selected label shown. Both come from
+        // values/bools.xml (overridden in values-w600dp), so the two configurations are resolved
+        // by the resource system and cannot be half-applied.
+        applyNavCompactMode();
 
         // Each tab is a single TextView carrying its own icon via drawableStart, so tinting
         // the compound drawable is what colours the icon.
@@ -465,7 +554,18 @@ public class BaseActivity extends AppCompatActivity {
             tab.setTypeface(tab.getTypeface(), id == activeTabId
                     ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
             TextViewCompat.setCompoundDrawableTintList(tab, ColorStateList.valueOf(color));
+            if (compactNavTabs) {
+                tab.setText(id == activeTabId ? getString(labelForTab(id)) : "");
+            }
         }
+    }
+
+    /** The resource string for one of {@link #NAV_TAB_IDS}, or 0 for an unknown id. */
+    private int labelForTab(int tabId) {
+        for (int i = 0; i < NAV_TAB_IDS.length; i++) {
+            if (NAV_TAB_IDS[i] == tabId) return NAV_TAB_LABELS[i];
+        }
+        return 0;
     }
 
     @Override
@@ -480,11 +580,34 @@ public class BaseActivity extends AppCompatActivity {
             );
             newsReceiverRegistered = true;
         }
+        ControllerConnectionMonitor monitor = controllerMonitor();
+        monitor.setListener(controllerListener);
+        monitor.start();
+    }
+
+    /**
+     * Returns the process-wide connection monitor.
+     *
+     * One monitor serves every screen; each activity attaches its own listener while visible so
+     * exactly the front activity shows the pill.
+     */
+    private ControllerConnectionMonitor controllerMonitor() {
+        return ControllerConnectionMonitor.get(this);
+    }
+
+    /** The process-wide monitor, so MinecraftActivity can share it. */
+    public static ControllerConnectionMonitor sharedControllerMonitor(Context context) {
+        return ControllerConnectionMonitor.get(context);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        if (fireworkLayer != null) {
+            // Re-read the gates on every resume: Battery Saver and "remove animations" can be
+            // toggled while the app is backgrounded, and a settings change must take effect.
+            fireworkLayer.refresh(this);
+        }
         int currentGen = ThemeManager.getThemeChangeGeneration();
         int currentPGen = PersonalizationManager.getChangeGeneration();
         if (appliedThemeGeneration != currentGen || appliedPersonalizationGeneration != currentPGen) {
@@ -505,13 +628,10 @@ public class BaseActivity extends AppCompatActivity {
             unregisterReceiver(newsReceiver);
             newsReceiverRegistered = false;
         }
+        ControllerConnectionMonitor monitor = controllerMonitor();
+        monitor.setListener(null);
+        monitor.stop();
         super.onStop();
-    }
-
-    @Override
-    protected void onPause() {
-        hideSystemUI();
-        super.onPause();
     }
 
     @Override
