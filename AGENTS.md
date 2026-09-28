@@ -415,11 +415,22 @@ these are the conclusions.
   strings exist -- so they cannot be xref'd via the vtable structures. Finding the function that
   reads a player's position needs a disassembler pass over the 220 MB `.text`; `resolveVtableFunction`
   gives a vtable, but a static vtable address alone does not yield a live `Actor*`.
-- **The entity feed a hitbox/crystal/armor/nametag module needs is therefore not derivable
+- **The *entity* feed a hitbox/crystal/armor/nametag module needs is therefore not derivable
   statically.** A `dynamic_cast` on a live `Actor*` would identify `LocalPlayer`, but there is no
   way to obtain the `Level*`/`ClientInstance*` to start from without either a byte-pattern signature
   per build or a `_ZTI...`-style mangled symbol, and this build exports neither for game classes.
   The in-repo `resolveSignature` is the right mechanism but needs patterns derived from the binary.
+- **The *local-player* feed, however, is implemented and is a different problem.** The in-world
+  Voice nametag icon needs only the listener's own view, and the local player is reachable without
+  any signature: `ClientInstance`'s vtable **slot 31** returns the local player, and that slot is
+  resolved **by RTTI name** through `resolveVtableFunction("14ClientInstance", 31, ...)` -- no
+  per-build code address. The preloader hooks that slot and snapshots position (`Actor+0x230`) and
+  view rotation (`Actor+0x238`); both field offsets are shared by 1.26.33.1 / 1.26.50.4 / 1.26.51.1
+  (confirmed against the 1.26.50.4 and 1.26.60.28 binaries). Live pointer dereference happens **only
+  inside the hook** (game thread, right after the game returned the pointer); Java reads a
+  seqlock-protected copy with a staleness window, so a session ending cannot leave the UI thread
+  reading freed memory. See `GameLocalPlayer.cpp` in the preloader. This does **not** unblock the
+  combat modules -- they need *other* entities' positions, which is the unreachable problem above.
 - **The game's Java layer is no help.** The dex contains 59 `com/mojang/minecraftpe/*` classes in
   1.26.60.28 (down from 68), all Android host plumbing (MainActivity, PlayIntegrity, FilePicker,
   Braze, WorldRecovery) plus PairIP-obfuscated stubs. There is no player/entity/position/camera API
@@ -428,12 +439,13 @@ these are the conclusions.
   primitives (`resolveSignature`/`resolveVtableFunction`/`hook`/`writeBytes`), input callbacks, and
   Mod Menu/HUD submission -- nothing that returns a world position. So even a native mod has to
   build the feed from the same signatures.
-- **`WorldSource` / `DataSource` / `EntitySource` / `TagSource` have no provider and are never
-  installed**
-  (`setWorldSource`/`setDataSource`/`setEntitySource`/`setTagSource` have zero callers). Crystal
-  Optimizer, Armor HUD, Hitboxes and the in-world Voice nametag icons therefore cannot produce
-  output; they correctly show their "awaiting game data" state (or draw nothing, for the icon).
-  Implement one only with a verified signature set, and keep the honest empty state.
+- **`WorldSource` / `DataSource` / `EntitySource` have no provider and are never installed**
+  (`setWorldSource`/`setDataSource`/`setEntitySource` have zero callers). Crystal Optimizer, Armor
+  HUD and Hitboxes therefore cannot produce output; they correctly show their "awaiting game data"
+  state. Implement one only with a verified signature set, and keep the honest empty state.
+  `TagSource` is the exception: the in-world Voice nametag icon *is* installed now (see the
+  local-player feed bullet above), because the peer positions it needs arrive over the voice
+  protocol and only the local view comes from the game.
 - **A cape feature is not reachable through this.** The in-game cape is a resource pack (see the
   cosmetics section), a supported mechanism rather than a native hook.
 - Static-analysis caution: RTTI pointers in this PIE binary live in `.data.rel.ro` as
