@@ -36,12 +36,16 @@ public final class Controller3DProjection {
         /** True when the region is a shoulder control, drawn in the raised layer. */
         public final boolean shoulder;
 
-        Projected(ControllerLayout.Spec spec, float x, float y, float radius, float z,
-                  boolean shoulder) {
+        /** Perspective factor at this region's depth; greater than 1 when in front of the face. */
+        public final float perspective;
+
+        Projected(ControllerLayout.Spec spec, float x, float y, float radius, float perspective,
+                  float z, boolean shoulder) {
             this.spec = spec;
             this.x = x;
             this.y = y;
             this.radius = radius;
+            this.perspective = perspective;
             this.z = z;
             this.shoulder = shoulder;
         }
@@ -121,10 +125,49 @@ public final class Controller3DProjection {
             float z = shoulder ? SHOULDER_Z : 0f;
             float[] p = project(ControllerLayout.regionDx(spec), -ControllerLayout.regionDy(spec), z,
                     scale, centerX, centerY);
-            out.add(new Projected(spec, p[0], p[1], spec.radius * 2f * scale * p[2], z, shoulder));
+            out.add(new Projected(spec, p[0], p[1], spec.radius * 2f * scale * p[2], p[2], z,
+                    shoulder));
         }
         out.sort((a, b) -> Float.compare(a.z, b.z));
         return out;
+    }
+
+    /**
+     * The projected extent of the whole illustration, as {@code minX, minY, maxX, maxY} in scale
+     * units at {@code scale = 1} and the origin as the centre.
+     *
+     * <p>This exists because the view cannot fit the pad from the shell alone. The triggers are
+     * lifted toward the camera and sit above the shell's shoulder, so the drawn shape is
+     * asymmetric about the face: fitting {@code height / 2} around the face centre left the
+     * triggers poking off the top edge, where the view clipped them. Measuring the real extent
+     * (shell plus every control, including each control's own radius) lets the view fit and centre
+     * the whole thing, so the shoulder controls are always on screen.
+     */
+    public static float[] unitBounds(ControllerType type, int samplesPerSegment) {
+        float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE;
+        float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
+
+        float[] shell = projectShell(type, samplesPerSegment, 1f, 0f, 0f);
+        for (int i = 0; i < shell.length; i += 2) {
+            minX = Math.min(minX, shell[i]);
+            maxX = Math.max(maxX, shell[i]);
+            minY = Math.min(minY, shell[i + 1]);
+            maxY = Math.max(maxY, shell[i + 1]);
+        }
+
+        for (Projected p : project(type, 1f, 0f, 0f)) {
+            // Use the real draw half-extents: bumpers, triggers and the touchpad are wide rounded
+            // rectangles, so a circle radius understates them and the fit clips their ends.
+            float hw = p.spec.halfWidth() * p.perspective;
+            float hh = p.spec.halfHeight() * p.perspective;
+            minX = Math.min(minX, p.x - hw);
+            maxX = Math.max(maxX, p.x + hw);
+            minY = Math.min(minY, p.y - hh);
+            maxY = Math.max(maxY, p.y + hh);
+        }
+
+        if (minX > maxX) return new float[]{-1f, -1f, 1f, 1f};
+        return new float[]{minX, minY, maxX, maxY};
     }
 
     /**
