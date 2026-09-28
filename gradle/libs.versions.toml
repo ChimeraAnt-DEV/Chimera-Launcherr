@@ -40,6 +40,12 @@ billing = "8.3.0"
 sqliteFramework = "2.6.2"
 dynamicanimation = "1.1.0"
 xcrash = "3.1.2"
+# Pure-Java Opus (BSD-3), so the voice relay needs no per-ABI native codec build. JitPack's
+# immutable build coordinate (`master-<sha>-1`) is unusable: its POM still declares
+# `master-SNAPSHOT`, which Gradle rejects as inconsistent module metadata. The plain `master`
+# coordinate resolves, and matches the moving coordinates this project already uses
+# (MinecraftAuth `main-SNAPSHOT`, bedrock-connection `...-SNAPSHOT`).
+concentus = "master"
 
 [libraries]
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomRuntime" }
@@ -90,6 +96,7 @@ simple-xml = { group = "org.simpleframework", name = "simple-xml", version.ref =
 billing = { group = "com.android.billingclient", name = "billing", version.ref = "billing" }
 androidx-dynamicanimation = { module = "androidx.dynamicanimation:dynamicanimation", version.ref = "dynamicanimation" }
 xcrash = { module = "com.github.RadiantByte:xCrash", version.ref = "xcrash" }
+concentus = { module = "com.github.lostromb.concentus:Concentus", version.ref = "concentus" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

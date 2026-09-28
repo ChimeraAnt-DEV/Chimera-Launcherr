@@ -81,6 +81,9 @@ public class InbuiltModManager {
     private static final String KEY_VOICE_ICON_ANIMATE = "voice_icon_animate";
     private static final String KEY_VOICE_ICON_SHOW_NAMETAG = "voice_icon_show_nametag";
     private static final String KEY_VOICE_REFRESH_MS = "voice_chatter_refresh_ms";
+    private static final String KEY_VOICE_RELAY_ENABLED = "voice_relay_enabled";
+    private static final String KEY_VOICE_RELAY_ADDRESS = "voice_relay_address";
+    private static final String KEY_VOICE_RELAY_PASSWORD = "voice_relay_password";
     private static final int DEFAULT_AIM_SMOOTHING = 40;
     private static final int DEFAULT_AIM_SENSITIVITY = 100;
     private static final int DEFAULT_AIM_CROSSHAIR_COLOR = 0xFF3DDC84;
@@ -800,5 +803,48 @@ public class InbuiltModManager {
 
     public void setVoiceChatterRefreshMs(int ms) {
         prefs.edit().putInt(KEY_VOICE_REFRESH_MS, Math.max(50, Math.min(1000, ms))).apply();
+    }
+
+    // --- Relay transport ------------------------------------------------------------------
+
+    /**
+     * Whether the relay transport is enabled.
+     *
+     * <p>Off by default: LAN multicast is the zero-configuration path and stays the default, so a
+     * player who has not set up a server is unaffected. Turning it on switches the session to the
+     * relay address below.
+     */
+    public boolean isVoiceRelayEnabled() {
+        return prefs.getBoolean(KEY_VOICE_RELAY_ENABLED, false);
+    }
+
+    public void setVoiceRelayEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_VOICE_RELAY_ENABLED, enabled).apply();
+    }
+
+    /** The configured relay address ({@code host} or {@code host:port}), or "" when unset. */
+    public String getVoiceRelayAddress() {
+        return prefs.getString(KEY_VOICE_RELAY_ADDRESS, "");
+    }
+
+    public void setVoiceRelayAddress(String address) {
+        prefs.edit().putString(KEY_VOICE_RELAY_ADDRESS,
+                address == null ? "" : address.trim()).apply();
+    }
+
+    /**
+     * The shared password for the relay, or "" when the server is open.
+     *
+     * <p>Stored as a plain preference, not encrypted: it is a shared room secret, not an account
+     * credential, and the launcher has no keystore-backed store for a per-feature value. This is
+     * the same trust level as the relay itself, which is documented as not being a secure channel.
+     */
+    public String getVoiceRelayPassword() {
+        return prefs.getString(KEY_VOICE_RELAY_PASSWORD, "");
+    }
+
+    public void setVoiceRelayPassword(String password) {
+        prefs.edit().putString(KEY_VOICE_RELAY_PASSWORD,
+                password == null ? "" : password.trim()).apply();
     }
 }

@@ -500,10 +500,23 @@ these are the conclusions.
   standing in front of you); two different private channels do not hear each other. Gain falls
   from 1 to 0 across the range with a linear band (`VoiceChannel.gain`). Pinned by
   `VoiceChannelTest`/`VoiceProtocolTest`.
-- **The position seam is not implemented.** Distance needs a world position that lives in
-  `libminecraftpe.so` (see the native-feed section), so `VoiceChatModule.PositionSource` has no
-  provider and the module runs in **channel mode** -- everyone on a reachable channel is audible at
-  full volume. That is a real mode, and the overlay says so rather than pretending a range applies.
+- **The position seam is installed, and "installed" is not "live".** `LocalPlayerFeed` (in
+  `core.mods.inbuilt.overlay`) installs `VoiceChatModule.setPositionSource(...)` from the same
+  `ClientInstance` vtable slot 31 the nametag mic icon uses, so distance falloff applies on both
+  transports once a world is loaded. The native read is **fail-closed**: with no world loaded
+  (before the first frame, on a loading screen, after leaving a session) it returns null, which is
+  a different state from "no feed". `isChannelMode()` reports the persistent state
+  (`positionSource == null`); `hasLivePosition()` reports whether a position is readable *this
+  frame*, which is what actually decides whether distance is in effect. Calling `isChannelMode()`
+  on the audio path was the bug: a null read collapsed to the origin, so every peer was graded
+  against a phantom (0,0,0) and dropped. The gain rule (`VoiceChatModule.gainFor(...)`, pure and
+  pinned by `VoicePositionGainTest`) now treats a missing position as channel mode — never as
+  distance from the origin — and `isChannelMode` is only a status predicate.
+- **`sanitizePosition` rejects a malformed feed value.** A NaN/infinite component from a torn
+  native read would propagate into the distance math and silence audio with no diagnosable cause,
+  so a value that is not three finite numbers reads as "no position" and falls back to the channel
+  rule. The Voice tab renders which state is active (`voice_proximity_mode`), so a player in a
+  loading screen is told why everyone is at full volume.
 - **`VoiceAudioEngine.ensureCapture`/`stopCapture` exist because a mic toggled on after a
   listen-only start must open the recorder**; a bare `setMicEnabled` only gates an already-running
   capture loop. `applyConfig` calls them. The RECORD_AUDIO permission is requested when voice
@@ -569,6 +582,56 @@ these are the conclusions.
   is pure and shares `HitboxProjector.Camera` on purpose -- a second camera convention is how one
   drifts. Icons sit right of the label, project far-to-near, and drop when the label is too small
   to read. Pinned by `NametagIconProjectorTest`/`NametagMicStateTest`/`VoiceNametagModTest`.
+
+## Voice relay server (server/voice-relay, Go) — internet voice
+- A standalone Go UDP relay so voice works between players **not on the same Wi-Fi**. LAN multicast
+  stays the default path (`VoiceTransport`); the relay is a second `VoiceLink`
+  (`VoiceRelayTransport`) the user opts into with a server address. Nothing in the launcher's
+  `VoiceChatModule` knows which one it has beyond the `VoiceLink` interface.
+- **`VoiceLink` is the transport seam.** `prefersOpus()` decides the codec: the LAN path returns
+  false (raw PCM, no codec dependency on a shared network), the relay returns true. `VoiceCodec`
+  wraps Concentus (pure-Java Opus, BSD-3) through **reflection**, so a missing jar degrades to PCM
+  rather than making the voice package un-loadable. `VoiceCodecTest` asserts Concentus is on the
+  test classpath — otherwise `isAvailable()` would be false and every relay session would silently
+  fall back to raw PCM, which is the whole bandwidth saving lost with no error.
+- **`VoiceJitterBuffer` is per peer, and its drain semantics are a priming problem, not a
+  per-call threshold.** It releases only after the buffer holds the adaptive target depth *or* the
+  head has waited past `MAX_WAIT_MS`; re-requiring the depth on every `poll` stalls the stream the
+  moment it dips below the cushion. It also anchors `nextSequence` at the **lowest buffered
+  sequence**, not the first arrival — an early frame that overtook the one that arrived first is
+  not late. `offer` only rejects `position < nextSequence` once actually primed. Sequence
+  wraparound and non-zero start values are handled by `extend` (reconstructs the full 64-bit
+  position from the 32-bit wire value relative to the last one).
+- **`VoiceMixer` sums sources sample-by-sample and saturates.** Each source is applied at its own
+  offset (so a talker that starts mid-frame does not shift the others) and a zero/short buffer
+  contributes silence rather than dragging the frame to zero.
+- **Wire format is pinned cross-language by golden vectors.** `VoiceProtocol` v4 adds the
+  server-assigned `clientId` (8 bytes after the type) and the codec byte (just before the payload
+  length), and carries **three** length-prefixed strings before the visibility byte: `peerId`,
+  `name`, `channel`. The Go parser must consume all three or every field after is read from the
+  wrong offset — a mistake that only surfaces when a real client meets a real server.
+  `VoiceProtocolGoldenVectorTest` (Java) fixes the exact bytes; `server/voice-relay/vector_test.go`
+  asserts the same literals parse to the same fields. Change the layout and one suite fails instead
+  of the mismatch shipping. v1/v2/v3 remain decodable (`VERSION_LEGACY..VERSION`); an unknown codec
+  byte reads as PCM.
+- **The relay never decodes audio.** It carries opaque payloads and the codec byte through, patches
+  the sender's assigned id into one copy, and fans it out — so a 1 vCPU / 1 GB VPS is enough.
+  `CanHear` mirrors `VoiceChannel.canHear` exactly (same channel, or the open `world` channel in
+  both directions) so a team-channel switch behaves the same over the relay as on the LAN.
+- **Keepalive keeps phone NAT mappings open.** The client pings every `HeartbeatMs` (server tells
+  it the interval in `HELLO_ACK`); the server answers PONG and evicts a session idle past
+  `IdleTimeoutSec`. `RelayReconnectPolicy` backs off reconnects; a phone that re-HELLOs from the
+  same socket replaces its session rather than accumulating one.
+- **Abuse controls are per client and per IP**: token-bucket packet and byte rate limits, a
+  per-channel member cap (a refused move is a no-op + NOTICE, not a disconnect), `max_channels`,
+  `max_clients`, `max_clients_per_ip`, and an optional shared password. `/healthz`, `/metrics`
+  (Prometheus) and `/status` are the monitoring surface. See `server/voice-relay/README.md` for
+  deploy (systemd unit in `deploy/`), firewall and NAT notes.
+- **Honest scope:** the password is a plain shared secret over UDP, not authenticated identity, and
+  audio is **not end-to-end encrypted** — the server carries it. `voice_relay_scope_note` says so in
+  the Voice tab. The relay only swaps transports; distance falloff applies on both paths via the
+  installed `PositionSource` (see the proximity-voice section — a missing live read falls back to
+  channel mode).
 
 ## In-game pack changer (core.content.InGamePackChanger + PackChangerPanel)
 - Per-instance opt-in toggle in Instance Settings (`GameVersion.inGamePackChangerEnabled`,

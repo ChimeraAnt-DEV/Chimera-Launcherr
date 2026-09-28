@@ -33,13 +33,23 @@ import java.util.Arrays;
  * the speaking animation reflects the audio actually being sent rather than a decorative pulse.
  * None of these change who can hear whom, so a v1 or v2 peer is still fully audible; its packets
  * simply carry no level/mute/capacity and the UI degrades to the neutral state.
+ *
+ * <p><b>Version 4</b> adds the server-assigned client id and the audio codec byte, and the packet
+ * types a relay conversation needs (hello/ack/ping/pong/notice). It is the format the
+ * {@code VoiceRelayTransport} speaks. The <em>multicast</em> transport deliberately keeps sending
+ * v3 with raw PCM: every existing LAN peer understands v3 and PCM, and a v4 header on the local
+ * group would be a needless break. The version on the wire is therefore a property of the
+ * transport, not of this class -- {@link #encodeBeacon} stays v3 and the relay builds v4 itself.
+ * On decode, v1-v4 are all accepted so one build can hear both a LAN peer and a relay peer.
  */
 public final class VoiceProtocol {
 
     public static final byte[] MAGIC = {'C', 'V'};
 
-    /** The current format version. */
-    public static final byte VERSION = 3;
+    /** The current format version, as used by the relay transport. */
+    public static final byte VERSION = 4;
+    /** The version the multicast transport still sends, for LAN compatibility. */
+    public static final byte VERSION_MULTICAST = 3;
     /** The oldest format version still accepted, so an older peer is still heard. */
     public static final byte VERSION_LEGACY = 1;
 
@@ -54,6 +64,30 @@ public final class VoiceProtocol {
     public static final byte TYPE_AUDIO = 2;
     /** A clean shutdown notice, so a peer leaves the list without waiting for the stale timer. */
     public static final byte TYPE_BYE = 3;
+    /** Relay only: the first packet a client sends, to be assigned an id. */
+    public static final byte TYPE_HELLO = 4;
+    /** Relay only: the server's reply, carrying the assigned client id. */
+    public static final byte TYPE_HELLO_ACK = 5;
+    /** Relay only: a server keepalive probe. */
+    public static final byte TYPE_PING = 6;
+    /** Relay only: a client's reply to a ping, and its own keepalive. */
+    public static final byte TYPE_PONG = 7;
+    /** Relay only: the server refused something; the reason is in {@link Packet#sequence}. */
+    public static final byte TYPE_NOTICE = 8;
+
+    /** Audio codec: raw 16-bit little-endian mono PCM, the LAN default. */
+    public static final byte CODEC_PCM = 0;
+    /** Audio codec: Opus, what the relay transport prefers for its bandwidth saving. */
+    public static final byte CODEC_OPUS = 1;
+
+    /** A relay notice reason: the server is at capacity. */
+    public static final int NOTICE_SERVER_FULL = 1;
+    /** A relay notice reason: the shared password was wrong or missing. */
+    public static final int NOTICE_BAD_PASSWORD = 2;
+    /** A relay notice reason: the channel is at capacity. */
+    public static final int NOTICE_CHANNEL_FULL = 3;
+    /** A relay notice reason: the server speaks a different protocol version. */
+    public static final int NOTICE_BAD_PROTOCOL = 4;
 
     /** The largest payload we will accept, so a hostile datagram cannot allocate unbounded memory. */
     public static final int MAX_PAYLOAD = 4096;
@@ -84,12 +118,17 @@ public final class VoiceProtocol {
         public final boolean muted;
         public final float x, y, z;
         public final int sequence;
+        /** {@link #CODEC_PCM} or {@link #CODEC_OPUS}; PCM for a v3-or-earlier packet. */
+        public final byte codec;
+        /** The server-assigned client id, or 0 outside the relay. */
+        public final long clientId;
         public final byte[] payload;
 
         private Packet(byte type, String peerId, String name, String channel,
                        byte visibility, String channelName,
                        int capacity, float level, boolean muted,
-                       float x, float y, float z, int sequence, byte[] payload) {
+                       float x, float y, float z, int sequence, byte codec, long clientId,
+                       byte[] payload) {
             this.type = type;
             this.peerId = peerId;
             this.name = name;
@@ -103,11 +142,24 @@ public final class VoiceProtocol {
             this.y = y;
             this.z = z;
             this.sequence = sequence;
+            this.codec = codec;
+            this.clientId = clientId;
             this.payload = payload;
         }
 
         public boolean isPrivate() {
             return visibility == VISIBILITY_PRIVATE;
+        }
+
+        /** Whether this packet's audio payload is Opus rather than raw PCM. */
+        public boolean isOpus() {
+            return codec == CODEC_OPUS;
+        }
+
+        /** A copy carrying a different payload, so a transport can reframe without re-decoding. */
+        public Packet withPayload(byte[] newPayload) {
+            return new Packet(type, peerId, name, channel, visibility, channelName,
+                    capacity, level, muted, x, y, z, sequence, codec, clientId, newPayload);
         }
     }
 
@@ -178,12 +230,32 @@ public final class VoiceProtocol {
                                  byte visibility, String channelName, int capacity,
                                  float level, boolean muted,
                                  float x, float y, float z, int sequence, byte[] audio) {
+        // The legacy entry points are the multicast path, which keeps sending v3 so every
+        // existing LAN peer still understands it.
+        return encode(VERSION_MULTICAST, 0L, type, peerId, name, channel, visibility,
+                channelName, capacity, level, muted, x, y, z, sequence, CODEC_PCM, audio);
+    }
+
+    /**
+     * The full encoder, parameterised by version-4 fields.
+     *
+     * <p>{@code version} selects the wire shape: v3 omits the client id and codec byte, v4 writes
+     * both. The multicast path calls this with v3 (so LAN peers are unaffected) and the relay
+     * path with v4. Keeping one encoder means the two shapes cannot drift.
+     */
+    public static byte[] encode(byte version, long clientId, byte type, String peerId, String name,
+                                String channel, byte visibility, String channelName, int capacity,
+                                float level, boolean muted,
+                                float x, float y, float z, int sequence, byte codec, byte[] audio) {
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             DataOutputStream out = new DataOutputStream(buffer);
             out.write(MAGIC);
-            out.writeByte(VERSION);
+            out.writeByte(version);
             out.writeByte(type);
+            if (version >= 4) {
+                out.writeLong(clientId);
+            }
             writeString(out, peerId);
             writeString(out, name);
             writeString(out, VoiceChannel.normalize(channel));
@@ -196,6 +268,9 @@ public final class VoiceProtocol {
             out.writeFloat(y);
             out.writeFloat(z);
             out.writeInt(sequence);
+            if (version >= 4) {
+                out.writeByte(normalizeCodec(codec));
+            }
             if (audio != null && audio.length > 0) {
                 int length = Math.min(audio.length, MAX_PAYLOAD);
                 out.writeInt(length);
@@ -211,6 +286,40 @@ public final class VoiceProtocol {
         }
     }
 
+    /**
+     * Encodes a v3 packet for the multicast transport. Exposed so the session can frame any type
+     * on the LAN path without a codec byte, which is exactly what an existing v3 peer expects.
+     */
+    public static byte[] encodeLegacy(byte type, String peerId, String name, String channel,
+                                      byte visibility, String channelName, int capacity,
+                                      float level, boolean muted,
+                                      float x, float y, float z, int sequence, byte[] payload) {
+        return encode(type, peerId, name, channel, visibility, channelName, capacity,
+                level, muted, x, y, z, sequence, payload);
+    }
+
+    /** Encodes a v4 beacon for the relay, carrying the assigned client id and the codec. */
+    public static byte[] encodeRelayBeacon(long clientId, byte type, String peerId, String name,
+                                           String channel, byte visibility, String channelName,
+                                           int capacity, float level, boolean muted,
+                                           float x, float y, float z, int sequence, byte codec,
+                                           byte[] audio) {
+        return encode(VERSION, clientId, type, peerId, name, channel, visibility, channelName,
+                capacity, level, muted, x, y, z, sequence, codec, audio);
+    }
+
+    /** A v4 HELLO: the first packet a client sends to a relay, to be assigned an id. */
+    public static byte[] encodeHello(String name, String channel, byte[] password) {
+        return encode(VERSION, 0L, TYPE_HELLO, "", name, channel, VISIBILITY_PUBLIC, "",
+                CAPACITY_NONE, 0f, false, 0f, 0f, 0f, 0, CODEC_OPUS, password);
+    }
+
+    /** A v4 PONG, sent as a keepalive and in reply to a server PING. */
+    public static byte[] encodePong(long clientId) {
+        return encode(VERSION, clientId, TYPE_PONG, "", "", VoiceChannel.WORLD,
+                VISIBILITY_PUBLIC, "", CAPACITY_NONE, 0f, false, 0f, 0f, 0f, 0, CODEC_PCM, null);
+    }
+
     /** Decodes a datagram, or returns null when it is not one of ours or is malformed. */
     public static Packet decode(byte[] data) {
         if (data == null || data.length < MAGIC.length + 2) return null;
@@ -222,7 +331,11 @@ public final class VoiceProtocol {
             in.skipBytes(MAGIC.length);
             in.readByte(); // version, already checked
             byte type = in.readByte();
-            if (type != TYPE_BEACON && type != TYPE_AUDIO && type != TYPE_BYE) return null;
+            if (!isKnownType(type)) return null;
+            long clientId = 0L;
+            if (version >= 4) {
+                clientId = in.readLong();
+            }
             String peerId = readString(in);
             String name = readString(in);
             String channel = readString(in);
@@ -244,15 +357,41 @@ public final class VoiceProtocol {
             float y = in.readFloat();
             float z = in.readFloat();
             int sequence = in.readInt();
+            byte codec = CODEC_PCM;
+            if (version >= 4) {
+                codec = normalizeCodec(in.readByte());
+            }
             int length = in.readInt();
             if (length < 0 || length > MAX_PAYLOAD) return null;
             byte[] payload = new byte[length];
             in.readFully(payload);
             return new Packet(type, peerId, name, channel, visibility, channelName,
-                    capacity, level, muted, x, y, z, sequence, payload);
+                    capacity, level, muted, x, y, z, sequence, codec, clientId, payload);
         } catch (IOException | RuntimeException e) {
             return null;
         }
+    }
+
+    /** Whether a packet type is one this class understands; an unknown type is rejected. */
+    private static boolean isKnownType(byte type) {
+        switch (type) {
+            case TYPE_BEACON:
+            case TYPE_AUDIO:
+            case TYPE_BYE:
+            case TYPE_HELLO:
+            case TYPE_HELLO_ACK:
+            case TYPE_PING:
+            case TYPE_PONG:
+            case TYPE_NOTICE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /** Clamps a decoded codec to one of the two known values. */
+    public static byte normalizeCodec(byte codec) {
+        return codec == CODEC_OPUS ? CODEC_OPUS : CODEC_PCM;
     }
 
     /** Clamps a decoded visibility to one of the two known values. */

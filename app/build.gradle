@@ -141,6 +141,7 @@ dependencies {
     implementation libs.material
     implementation libs.gson
     implementation libs.luaj.jse
+    implementation libs.concentus
     implementation libs.androidx.preference.ktx
     implementation libs.androidx.games.activity
     implementation libs.okhttp

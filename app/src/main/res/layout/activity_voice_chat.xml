@@ -101,6 +101,106 @@
                 android:orientation="vertical"
                 android:paddingEnd="6dp">
 
+                <!-- Relay server: off by default, so LAN stays the zero-config path. -->
+                <LinearLayout
+                    style="@style/Widget.Chimera.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="10dp"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/voice_relay_title"
+                            android:fontFamily="@font/misans"
+                            android:textColor="@color/on_surface"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/voice_relay_switch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:thumbTint="@color/primary"
+                            android:trackTint="#555555" />
+
+                    </LinearLayout>
+
+                    <EditText
+                        android:id="@+id/voice_relay_address"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:minHeight="44dp"
+                        android:background="@drawable/chimera_card_small"
+                        android:hint="@string/voice_relay_address_hint"
+                        android:fontFamily="@font/misans"
+                        android:inputType="textUri|textNoSuggestions"
+                        android:maxLength="255"
+                        android:paddingHorizontal="12dp"
+                        android:singleLine="true"
+                        android:textColor="@color/on_surface"
+                        android:textColorHint="@color/text_secondary"
+                        android:textSize="14sp" />
+
+                    <EditText
+                        android:id="@+id/voice_relay_password"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="44dp"
+                        android:background="@drawable/chimera_card_small"
+                        android:hint="@string/voice_relay_password_hint"
+                        android:fontFamily="@font/misans"
+                        android:inputType="textPassword|textNoSuggestions"
+                        android:maxLength="64"
+                        android:paddingHorizontal="12dp"
+                        android:singleLine="true"
+                        android:textColor="@color/on_surface"
+                        android:textColorHint="@color/text_secondary"
+                        android:textSize="14sp" />
+
+                    <Button
+                        android:id="@+id/voice_relay_save_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:minHeight="40dp"
+                        android:backgroundTint="@color/primary"
+                        android:fontFamily="@font/misans"
+                        android:text="@string/voice_relay_apply"
+                        android:textAllCaps="false"
+                        android:textColor="@color/on_primary"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/voice_relay_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:fontFamily="@font/misans"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:fontFamily="@font/misans"
+                        android:text="@string/voice_relay_scope_note"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp" />
+
+                </LinearLayout>
+
                 <LinearLayout
                     style="@style/Widget.Chimera.Card"
                     android:layout_width="match_parent"
@@ -128,6 +228,15 @@
 
                     <TextView
                         android:id="@+id/voice_channel_kind"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:fontFamily="@font/misans"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/voice_proximity_mode"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
