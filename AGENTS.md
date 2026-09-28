@@ -627,6 +627,32 @@ these are the conclusions.
   `max_clients`, `max_clients_per_ip`, and an optional shared password. `/healthz`, `/metrics`
   (Prometheus) and `/status` are the monitoring surface. See `server/voice-relay/README.md` for
   deploy (systemd unit in `deploy/`), firewall and NAT notes.
+- **Token auth replaces the replayable password.** Set `TokenSecret` (`-token-secret` /
+  `VOICE_TOKEN_SECRET`) and the relay requires a signed join token instead: the launcher holds the
+  secret, never sends it, and mints `VoiceToken.issue(secret, deviceId, ttl, now)` per HELLO —
+  re-minted on every reconnect, so an expiry mid-session cannot lock a client out. The token is
+  `v1.<base64url(deviceID|expiryUnix)>.<base64url(hmacSHA256(secret,"v1|"+payload))>`; the HMAC
+  covers the version prefix, the base64 is **URL-safe without padding**, and `MAX_TTL_SECONDS`
+  caps a hand-minted far-future expiry. A device id is sanitized on both sides (control bytes and
+  `|` stripped, 64 chars max) because it becomes part of a signed payload. **The format is pinned
+  across languages**: `VoiceTokenTest.GOLDEN` (Java) and
+  `token_test.go:TestTokenGoldenVectorMatchesTheLauncher` (Go) assert the same literal — a drift
+  here is not a compile error but a relay that refuses every connection.
+- **Bans: auto, static and live.** Repeated bad credentials auto-ban an IP for `BanMinutes`
+  (`AuthFailuresBeforeBan`, 0 disables); `BannedIPs` (IP or CIDR) and `BannedDevices` are permanent
+  and the device ban survives an IP change. The admin endpoint (`AdminListen`, localhost/private
+  only, `AdminToken` bearer) exposes `GET /admin/bans`, `POST /admin/ban` and `POST /admin/unban`
+  (`{"ip"|"device", "minutes"}`); a ban takes effect immediately and `DisconnectBanned` drops any
+  matching live session. The device id rides the v4 wire as its own field (`Packet.DeviceID`, after
+  `name`), and every relayed frame is stamped with it so a ban can be bound to a device.
+- **The device id is generated on first use, never a hardware id.** `InbuiltModManager
+  .getVoiceDeviceId()` returns a random `UUID` kept in prefs — enough to bind a token and a ban to
+  an install without being a cross-app tracking identifier. Clearing the pref is the intended
+  "start over" escape hatch.
+- **A default relay address can be baked in at build time.** `local.properties` →
+  `voice.relay.address` → `BuildConfig.DEFAULT_VOICE_RELAY_ADDRESS` (empty by default). The pref
+  wins when set; `getVoiceRelayAddress()` falls back to the build value so a release ships a
+  working server with no first-run typing. The value is not a package path and holds no secret.
 - **Honest scope:** the password is a plain shared secret over UDP, not authenticated identity, and
   audio is **not end-to-end encrypted** — the server carries it. `voice_relay_scope_note` says so in
   the Voice tab. The relay only swaps transports; distance falloff applies on both paths via the

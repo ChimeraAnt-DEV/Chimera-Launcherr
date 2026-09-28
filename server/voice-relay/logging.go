@@ -83,6 +83,9 @@ type Metrics struct {
 	rejectedFull       atomic.Int64
 	rejectedPassword   atomic.Int64
 	rejectedChannel    atomic.Int64
+	rejectedAuth       atomic.Int64
+	rejectedBanned     atomic.Int64
+	bansApplied        atomic.Int64
 
 	mu       sync.Mutex
 	lastSeen map[uint64]time.Time
@@ -153,5 +156,11 @@ func (m *Metrics) Render() string {
 		m.rejectedPassword.Load())
 	writeCounter("chimera_voice_rejected_channel_full_total", "Joins refused because the channel was full",
 		m.rejectedChannel.Load())
+	writeCounter("chimera_voice_rejected_auth_total", "HELLOs refused for a bad credential",
+		m.rejectedAuth.Load())
+	writeCounter("chimera_voice_rejected_banned_total", "HELLOs refused because the client is banned",
+		m.rejectedBanned.Load())
+	writeCounter("chimera_voice_bans_applied_total", "Addresses auto-banned after repeated auth failures",
+		m.bansApplied.Load())
 	return b.String()
 }

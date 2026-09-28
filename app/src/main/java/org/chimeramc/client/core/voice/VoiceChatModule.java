@@ -279,7 +279,8 @@ public final class VoiceChatModule {
             VoiceRelayAddress parsed = VoiceRelayAddress.parse(manager.getVoiceRelayAddress());
             if (parsed != null) {
                 return new VoiceRelayTransport(parsed, displayName,
-                        manager.getVoiceRelayPassword(), currentChannel(), new VoiceLink.Listener() {
+                        manager.getVoiceRelayPassword(), manager.getVoiceRelayTokenSecret(),
+                        manager.getVoiceDeviceId(), currentChannel(), new VoiceLink.Listener() {
                     @Override
                     public void onDatagram(byte[] data, int length) {
                         VoiceChatModule.this.onDatagram(data, length);
@@ -466,7 +467,8 @@ public final class VoiceChatModule {
         if (active instanceof VoiceRelayTransport) {
             VoiceRelayTransport relay = (VoiceRelayTransport) active;
             return VoiceProtocol.encodeRelayBeacon(relay.clientId(), type, peerId, displayName,
-                    currentChannel(), currentChannelVisibility(), currentChannelName(),
+                    relay.deviceId(), currentChannel(), currentChannelVisibility(),
+                    currentChannelName(),
                     currentChannelCapacity(), localLevel(), localSelfMuted(),
                     x, y, z, seq, codecByte, payload);
         }

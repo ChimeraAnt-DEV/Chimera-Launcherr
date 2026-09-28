@@ -72,6 +72,7 @@ public class VoiceChatActivity extends BaseActivity {
     private SwitchMaterial relaySwitch;
     private EditText relayAddress;
     private EditText relayPassword;
+    private EditText relayTokenSecret;
     private TextView relaySaveButton;
     private TextView relayStatus;
     private TextView masterState;
@@ -154,6 +155,7 @@ public class VoiceChatActivity extends BaseActivity {
         relaySwitch = findViewById(R.id.voice_relay_switch);
         relayAddress = findViewById(R.id.voice_relay_address);
         relayPassword = findViewById(R.id.voice_relay_password);
+        relayTokenSecret = findViewById(R.id.voice_relay_token_secret);
         relaySaveButton = findViewById(R.id.voice_relay_save_button);
         relayStatus = findViewById(R.id.voice_relay_status);
         masterState = findViewById(R.id.voice_master_state);
@@ -283,6 +285,7 @@ public class VoiceChatActivity extends BaseActivity {
         relaySwitch.setChecked(manager().isVoiceRelayEnabled());
         relayAddress.setText(manager().getVoiceRelayAddress());
         relayPassword.setText(manager().getVoiceRelayPassword());
+        if (relayTokenSecret != null) relayTokenSecret.setText(manager().getVoiceRelayTokenSecret());
 
         relaySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             manager().setVoiceRelayEnabled(isChecked);
@@ -296,6 +299,10 @@ public class VoiceChatActivity extends BaseActivity {
                 ? "" : relayAddress.getText().toString());
         manager().setVoiceRelayPassword(relayPassword.getText() == null
                 ? "" : relayPassword.getText().toString());
+        if (relayTokenSecret != null) {
+            manager().setVoiceRelayTokenSecret(relayTokenSecret.getText() == null
+                    ? "" : relayTokenSecret.getText().toString());
+        }
 
         if (manager().isVoiceRelayEnabled()
                 && org.chimeramc.client.core.voice.VoiceRelayAddress.parse(

@@ -88,6 +88,10 @@ public final class VoiceProtocol {
     public static final int NOTICE_CHANNEL_FULL = 3;
     /** A relay notice reason: the server speaks a different protocol version. */
     public static final int NOTICE_BAD_PROTOCOL = 4;
+    /** The join token was missing, malformed, expired, or bound to a different device. */
+    public static final int NOTICE_BAD_TOKEN = 5;
+    /** The address or device is banned from the relay. */
+    public static final int NOTICE_BANNED = 6;
 
     /** The largest payload we will accept, so a hostile datagram cannot allocate unbounded memory. */
     public static final int MAX_PAYLOAD = 4096;
@@ -122,9 +126,17 @@ public final class VoiceProtocol {
         public final byte codec;
         /** The server-assigned client id, or 0 outside the relay. */
         public final long clientId;
+        /**
+         * A stable, client-supplied device id, or "" outside the relay.
+         *
+         * <p>It is not trusted for identity -- a client could put anything here -- but it is what a
+         * device-bound token and a device ban bind to, so a banned or token-bound device is refused
+         * regardless of the IP it connects from.
+         */
+        public final String deviceId;
         public final byte[] payload;
 
-        private Packet(byte type, String peerId, String name, String channel,
+        private Packet(byte type, String peerId, String name, String deviceId, String channel,
                        byte visibility, String channelName,
                        int capacity, float level, boolean muted,
                        float x, float y, float z, int sequence, byte codec, long clientId,
@@ -132,6 +144,7 @@ public final class VoiceProtocol {
             this.type = type;
             this.peerId = peerId;
             this.name = name;
+            this.deviceId = deviceId;
             this.channel = channel;
             this.visibility = visibility;
             this.channelName = channelName;
@@ -158,7 +171,7 @@ public final class VoiceProtocol {
 
         /** A copy carrying a different payload, so a transport can reframe without re-decoding. */
         public Packet withPayload(byte[] newPayload) {
-            return new Packet(type, peerId, name, channel, visibility, channelName,
+            return new Packet(type, peerId, name, deviceId, channel, visibility, channelName,
                     capacity, level, muted, x, y, z, sequence, codec, clientId, newPayload);
         }
     }
@@ -247,6 +260,21 @@ public final class VoiceProtocol {
                                 String channel, byte visibility, String channelName, int capacity,
                                 float level, boolean muted,
                                 float x, float y, float z, int sequence, byte codec, byte[] audio) {
+        return encode(version, clientId, type, peerId, name, "", channel, visibility, channelName,
+                capacity, level, muted, x, y, z, sequence, codec, audio);
+    }
+
+    /**
+     * The full encoder, parameterised by version-4 fields, including the device id.
+     *
+     * <p>{@code version} selects the wire shape: v3 omits the client id, device id and codec byte;
+     * v4 writes all three. The multicast path calls this with v3 (so LAN peers are unaffected) and
+     * the relay path with v4. Keeping one encoder means the two shapes cannot drift.
+     */
+    public static byte[] encode(byte version, long clientId, byte type, String peerId, String name,
+                                String deviceId, String channel, byte visibility, String channelName,
+                                int capacity, float level, boolean muted,
+                                float x, float y, float z, int sequence, byte codec, byte[] audio) {
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             DataOutputStream out = new DataOutputStream(buffer);
@@ -258,6 +286,9 @@ public final class VoiceProtocol {
             }
             writeString(out, peerId);
             writeString(out, name);
+            if (version >= 4) {
+                writeString(out, deviceId == null ? "" : deviceId);
+            }
             writeString(out, VoiceChannel.normalize(channel));
             out.writeByte(normalizeVisibility(visibility));
             writeString(out, channelName == null ? "" : channelName.trim());
@@ -304,19 +335,41 @@ public final class VoiceProtocol {
                                            int capacity, float level, boolean muted,
                                            float x, float y, float z, int sequence, byte codec,
                                            byte[] audio) {
-        return encode(VERSION, clientId, type, peerId, name, channel, visibility, channelName,
+        return encode(VERSION, clientId, type, peerId, name, "", channel, visibility, channelName,
                 capacity, level, muted, x, y, z, sequence, codec, audio);
     }
 
-    /** A v4 HELLO: the first packet a client sends to a relay, to be assigned an id. */
-    public static byte[] encodeHello(String name, String channel, byte[] password) {
-        return encode(VERSION, 0L, TYPE_HELLO, "", name, channel, VISIBILITY_PUBLIC, "",
-                CAPACITY_NONE, 0f, false, 0f, 0f, 0f, 0, CODEC_OPUS, password);
+    /** As above, but stamps the sender's device id so the relay can bind it to a token/ban. */
+    public static byte[] encodeRelayBeacon(long clientId, byte type, String peerId, String name,
+                                           String deviceId, String channel, byte visibility,
+                                           String channelName, int capacity, float level,
+                                           boolean muted,
+                                           float x, float y, float z, int sequence, byte codec,
+                                           byte[] audio) {
+        return encode(VERSION, clientId, type, peerId, name, deviceId, channel, visibility,
+                channelName, capacity, level, muted, x, y, z, sequence, codec, audio);
+    }
+
+    /**
+     * A v4 HELLO: the first packet a client sends to a relay, to be assigned an id.
+     *
+     * <p>The payload is the credential: either a signed join token ({@code v1.…}) or the shared
+     * password. The device id rides in its own field so the relay can bind both to a device even
+     * when only a password is in use.
+     */
+    public static byte[] encodeHello(String name, String deviceId, String channel, byte[] credential) {
+        return encode(VERSION, 0L, TYPE_HELLO, "", name, deviceId, channel, VISIBILITY_PUBLIC, "",
+                CAPACITY_NONE, 0f, false, 0f, 0f, 0f, 0, CODEC_OPUS, credential);
+    }
+
+    /** Backwards-compatible HELLO with no device id; the relay treats it as unbound. */
+    public static byte[] encodeHello(String name, String channel, byte[] credential) {
+        return encodeHello(name, "", channel, credential);
     }
 
     /** A v4 PONG, sent as a keepalive and in reply to a server PING. */
     public static byte[] encodePong(long clientId) {
-        return encode(VERSION, clientId, TYPE_PONG, "", "", VoiceChannel.WORLD,
+        return encode(VERSION, clientId, TYPE_PONG, "", "", "", VoiceChannel.WORLD,
                 VISIBILITY_PUBLIC, "", CAPACITY_NONE, 0f, false, 0f, 0f, 0f, 0, CODEC_PCM, null);
     }
 
@@ -338,6 +391,12 @@ public final class VoiceProtocol {
             }
             String peerId = readString(in);
             String name = readString(in);
+            // The device id is a v4 field, written right after the name, so read it here rather
+            // than with the v3 tail -- field order, not grouping, is what the wire cares about.
+            String deviceId = "";
+            if (version >= 4) {
+                deviceId = readString(in);
+            }
             String channel = readString(in);
             byte visibility = VISIBILITY_PUBLIC;
             String channelName = "";
@@ -365,7 +424,7 @@ public final class VoiceProtocol {
             if (length < 0 || length > MAX_PAYLOAD) return null;
             byte[] payload = new byte[length];
             in.readFully(payload);
-            return new Packet(type, peerId, name, channel, visibility, channelName,
+            return new Packet(type, peerId, name, deviceId, channel, visibility, channelName,
                     capacity, level, muted, x, y, z, sequence, codec, clientId, payload);
         } catch (IOException | RuntimeException e) {
             return null;

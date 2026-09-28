@@ -47,6 +47,8 @@ public final class VoiceRelayTransport implements VoiceLink {
     private final VoiceRelayAddress address;
     private final String displayName;
     private final String password;
+    private final String tokenSecret;
+    private final String deviceId;
     private final String initialChannel;
     private final Listener listener;
     private final RelayReconnectPolicy reconnect = RelayReconnectPolicy.defaults();
@@ -62,11 +64,40 @@ public final class VoiceRelayTransport implements VoiceLink {
 
     public VoiceRelayTransport(VoiceRelayAddress address, String displayName, String password,
                                String channel, Listener listener) {
+        this(address, displayName, password, "", "", channel, listener);
+    }
+
+    /**
+     * The full constructor.
+     *
+     * <p>{@code tokenSecret} and {@code deviceId} drive the signed-token handshake: when a secret is
+     * set the HELLO carries a freshly minted token instead of the raw password, and the token is
+     * re-minted on every reconnect so an expiry during a long session cannot lock the client out.
+     * {@code deviceId} rides in its own field so the relay can bind the session to a device for
+     * banning, whether or not tokens are in use.
+     */
+    public VoiceRelayTransport(VoiceRelayAddress address, String displayName, String password,
+                               String tokenSecret, String deviceId, String channel,
+                               Listener listener) {
         this.address = address;
         this.displayName = displayName == null ? "" : displayName;
         this.password = password == null ? "" : password;
+        this.tokenSecret = tokenSecret == null ? "" : tokenSecret;
+        this.deviceId = deviceId == null ? "" : deviceId;
         this.initialChannel = VoiceChannel.normalize(channel);
         this.listener = listener;
+    }
+
+    /** The credential to present: a fresh signed token when a secret is configured, else the password. */
+    private byte[] credential() {
+        if (!tokenSecret.isEmpty()) {
+            String token = VoiceToken.issue(tokenSecret, deviceId,
+                    VoiceToken.DEFAULT_TTL_SECONDS, System.currentTimeMillis() / 1000L);
+            if (token != null) {
+                return token.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            }
+        }
+        return password.getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
 
     @Override
@@ -92,6 +123,11 @@ public final class VoiceRelayTransport implements VoiceLink {
     /** The server's advertised keepalive interval, for the status line. */
     public int keepaliveIntervalMs() {
         return keepaliveMs;
+    }
+
+    /** The device id stamped into every relayed frame, so the relay can bind a ban to it. */
+    public String deviceId() {
+        return deviceId;
     }
 
     @Override
@@ -190,7 +226,7 @@ public final class VoiceRelayTransport implements VoiceLink {
         }
         socket = fresh;
 
-        send(VoiceProtocol.encodeHello(displayName, initialChannel, password.getBytes()));
+        send(VoiceProtocol.encodeHello(displayName, deviceId, initialChannel, credential()));
 
         long deadline = System.currentTimeMillis() + HANDSHAKE_TIMEOUT_MS;
         byte[] buffer = new byte[VoiceProtocol.MAX_PAYLOAD + 128];
@@ -284,6 +320,10 @@ public final class VoiceRelayTransport implements VoiceLink {
                 return "channel is full on the relay";
             case VoiceProtocol.NOTICE_BAD_PROTOCOL:
                 return "relay speaks a different protocol version";
+            case VoiceProtocol.NOTICE_BAD_TOKEN:
+                return "relay rejected the join token";
+            case VoiceProtocol.NOTICE_BANNED:
+                return "you are banned from this relay";
             default:
                 return "relay refused the connection";
         }

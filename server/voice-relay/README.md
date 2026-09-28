@@ -68,6 +68,46 @@ The ones that matter in practice:
 | `-max-channel-members` | `VOICE_MAX_CHANNEL_MEMBERS` | 50 | per-channel cap; 0 disables |
 | `-rate-pps` | `VOICE_RATE_PPS` | 120 | per-client packets/second |
 | `-rate-bps` | `VOICE_RATE_BPS` | 32000 | per-client bytes/second |
+| `-token-secret` | `VOICE_TOKEN_SECRET` | (off) | shared secret for signed join tokens; see below |
+| `-token-ttl-hours` | `VOICE_TOKEN_TTL_HOURS` | 6 | default token lifetime for `-mint-token` |
+| `-admin-listen` | `VOICE_ADMIN_LISTEN` | (off) | TCP bind for the admin ban endpoint; never expose publicly |
+| `-admin-token` | `VOICE_ADMIN_TOKEN` | (off) | bearer token required by the admin endpoint |
+| `-auth-failures-before-ban` | `VOICE_AUTH_FAILURES_BEFORE_BAN` | 5 | auto-ban an IP after this many bad attempts; 0 disables |
+
+### Token auth instead of a password
+
+A plain password travels in the `HELLO`, so anyone who captures it can replay it. Setting
+`token_secret` switches the relay to signed join tokens instead: the client holds the secret,
+never sends it, and instead presents a short-lived token signed with it. The token also carries
+the client's device id, so a captured token cannot be replayed from another device and expires on
+its own.
+
+```sh
+# -mint-token takes the device id as its value; the printed token is what that device presents.
+./voice-relay -mint-token abc123 -token-secret "$(openssl rand -hex 32)"
+```
+
+Give players the secret (launcher → Voice tab → **Join token secret**) and set the same
+`token_secret` on the server. When `token_secret` is set, tokens are required; the password field
+is only used when no secret is configured.
+
+### Bans and the admin endpoint
+
+Bad credentials from one address auto-ban it after `auth_failures_before_ban` attempts for
+`ban_minutes`. Permanent bans go in `banned_ips` (a plain IP or CIDR) and `banned_devices`
+(survives an IP change). For live control, set `admin_listen` and `admin_token`:
+
+```sh
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{"ip":"203.0.113.77","minutes":60}' localhost:8082/admin/ban
+curl -H "Authorization: Bearer $ADMIN_TOKEN" -d '{"device":"abc123"}' localhost:8082/admin/ban
+curl -H "Authorization: Bearer $ADMIN_TOKEN" -d '{"ip":"203.0.113.77"}' localhost:8082/admin/unban
+curl -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8082/admin/bans
+```
+
+A ban takes effect immediately, including dropping any live session it matches. **Bind the admin
+endpoint to localhost or a private interface** (`127.0.0.1:8082`), or reach it over SSH; it is
+guarded only by the bearer token.
 
 The **per-client byte rate is the one that bounds your bandwidth bill.** At the default 32 kB/s a
 client can send roughly 4 kB/s of sustained audio, which is generous for 20 ms Opus frames and
@@ -117,8 +157,13 @@ A minimal alert set: `/healthz` down for 2 minutes, and `chimera_voice_clients` 
 
 In the launcher, open the **Voice** tab and enter the relay address under **Relay server**, then
 turn on **Use relay server**. The address is `host:port`, e.g. `voice.example.com:47902`. If you
-set a password on the server, enter the same one in the launcher. The launcher keeps LAN multicast
-as a fallback: turning the relay off, or losing the connection, returns it to the local network.
+set a password on the server, enter the same one in the launcher; if you set `token_secret`, enter
+the secret in **Join token secret** instead. The launcher keeps LAN multicast as a fallback:
+turning the relay off, or losing the connection, returns it to the local network.
+
+To ship a default address so users do not have to type one, set `voice.relay.address` in the
+build's `local.properties` (gitignored). It becomes `BuildConfig.DEFAULT_VOICE_RELAY_ADDRESS` and
+the Voice screen shows it on first run; a value the user saves always overrides it.
 
 ## Firewall and NAT notes
 
@@ -136,13 +181,19 @@ as a fallback: turning the relay off, or losing the connection, returns it to th
 
 ## Security
 
-- **Password** is a plain shared secret, sent in the `HELLO`. It stops casual abuse, not a
-  determined attacker — for that, restrict the UDP port to your players' address ranges, or run
-  the relay on a private network (WireGuard/Tailscale) and hand out that address.
+- **Two credential modes.** With `token_secret` set, clients present a short-lived, device-bound
+  signed token and never send the secret itself. With only `password` set, the password travels in
+  the `HELLO` and should be treated as replayable — for a strong setup restrict the UDP port to
+  your players' address ranges, or run the relay on a private network (WireGuard/Tailscale) and
+  hand out that address.
 - **No authentication of identity.** A client's id is assigned by the server, so a peer cannot
-  impersonate another peer's id, but anyone who knows the password can join. Do not treat the
-  relay as a trusted network for sensitive conversation.
+  impersonate another peer's id, but anyone with the credential can join. Do not treat the relay
+  as a trusted network for sensitive conversation.
 - **Rate limits and caps are the abuse controls.** They are per client and per IP; a flood is
   dropped, counted in `chimera_voice_packets_dropped_rate_total`, and logged at debug level.
+- **Bans.** Auto-ban on repeated bad credentials, permanent `banned_ips`/`banned_devices`, and the
+  live admin endpoint. A ban drops an existing session immediately.
+- **The admin endpoint is protected only by its bearer token.** Bind it to `127.0.0.1` or a
+  private interface; never open it to the internet.
 - **The server holds no state on disk.** Restarting it drops every session; clients reconnect on
   their own.

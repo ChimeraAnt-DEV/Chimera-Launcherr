@@ -33,6 +33,19 @@ func main() {
 	}
 
 	logger := NewLogger(cfg.LogLevel)
+
+	// A -mint-token request mints once and exits, so an operator can hand a user a token without
+	// running the relay. It needs the token secret, and prints to stdout (not the logger).
+	if cfg.MintToken != "" {
+		if cfg.TokenSecret == "" {
+			fmt.Fprintln(os.Stderr, "voice-relay: -mint-token needs -token-secret (or VOICE_TOKEN_SECRET)")
+			os.Exit(2)
+		}
+		ttl := time.Duration(cfg.TokenTTLHours) * time.Hour
+		fmt.Println(IssueToken([]byte(cfg.TokenSecret), cfg.MintToken, ttl, time.Now()))
+		return
+	}
+
 	metrics := NewMetrics()
 
 	udpAddr, err := net.ResolveUDPAddr("udp", cfg.Listen)
@@ -60,6 +73,7 @@ func main() {
 		"maxClients": cfg.MaxClients,
 		"maxChannel": cfg.MaxChannelMembers,
 		"password":   cfg.Password != "",
+		"tokenAuth":  cfg.TokenSecret != "",
 	})
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -73,11 +87,21 @@ func main() {
 		httpServer = startHTTP(cfg, hub, metrics, logger)
 	}
 
+	var adminServer *http.Server
+	if cfg.AdminListen != "" {
+		adminServer = startAdmin(cfg, hub, logger)
+	}
+
 	<-ctx.Done()
 	logger.Info("shutting down", nil)
 	if httpServer != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		_ = httpServer.Shutdown(shutdownCtx)
+		cancel()
+	}
+	if adminServer != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		_ = adminServer.Shutdown(shutdownCtx)
 		cancel()
 	}
 	// Closing the socket unblocks the read loop.

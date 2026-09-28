@@ -1520,6 +1520,7 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="voice_relay_title">Relay server</string>
     <string name="voice_relay_address_hint">host or host:port (e.g. voice.example.com:47902)</string>
     <string name="voice_relay_password_hint">Server password (optional)</string>
+    <string name="voice_relay_token_hint">Join token secret (optional; used instead of the password if the server runs in token mode)</string>
     <string name="voice_relay_apply">Apply &amp; reconnect</string>
     <string name="voice_relay_off">LAN only - not using a relay server</string>
     <string name="voice_relay_connecting">Connecting to %1$s\u2026</string>

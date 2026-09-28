@@ -168,6 +168,23 @@
                         android:textColorHint="@color/text_secondary"
                         android:textSize="14sp" />
 
+                    <EditText
+                        android:id="@+id/voice_relay_token_secret"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="44dp"
+                        android:background="@drawable/chimera_card_small"
+                        android:hint="@string/voice_relay_token_hint"
+                        android:fontFamily="@font/misans"
+                        android:inputType="textPassword|textNoSuggestions"
+                        android:maxLength="128"
+                        android:paddingHorizontal="12dp"
+                        android:singleLine="true"
+                        android:textColor="@color/on_surface"
+                        android:textColorHint="@color/text_secondary"
+                        android:textSize="14sp" />
+
                     <Button
                         android:id="@+id/voice_relay_save_button"
                         android:layout_width="wrap_content"

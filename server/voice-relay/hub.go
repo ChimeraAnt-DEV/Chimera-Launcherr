@@ -20,6 +20,7 @@ type Client struct {
 	addr        *net.UDPAddr
 	ip          string
 	name        string
+	deviceID    string
 	channel     string
 	channelName string
 	visibility  byte
@@ -40,6 +41,7 @@ type Hub struct {
 	metrics *Metrics
 	conn    packetConn
 	now     func() time.Time
+	bans    *BanList
 
 	mu        sync.Mutex
 	clients   map[uint64]*Client
@@ -57,12 +59,16 @@ func NewHub(cfg Config, log *Logger, metrics *Metrics, conn packetConn) *Hub {
 		metrics:   metrics,
 		conn:      conn,
 		now:       time.Now,
+		bans:      NewBanList(cfg.BannedIPs, cfg.BannedDevices, cfg.AuthFailuresBeforeBan, cfg.BanWindow()),
 		clients:   map[uint64]*Client{},
 		addrIndex: map[string]uint64{},
 		ipCount:   map[string]int{},
 		channels:  map[string]int{},
 	}
 }
+
+// Bans exposes the ban list so the admin endpoint and reaper can act on it.
+func (h *Hub) Bans() *BanList { return h.bans }
 
 // Handle processes one received datagram. It never returns an error: a malformed or hostile
 // packet is counted and dropped, because a relay must not be crashable by its input.
@@ -104,23 +110,83 @@ func (h *Hub) Handle(data []byte, addr *net.UDPAddr) {
 	}
 }
 
+// authenticate decides whether a HELLO's credential is acceptable, returning the device id to
+// bind the session to. Two schemes, in order:
+//
+//   - Token auth (the real one): when TokenSecret is set, the payload must be a signed token whose
+//     signature and expiry verify. The device id baked into the token must match the one the
+//     client claims in the packet, so a token cannot be presented for a different device.
+//   - Password (the fallback): the payload must equal the shared password.
+//
+// An empty TokenSecret and empty Password is an open relay, which returns deviceUnbound and is
+// what a first deployment looks like before it is locked down.
+const deviceUnbound = ""
+
+func (h *Hub) authenticate(p Packet, ip string, now time.Time) (device string, ok bool, reason string, notice int32) {
+	if h.bans.Banned(ip, p.DeviceID, now) {
+		return "", false, "banned", NoticeBanned
+	}
+	if h.cfg.TokenSecret != "" {
+		token := string(p.Payload)
+		device, err := VerifyToken([]byte(h.cfg.TokenSecret), token, now)
+		if err != nil {
+			return "", false, "bad token: " + err.Error(), NoticeBadToken
+		}
+		if p.DeviceID != "" && p.DeviceID != device {
+			return "", false, "token device mismatch", NoticeBadToken
+		}
+		return device, true, "", 0
+	}
+	if h.cfg.Password != "" && string(p.Payload) != h.cfg.Password {
+		return "", false, "bad password", NoticeBadPassword
+	}
+	return p.DeviceID, true, "", 0
+}
+
 // onHello admits a session. The address index means a re-HELLO from the same socket replaces the
 // previous session rather than accumulating one per attempt (a phone that reconnects every few
 // seconds must not exhaust MaxClients).
 func (h *Hub) onHello(p Packet, addr *net.UDPAddr, now time.Time) {
-	if h.cfg.Password != "" && string(p.Payload) != h.cfg.Password {
-		h.metrics.rejectedPassword.Add(1)
-		h.notice(addr, 0, NoticeBadPassword, "wrong or missing server password")
-		h.log.Info("rejected hello: bad password", map[string]any{"from": addr.String()})
+	ip := ipOf(addr)
+
+	// A banned device is refused before any credential is checked: there is no point verifying a
+	// token for someone who is not allowed to connect at all.
+	if h.bans.Banned(ip, p.DeviceID, now) {
+		h.metrics.rejectedBanned.Add(1)
+		h.notice(addr, 0, NoticeBanned, "you are banned from this relay")
+		h.log.Info("rejected hello: banned", map[string]any{"from": addr.String(), "device": p.DeviceID})
+		return
+	}
+
+	device, ok, reason, notice := h.authenticate(p, ip, now)
+	if !ok {
+		// Count the failure against the address; enough of them auto-bans it. Only a credential
+		// failure counts, not a busy server, so a legitimate user is never banned for being early.
+		if notice == NoticeBadToken || notice == NoticeBadPassword {
+			if h.bans.NoteAuthFailure(ip, now) {
+				h.metrics.bansApplied.Add(1)
+				h.log.Info("auto-banned after repeated auth failures", map[string]any{"ip": ip})
+			}
+		}
+		h.metrics.rejectedAuth.Add(1)
+		h.notice(addr, 0, notice, authMessage(reason))
+		h.log.Info("rejected hello", map[string]any{"from": addr.String(), "reason": reason})
 		return
 	}
 
 	h.mu.Lock()
+	// A banned address that still holds a session is dropped here too, so an admin ban takes
+	// effect on the next packet rather than waiting for the idle timeout.
+	if h.bans.Banned(ip, device, now) {
+		h.mu.Unlock()
+		h.metrics.rejectedBanned.Add(1)
+		h.notice(addr, 0, NoticeBanned, "you are banned from this relay")
+		return
+	}
 	// Replace any session already bound to this socket.
 	if oldID, ok := h.addrIndex[addr.String()]; ok {
 		h.removeLocked(oldID, "replaced by a new hello")
 	}
-	ip := ipOf(addr)
 	if h.cfg.MaxClientsPerIP > 0 && h.ipCount[ip] >= h.cfg.MaxClientsPerIP {
 		h.mu.Unlock()
 		h.notice(addr, 0, NoticeServerFull, "too many connections from this address")
@@ -142,6 +208,7 @@ func (h *Hub) onHello(p Packet, addr *net.UDPAddr, now time.Time) {
 		addr:     addr,
 		ip:       ip,
 		name:     sanitizeName(p.Name),
+		deviceID: device,
 		channel:  p.Channel,
 		lastSeen: now,
 		limiter: NewRateLimiter(h.cfg.RatePerClientPPS, h.cfg.RateBurstPackets,
@@ -159,9 +226,17 @@ func (h *Hub) onHello(p Packet, addr *net.UDPAddr, now time.Time) {
 	h.metrics.noteClient(id, now)
 
 	h.log.Info("client joined", map[string]any{
-		"id": id, "from": addr.String(), "name": c.name, "channel": c.channel,
+		"id": id, "from": addr.String(), "name": c.name, "channel": c.channel, "device": device,
 	})
 	h.send(BuildHelloAck(id, h.cfg.ServerName, int32(h.cfg.HeartbeatMs)), addr)
+}
+
+// authMessage keeps the reason a client sees generic; the specific cause is logged server-side.
+func authMessage(reason string) string {
+	if reason == "banned" {
+		return "you are banned from this relay"
+	}
+	return "authentication failed"
 }
 
 // onClientPacket handles a beacon/audio/bye from a session that has already HELLOed.
@@ -186,6 +261,9 @@ func (h *Hub) onClientPacket(p Packet, data []byte, addr *net.UDPAddr, now time.
 
 	c.lastSeen = now
 	c.name = sanitizeName(p.Name)
+	if p.DeviceID != "" {
+		c.deviceID = p.DeviceID
+	}
 	c.visibility = p.Visibility
 	c.channelName = p.ChannelName
 	c.capacity = p.Capacity
@@ -283,6 +361,7 @@ func (h *Hub) Reap(now time.Time) []uint64 {
 		h.removeLocked(id, "idle timeout")
 	}
 	h.mu.Unlock()
+	h.bans.Sweep(now)
 
 	if len(evicted) > 0 {
 		h.metrics.clients.Store(int64(h.clientCount()))
@@ -347,6 +426,30 @@ func (h *Hub) send(data []byte, addr *net.UDPAddr) {
 
 func (h *Hub) notice(addr *net.UDPAddr, id uint64, reason int32, message string) {
 	h.send(BuildNotice(id, reason, message), addr)
+}
+
+// DisconnectBanned drops any live session whose address or device is now banned. Called by the
+// admin endpoint so a ban takes effect immediately instead of at the next idle timeout.
+func (h *Hub) DisconnectBanned(now time.Time) int {
+	h.mu.Lock()
+	var dropped []uint64
+	for id, c := range h.clients {
+		if h.bans.Banned(c.ip, c.deviceID, now) {
+			dropped = append(dropped, id)
+		}
+	}
+	for _, id := range dropped {
+		h.removeLocked(id, "banned")
+	}
+	h.mu.Unlock()
+	if len(dropped) > 0 {
+		h.metrics.clients.Store(int64(h.clientCount()))
+		h.metrics.channels.Store(int64(h.channelCount()))
+		for _, id := range dropped {
+			h.log.Info("client disconnected by ban", map[string]any{"id": id})
+		}
+	}
+	return len(dropped)
 }
 
 // Snapshot returns a copy of the session table, for tests and diagnostics.

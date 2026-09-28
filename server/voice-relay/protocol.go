@@ -50,6 +50,10 @@ const (
 	NoticeBadPassword = 2
 	NoticeChannelFull = 3
 	NoticeBadProtocol = 4
+	// NoticeBadToken is a token that failed to verify (bad signature, expired, device mismatch).
+	NoticeBadToken = 5
+	// NoticeBanned is a refusal because the address or device is on the ban list.
+	NoticeBanned = 6
 )
 
 // ChannelWorld is the open channel everyone hears across, matching VoiceChannel.WORLD in the
@@ -66,10 +70,14 @@ var (
 // Packet is one decoded datagram. The same shape is used in both directions; a relayed packet
 // keeps the sender's type (beacon/audio/bye) and only its ClientID is rewritten.
 type Packet struct {
-	Type        byte
-	ClientID    uint64
-	PeerID      string
-	Name        string
+	Type     byte
+	ClientID uint64
+	PeerID   string
+	Name     string
+	// DeviceID is a stable, client-supplied id used for device-bound token auth and device bans.
+	// It is not trusted for identity (a client could lie), but it is what a ban list and a token
+	// signature bind to, so a banned or token-bound device is refused regardless of its IP.
+	DeviceID    string
 	Channel     string
 	Visibility  byte
 	ChannelName string
@@ -181,6 +189,9 @@ func ParsePacket(data []byte) (Packet, error) {
 	if p.Name, err = r.str(); err != nil {
 		return p, ErrTruncated
 	}
+	if p.DeviceID, err = r.str(); err != nil {
+		return p, ErrTruncated
+	}
 	if p.Channel, err = r.str(); err != nil {
 		return p, ErrTruncated
 	}
@@ -266,6 +277,7 @@ func build(p Packet) []byte {
 	buf = binary.BigEndian.AppendUint64(buf, p.ClientID)
 	buf = appendString(buf, p.PeerID)
 	buf = appendString(buf, p.Name)
+	buf = appendString(buf, p.DeviceID)
 	buf = appendString(buf, p.Channel)
 	buf = append(buf, normalizeVisibility(p.Visibility))
 	buf = appendString(buf, p.ChannelName)

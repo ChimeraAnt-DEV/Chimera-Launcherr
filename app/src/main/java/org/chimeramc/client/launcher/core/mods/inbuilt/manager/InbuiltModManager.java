@@ -84,6 +84,8 @@ public class InbuiltModManager {
     private static final String KEY_VOICE_RELAY_ENABLED = "voice_relay_enabled";
     private static final String KEY_VOICE_RELAY_ADDRESS = "voice_relay_address";
     private static final String KEY_VOICE_RELAY_PASSWORD = "voice_relay_password";
+    private static final String KEY_VOICE_RELAY_TOKEN_SECRET = "voice_relay_token_secret";
+    private static final String KEY_VOICE_DEVICE_ID = "voice_device_id";
     private static final int DEFAULT_AIM_SMOOTHING = 40;
     private static final int DEFAULT_AIM_SENSITIVITY = 100;
     private static final int DEFAULT_AIM_CROSSHAIR_COLOR = 0xFF3DDC84;
@@ -824,12 +826,48 @@ public class InbuiltModManager {
 
     /** The configured relay address ({@code host} or {@code host:port}), or "" when unset. */
     public String getVoiceRelayAddress() {
-        return prefs.getString(KEY_VOICE_RELAY_ADDRESS, "");
+        String configured = prefs.getString(KEY_VOICE_RELAY_ADDRESS, "");
+        if (configured != null && !configured.trim().isEmpty()) {
+            return configured;
+        }
+        // Nothing saved: fall back to the address baked in at build time, so a release build can
+        // point at the operator's server with no first-run setup. A saved value (including an
+        // explicit clear) always wins, because an empty pref means "I set this".
+        return org.chimeramc.client.BuildConfig.DEFAULT_VOICE_RELAY_ADDRESS;
     }
 
     public void setVoiceRelayAddress(String address) {
         prefs.edit().putString(KEY_VOICE_RELAY_ADDRESS,
                 address == null ? "" : address.trim()).apply();
+    }
+
+    /**
+     * Whether the relay address shown/in use comes from the build default rather than user input.
+     * Used by the Voice screen to say where the default came from instead of presenting a value
+     * the user never typed as if they had.
+     */
+    public boolean isVoiceRelayAddressFromBuildDefault() {
+        String configured = prefs.getString(KEY_VOICE_RELAY_ADDRESS, "");
+        return (configured == null || configured.trim().isEmpty())
+                && !org.chimeramc.client.BuildConfig.DEFAULT_VOICE_RELAY_ADDRESS.isEmpty();
+    }
+
+    /**
+     * A stable, non-identifying device id for the relay's token binding and device bans.
+     *
+     * <p>Deliberately not {@code ANDROID_ID} or any hardware id: it is a random value generated on
+     * first use and kept in preferences, so it identifies this install to this relay for banning
+     * and token binding without being a cross-app tracking identifier. Rotating it means a fresh
+     * identity, which a user can do by clearing the pref; that is the intended escape hatch.
+     */
+    public String getVoiceDeviceId() {
+        String existing = prefs.getString(KEY_VOICE_DEVICE_ID, "");
+        if (existing != null && !existing.isEmpty()) {
+            return existing;
+        }
+        String generated = java.util.UUID.randomUUID().toString().replace("-", "");
+        prefs.edit().putString(KEY_VOICE_DEVICE_ID, generated).apply();
+        return generated;
     }
 
     /**
@@ -846,5 +884,23 @@ public class InbuiltModManager {
     public void setVoiceRelayPassword(String password) {
         prefs.edit().putString(KEY_VOICE_RELAY_PASSWORD,
                 password == null ? "" : password.trim()).apply();
+    }
+
+    /**
+     * The shared token secret, if the relay uses signed join tokens instead of (or as well as) a
+     * plain password. Empty means "password mode".
+     *
+     * <p>Same trust level as the password: a shared room secret, not an account credential. The
+     * client never sends it; it signs a short-lived token with it (see
+     * {@code org.chimeramc.client.core.voice.VoiceToken}), so a captured packet is useless once the
+     * token expires.
+     */
+    public String getVoiceRelayTokenSecret() {
+        return prefs.getString(KEY_VOICE_RELAY_TOKEN_SECRET, "");
+    }
+
+    public void setVoiceRelayTokenSecret(String secret) {
+        prefs.edit().putString(KEY_VOICE_RELAY_TOKEN_SECRET,
+                secret == null ? "" : secret.trim()).apply();
     }
 }

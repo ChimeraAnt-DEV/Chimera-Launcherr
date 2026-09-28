@@ -44,6 +44,10 @@ android {
         versionName getGitTag()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "String", "CURSEFORGE_API_KEY", "\"${localProperties.getProperty('curseforge.api_key', '')}\""
+        // The relay address users get without typing one. Baked in at build time from a local
+        // property (gitignored), so the shipped app can default to the operator's own server while
+        // the source stays free of a hardcoded host. Empty means "LAN only until configured".
+        buildConfigField "String", "DEFAULT_VOICE_RELAY_ADDRESS", "\"${localProperties.getProperty('voice.relay.address', '')}\""
         ndk {
             // 64-bit only: 32-bit (armeabi-v7a) instances cannot run in this app
             // (Android processes lock in one bitness), so only ship arm64-v8a.

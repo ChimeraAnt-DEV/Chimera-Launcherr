@@ -25,6 +25,30 @@ type Config struct {
 	ServerName string `json:"server_name"`
 	// Password, when non-empty, must match the client's HELLO. Empty means open.
 	Password string `json:"password"`
+	// TokenSecret, when non-empty, enables signed join tokens: a client presents a token
+	// derived from this secret instead of the raw password, and the server verifies the
+	// signature and expiry. This is the real authentication (see token.go); the password is
+	// kept as the simpler fallback for a trusted network.
+	TokenSecret string `json:"token_secret"`
+	// TokenTTLHours is the default lifetime of a token minted by the -mint-token helper.
+	TokenTTLHours int `json:"token_ttl_hours"`
+
+	// AdminListen is the TCP bind address for the operator-only ban/unban endpoint. Empty
+	// disables it. It must never be exposed publicly: it is guarded by AdminToken.
+	AdminListen string `json:"admin_listen"`
+	// AdminToken is the bearer token for the admin endpoint. Required whenever AdminListen is
+	// set; the server refuses to start otherwise.
+	AdminToken string `json:"admin_token"`
+
+	// BannedIPs are permanent address bans: a plain IP or a CIDR range.
+	BannedIPs []string `json:"banned_ips"`
+	// BannedDevices are permanent device-id bans, which survive an IP change.
+	BannedDevices []string `json:"banned_devices"`
+	// AuthFailuresBeforeBan bans an address after this many bad credential attempts within the
+	// ban window. 0 disables the auto-ban.
+	AuthFailuresBeforeBan int `json:"auth_failures_before_ban"`
+	// BanMinutes is both the auto-ban duration and the failure-counting window.
+	BanMinutes int `json:"ban_minutes"`
 
 	// HeartbeatMs is the keepalive interval the server asks clients to use. Clients send a
 	// beacon (which doubles as a keepalive) at least this often.
@@ -54,27 +78,37 @@ type Config struct {
 
 	// LogLevel is "debug", "info", or "error".
 	LogLevel string `json:"log_level"`
+
+	// MintToken is not persisted config: it carries a -mint-token request out of LoadConfig so
+	// main can print a token and exit instead of starting the relay.
+	MintToken string `json:"-"`
 }
 
 // DefaultConfig returns the shipped defaults: a small, safe relay suitable for one VPS.
 func DefaultConfig() Config {
 	return Config{
-		Listen:            ":47902",
-		HTTPListen:        ":8081",
-		PublicAddress:     "",
-		ServerName:        "Chimera Voice Relay",
-		Password:          "",
-		HeartbeatMs:       3000,
-		IdleTimeoutSec:    20,
-		MaxClients:        200,
-		MaxClientsPerIP:   8,
-		MaxChannelMembers: 50,
-		MaxChannels:       200,
-		RatePerClientPPS:  120,
-		RateBurstPackets:  240,
-		RatePerClientBPS:  32000,
-		RateBurstBytes:    64000,
-		LogLevel:          "info",
+		Listen:                ":47902",
+		HTTPListen:            ":8081",
+		PublicAddress:         "",
+		ServerName:            "Chimera Voice Relay",
+		Password:              "",
+		TokenSecret:           "",
+		TokenTTLHours:         6,
+		AdminListen:           "",
+		AdminToken:            "",
+		AuthFailuresBeforeBan: 5,
+		BanMinutes:            15,
+		HeartbeatMs:           3000,
+		IdleTimeoutSec:        20,
+		MaxClients:            200,
+		MaxClientsPerIP:       8,
+		MaxChannelMembers:     50,
+		MaxChannels:           200,
+		RatePerClientPPS:      120,
+		RateBurstPackets:      240,
+		RatePerClientBPS:      32000,
+		RateBurstBytes:        64000,
+		LogLevel:              "info",
 	}
 }
 
@@ -90,6 +124,13 @@ func LoadConfig(args []string) (Config, error) {
 	fs.StringVar(&cfg.PublicAddress, "public-address", cfg.PublicAddress, "address advertised to clients, e.g. voice.example.com:47902")
 	fs.StringVar(&cfg.ServerName, "server-name", cfg.ServerName, "server name shown to clients")
 	fs.StringVar(&cfg.Password, "password", cfg.Password, "shared password; empty means open")
+	fs.StringVar(&cfg.TokenSecret, "token-secret", cfg.TokenSecret, "secret for signed join tokens; empty disables token auth")
+	fs.IntVar(&cfg.TokenTTLHours, "token-ttl-hours", cfg.TokenTTLHours, "default token lifetime for -mint-token")
+	fs.StringVar(&cfg.AdminListen, "admin-listen", cfg.AdminListen, "TCP bind address for the admin ban endpoint, empty to disable")
+	fs.StringVar(&cfg.AdminToken, "admin-token", cfg.AdminToken, "bearer token for the admin endpoint")
+	fs.IntVar(&cfg.AuthFailuresBeforeBan, "auth-failures-before-ban", cfg.AuthFailuresBeforeBan, "auto-ban an IP after this many bad credential attempts, 0 to disable")
+	fs.IntVar(&cfg.BanMinutes, "ban-minutes", cfg.BanMinutes, "auto-ban duration and failure-counting window")
+	mintToken := fs.String("mint-token", "", "print a join token for this device id and exit")
 	fs.IntVar(&cfg.HeartbeatMs, "heartbeat-ms", cfg.HeartbeatMs, "keepalive interval asked of clients")
 	fs.IntVar(&cfg.IdleTimeoutSec, "idle-timeout", cfg.IdleTimeoutSec, "evict a client after this many idle seconds")
 	fs.IntVar(&cfg.MaxClients, "max-clients", cfg.MaxClients, "maximum concurrent clients")
@@ -124,6 +165,7 @@ func LoadConfig(args []string) (Config, error) {
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
 	}
+	cfg.MintToken = *mintToken
 	if err := cfg.Validate(); err != nil {
 		return cfg, err
 	}
@@ -145,7 +187,26 @@ func mergeConfig(cfg *Config, file Config, fs *flag.FlagSet) {
 	apply("public-address", &cfg.PublicAddress, file.PublicAddress)
 	apply("server-name", &cfg.ServerName, file.ServerName)
 	apply("password", &cfg.Password, file.Password)
+	apply("token-secret", &cfg.TokenSecret, file.TokenSecret)
+	apply("admin-listen", &cfg.AdminListen, file.AdminListen)
+	apply("admin-token", &cfg.AdminToken, file.AdminToken)
 	apply("log-level", &cfg.LogLevel, file.LogLevel)
+	if !set["token-ttl-hours"] {
+		cfg.TokenTTLHours = file.TokenTTLHours
+	}
+	if !set["auth-failures-before-ban"] {
+		cfg.AuthFailuresBeforeBan = file.AuthFailuresBeforeBan
+	}
+	if !set["ban-minutes"] {
+		cfg.BanMinutes = file.BanMinutes
+	}
+	// A file may carry bans; a flag cannot, so the file value is always taken when present.
+	if len(file.BannedIPs) > 0 {
+		cfg.BannedIPs = file.BannedIPs
+	}
+	if len(file.BannedDevices) > 0 {
+		cfg.BannedDevices = file.BannedDevices
+	}
 	if !set["heartbeat-ms"] {
 		cfg.HeartbeatMs = file.HeartbeatMs
 	}
@@ -198,7 +259,13 @@ func applyEnv(cfg *Config) {
 	setStr("VOICE_PUBLIC_ADDRESS", &cfg.PublicAddress)
 	setStr("VOICE_SERVER_NAME", &cfg.ServerName)
 	setStr("VOICE_PASSWORD", &cfg.Password)
+	setStr("VOICE_TOKEN_SECRET", &cfg.TokenSecret)
+	setStr("VOICE_ADMIN_LISTEN", &cfg.AdminListen)
+	setStr("VOICE_ADMIN_TOKEN", &cfg.AdminToken)
 	setStr("VOICE_LOG_LEVEL", &cfg.LogLevel)
+	setInt("VOICE_TOKEN_TTL_HOURS", &cfg.TokenTTLHours)
+	setInt("VOICE_AUTH_FAILURES_BEFORE_BAN", &cfg.AuthFailuresBeforeBan)
+	setInt("VOICE_BAN_MINUTES", &cfg.BanMinutes)
 	setInt("VOICE_HEARTBEAT_MS", &cfg.HeartbeatMs)
 	setInt("VOICE_IDLE_TIMEOUT_SEC", &cfg.IdleTimeoutSec)
 	setInt("VOICE_MAX_CLIENTS", &cfg.MaxClients)
@@ -250,7 +317,29 @@ func (c *Config) Validate() error {
 	if c.RateBurstBytes < c.RatePerClientBPS/2 {
 		c.RateBurstBytes = c.RatePerClientBPS
 	}
+	// The admin endpoint carries bans, so it must be authenticated. Refuse to start rather than
+	// silently exposing an unauthenticated control surface.
+	if strings.TrimSpace(c.AdminListen) != "" && strings.TrimSpace(c.AdminToken) == "" {
+		return fmt.Errorf("admin_listen is set but admin_token is empty; the admin endpoint must be authenticated")
+	}
+	if c.TokenTTLHours < 1 {
+		c.TokenTTLHours = 1
+	}
+	if c.TokenTTLHours > 24*30 {
+		c.TokenTTLHours = 24 * 30
+	}
+	if c.AuthFailuresBeforeBan < 0 {
+		c.AuthFailuresBeforeBan = 0
+	}
+	if c.BanMinutes < 1 {
+		c.BanMinutes = 1
+	}
 	return nil
+}
+
+// BanWindow is the auto-ban duration and the failure-counting window as a duration.
+func (c Config) BanWindow() time.Duration {
+	return time.Duration(c.BanMinutes) * time.Minute
 }
 
 // HeartbeatInterval is the configured keepalive as a duration.
