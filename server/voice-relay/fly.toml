@@ -1,0 +1,18 @@
+# Fly.io deployment for the Chimera voice relay.
+# UDP is the only service the launcher needs; the relay holds no state on disk.
+app = "glowberry-voice-relay"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# The relay cannot sleep: a stopped machine would drop every live voice session, and UDP voice is
+# the entire point of the service.
+auto_stop_machines = false
+
+[[services]]
+  internal_port = 47902
+  protocol = "udp"
+
+  [[services.ports]]
+    port = 47902
