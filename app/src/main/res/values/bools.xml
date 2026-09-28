@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Phone defaults for the top navigation bar.
+
+    nav_show_app_name controls the wordmark beside the berry logo; nav_compact_tabs makes each
+    tab an icon-only entry whose label only appears for the selected tab. Both flip to true in
+    values-w600dp. Keeping them as booleans (rather than measuring at runtime) means the two
+    configurations are resolved by the resource system, so a configuration change cannot leave
+    the bar in a half-applied state.
+-->
+<resources>
+    <bool name="nav_show_app_name">false</bool>
+    <bool name="nav_compact_tabs">true</bool>
+</resources>

@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    The launcher's top navigation bar.
+
+    Structure: a single 48dp row containing (start) the back button, berry logo and wordmark,
+    (centre) a horizontally scrollable strip of tabs, and (end) the news / account controls.
+    Below the divider sits the screen's own content — this file is only the chrome.
+
+    The row is a ConstraintLayout rather than a box with three children because the previous
+    layout let the wordmark and the tab strip overlap: the name was wrap_content with no line
+    limit and the tabs were a wrap_content scroll view centred against it, so on a narrow phone
+    (or a Samsung at large font scale) the name wrapped to two lines and slid under the first
+    tab. Here the name is pinned between the logo and the tab strip with a hard end constraint,
+    one line, an ellipsis and autosize; the tab strip is pinned to the end controls and scrolls;
+    and the wordmark itself is hidden entirely on a narrow window (see @bool/nav_show_app_name),
+    where the tabs go icon-only with only the selected label shown. Those three together mean the
+    bar cannot collide at any width or font scale.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/nav_bar_root"
@@ -6,60 +23,93 @@
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <FrameLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp">
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
 
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_gravity="start|center_vertical"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+        <ImageView
+            android:id="@+id/nav_back_button"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="6dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:contentDescription="@string/nav_back"
+            android:focusable="true"
+            android:rotation="90"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_arrow_down"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="@color/text_secondary" />
 
-            <ImageView
-                android:id="@+id/nav_back_button"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_marginEnd="10dp"
-                android:src="@drawable/ic_arrow_down"
-                android:rotation="90"
-                android:scaleType="centerInside"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:clickable="true"
-                android:focusable="true"
-                app:tint="@color/text_secondary" />
+        <ImageView
+            android:id="@+id/nav_logo"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="2dp"
+            android:contentDescription="@string/app_name"
+            android:src="@drawable/ic_glowberry_logo"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@id/nav_back_button"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <ImageView
-                android:id="@+id/nav_logo"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:src="@drawable/ic_glowberry_logo" />
+        <!--
+            The wordmark. Constraints (not a maxWidth) are what keep it off the tabs: it starts
+            after the logo and ends where the tab strip starts, so it can never grow under them.
+            maxLines + singleLine + ellipsize handle the remaining squeeze; autosize shrinks it
+            on very narrow windows; visibility is set from @bool/nav_show_app_name so a narrow
+            window drops it entirely.
+        -->
+        <TextView
+            android:id="@+id/nav_app_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="8dp"
+            android:autoSizeMaxTextSize="18sp"
+            android:autoSizeMinTextSize="12sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:ellipsize="end"
+            android:fontFamily="@font/misans"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:text="@string/app_name"
+            android:textColor="@color/accent_text"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/nav_tab_scroll"
+            app:layout_constraintHorizontal_bias="0"
+            app:layout_constraintStart_toEndOf="@id/nav_logo"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <TextView
-                android:id="@+id/nav_app_name"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:fontFamily="@font/misans"
-                android:text="@string/app_name"
-                android:textColor="@color/accent_text"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-        </LinearLayout>
-
+        <!--
+            Tabs live in a scroll view so six labelled entries always fit; the strip is pinned
+            between the wordmark's end and the start of the news/account controls, which is what
+            guarantees it cannot slide under either. fillViewport lets the row stretch so the
+            tap targets stay full-height when there is spare room.
+        -->
         <HorizontalScrollView
-            android:layout_width="wrap_content"
+            android:id="@+id/nav_tab_scroll"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_gravity="center"
-            android:layout_marginStart="24dp"
+            android:fillViewport="true"
+            android:overScrollMode="never"
             android:scrollbars="none"
-            android:overScrollMode="never">
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/nav_trailing"
+            app:layout_constraintHorizontal_bias="0.5"
+            app:layout_constraintStart_toEndOf="@id/nav_app_name"
+            app:layout_constraintTop_toTopOf="parent">
 
             <LinearLayout
+                android:id="@+id/nav_tab_row"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:gravity="center_vertical"
@@ -67,98 +117,57 @@
 
                 <TextView
                     android:id="@+id/nav_tab_launch"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:paddingHorizontal="12dp"
-                    android:fontFamily="@font/misans"
-                    android:text="@string/nav_launch"
-                    android:textColor="@color/on_surface"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
+                    style="@style/Widget.Chimera.NavTab"
                     android:drawableStart="@drawable/ic_nav_launch"
-                    android:drawablePadding="5dp"
-                    android:background="?attr/selectableItemBackground" />
+                    android:text="@string/nav_launch" />
 
                 <TextView
                     android:id="@+id/nav_tab_instances"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:paddingHorizontal="12dp"
-                    android:fontFamily="@font/misans"
-                    android:text="@string/nav_instances"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp"
+                    style="@style/Widget.Chimera.NavTab"
                     android:drawableStart="@drawable/ic_nav_instances"
-                    android:drawablePadding="5dp"
-                    android:background="?attr/selectableItemBackground" />
+                    android:text="@string/nav_instances" />
 
                 <TextView
                     android:id="@+id/nav_tab_installations"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:paddingHorizontal="12dp"
-                    android:fontFamily="@font/misans"
-                    android:text="@string/nav_installations"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp"
+                    style="@style/Widget.Chimera.NavTab"
                     android:drawableStart="@drawable/ic_nav_installations"
-                    android:drawablePadding="5dp"
-                    android:background="?attr/selectableItemBackground" />
+                    android:text="@string/nav_installations" />
 
                 <TextView
                     android:id="@+id/nav_tab_mods"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:paddingHorizontal="12dp"
-                    android:fontFamily="@font/misans"
-                    android:text="@string/nav_mods"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp"
+                    style="@style/Widget.Chimera.NavTab"
                     android:drawableStart="@drawable/ic_inbuilt_mods"
-                    android:drawablePadding="5dp"
-                    android:background="?attr/selectableItemBackground" />
+                    android:text="@string/nav_mods" />
 
                 <TextView
                     android:id="@+id/nav_tab_customize"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:paddingHorizontal="12dp"
-                    android:fontFamily="@font/misans"
-                    android:text="@string/nav_customize"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp"
+                    style="@style/Widget.Chimera.NavTab"
                     android:drawableStart="@drawable/ic_nav_controller"
-                    android:drawablePadding="5dp"
-                    android:background="?attr/selectableItemBackground" />
+                    android:text="@string/nav_customize" />
 
                 <TextView
                     android:id="@+id/nav_tab_settings"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:paddingHorizontal="12dp"
-                    android:fontFamily="@font/misans"
-                    android:text="@string/nav_settings"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp"
+                    style="@style/Widget.Chimera.NavTab"
                     android:drawableStart="@drawable/ic_nav_settings"
-                    android:drawablePadding="5dp"
-                    android:background="?attr/selectableItemBackground" />
+                    android:text="@string/nav_settings" />
 
             </LinearLayout>
         </HorizontalScrollView>
 
+        <!--
+            Trailing controls sit hard against the end; the tab strip is constrained to their
+            start, so their space is reserved before the strip is measured and they can never be
+            pushed off screen.
+        -->
         <LinearLayout
+            android:id="@+id/nav_trailing"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_gravity="end|center_vertical"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
             <FrameLayout
                 android:id="@+id/nav_news_container"
@@ -237,7 +246,7 @@
 
         </LinearLayout>
 
-    </FrameLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <View
         android:id="@+id/nav_divider"

@@ -21,6 +21,63 @@ public class ServerManager {
         return new File(minecraftPeDir, "external_servers.txt");
     }
 
+    /**
+     * Writes a server straight into the given {@code external_servers.txt}.
+     *
+     * <p>Static so a caller that knows the game data directory but does not own a ContentManager
+     * (the Quick Launch "add server" action) can persist a server without first wiring one up.
+     * The format is the one the game itself reads: {@code id:name:ip:port:timestamp}, with the id
+     * one past the current maximum. Returns false when the server already exists or the file
+     * cannot be written.
+     */
+    public static boolean writeServerToFile(File file, ServerItem serverItem) {
+        if (file == null || serverItem == null) return false;
+        File parent = file.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) return false;
+
+        List<String> lines = new ArrayList<>();
+        int maxIndex = 0;
+        boolean exists = false;
+        if (file.exists()) {
+            try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    lines.add(line);
+                    String[] parts = line.split(":");
+                    if (parts.length >= 5) {
+                        if (parts[1].equals(serverItem.name)
+                                && parts[2].equals(serverItem.ip)
+                                && parts[3].equals(String.valueOf(serverItem.port))) {
+                            exists = true;
+                        }
+                        try {
+                            int idx = Integer.parseInt(parts[0]);
+                            if (idx > maxIndex) maxIndex = idx;
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        if (exists) return false;
+
+        long timestamp = System.currentTimeMillis() / 1000L;
+        lines.add((maxIndex + 1) + ":" + serverItem.name + ":" + serverItem.ip + ":"
+                + serverItem.port + ":" + timestamp);
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
+            for (String l : lines) {
+                bw.write(l);
+                bw.newLine();
+            }
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
     public List<ServerItem> getServers() {
         List<ServerItem> items = new ArrayList<>();
         File serverFile = getServerListFile();

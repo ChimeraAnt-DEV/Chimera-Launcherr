@@ -20,6 +20,8 @@ public class InbuiltModManager {
     private static final String KEY_MOD_MENU_OPACITY = "mod_menu_opacity";
     private static final String KEY_MOD_MENU_BUTTON_OPACITY = "mod_menu_button_opacity";
     private static final String KEY_MOD_MENU_COMPACT = "mod_menu_compact";
+    private static final String KEY_MOD_MENU_KEYBIND = "mod_menu_keybind";
+    private static final String KEY_MOD_MENU_CONTROLLER_BIND = "mod_menu_controller_bind";
     private static final String KEY_PAUSE_MENU_ONLY = "pause_menu_only";
     private static final String KEY_FAVORITE_MOD_KEYS = "favorite_mod_keys";
     private static final String KEY_INBUILT_MOD_ENABLED_PREFIX = "inbuilt_mod_enabled_";
@@ -216,6 +218,42 @@ public class InbuiltModManager {
 
     public void setModMenuCompact(boolean compact) {
         prefs.edit().putBoolean(KEY_MOD_MENU_COMPACT, compact).apply();
+    }
+
+    /**
+     * The keyboard key that opens the Mod Menu, or 0 for unbound.
+     *
+     * Stored as an Android key code so it travels with the app and can be shown without a
+     * lookup table; the in-game dispatcher compares the raw code.
+     */
+    public int getModMenuKeybind() {
+        return prefs.getInt(KEY_MOD_MENU_KEYBIND, 0);
+    }
+
+    public void setModMenuKeybind(int keyCode) {
+        prefs.edit().putInt(KEY_MOD_MENU_KEYBIND, Math.max(0, keyCode)).apply();
+    }
+
+    /** The controller button that opens the Mod Menu, or 0 for unbound. */
+    public int getModMenuControllerBind() {
+        return prefs.getInt(KEY_MOD_MENU_CONTROLLER_BIND, 0);
+    }
+
+    public void setModMenuControllerBind(int keyCode) {
+        prefs.edit().putInt(KEY_MOD_MENU_CONTROLLER_BIND, Math.max(0, keyCode)).apply();
+    }
+
+    /**
+     * Whether a key press should open the Mod Menu.
+     *
+     * Pure so the match can be unit tested: the two binds are independent, an unbound (0) side
+     * never matches, and a key matches on either its remapped or its raw code so a profile that
+     * remaps the bound button still opens the menu.
+     */
+    public static boolean matchesModMenuBind(int menuBind, int controllerBind,
+                                             int keyCode, int rawKeyCode) {
+        if (menuBind != 0 && (keyCode == menuBind || rawKeyCode == menuBind)) return true;
+        return controllerBind != 0 && (keyCode == controllerBind || rawKeyCode == controllerBind);
     }
 
     public boolean isPauseMenuOnly() {

@@ -67,6 +67,9 @@ public final class ControllerLayout {
             float r = radius * 2f;
             switch (shape) {
                 case BUMPER: return r * 0.52f;
+                // The lever arc spans from slightly above its centre to well below; its reach
+                // outward is what matters for placement.
+                case TRIGGER: return r * 0.95f;
                 case TOUCHPAD: return r * 0.78f;
                 case MUTE: return r * 0.55f;
                 default: return r;
@@ -102,8 +105,11 @@ public final class ControllerLayout {
                 // Bumpers sit below the triggers so they clear the shell's curved shoulder.
                 out.add(new Spec("lb", 0.345f, 0.155f, 0.028f, "LB", Shape.BUMPER));
                 out.add(new Spec("rb", 0.655f, 0.155f, 0.028f, "RB", Shape.BUMPER));
-                out.add(new Spec("lt", 0.185f, 0.130f, 0.030f, "", Shape.TRIGGER));
-                out.add(new Spec("rt", 0.815f, 0.130f, 0.030f, "", Shape.TRIGGER));
+                // Triggers sit high enough that the lever crown clears the shell's shoulder.
+                // At the old height the whole path sat behind the body and only an invisible
+                // sliver poked out — the "back triggers don't show" report.
+                out.add(new Spec("lt", 0.185f, 0.096f, 0.032f, "", Shape.TRIGGER));
+                out.add(new Spec("rt", 0.815f, 0.096f, 0.032f, "", Shape.TRIGGER));
                 out.add(new Spec("view", 0.440f, 0.355f, 0.020f, "", Shape.CENTER_BUTTON));
                 out.add(new Spec("menu", 0.560f, 0.355f, 0.020f, "", Shape.CENTER_BUTTON));
                 out.add(new Spec("guide", 0.500f, 0.265f, 0.026f, "", Shape.GUIDE));
@@ -121,8 +127,8 @@ public final class ControllerLayout {
                 out.add(new Spec("y", 0.685f, 0.327f, 0.040f, "", Shape.FACE_DUAL));
                 out.add(new Spec("lb", 0.345f, 0.165f, 0.028f, "L1", Shape.BUMPER));
                 out.add(new Spec("rb", 0.655f, 0.165f, 0.028f, "R1", Shape.BUMPER));
-                out.add(new Spec("lt", 0.248f, 0.145f, 0.028f, "", Shape.TRIGGER));
-                out.add(new Spec("rt", 0.752f, 0.145f, 0.028f, "", Shape.TRIGGER));
+                out.add(new Spec("lt", 0.248f, 0.112f, 0.030f, "", Shape.TRIGGER));
+                out.add(new Spec("rt", 0.752f, 0.112f, 0.030f, "", Shape.TRIGGER));
                 out.add(new Spec("touch", 0.500f, 0.235f, dualSense ? 0.056f : 0.050f, "",
                         Shape.TOUCHPAD));
                 out.add(new Spec("share", 0.300f, 0.255f, 0.019f, "", Shape.CENTER_BUTTON));

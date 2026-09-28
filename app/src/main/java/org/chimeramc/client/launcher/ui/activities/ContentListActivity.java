@@ -129,7 +129,36 @@ public class ContentListActivity extends BaseActivity {
         setupActivityResultLaunchers();
         setupUI();
         setupObservers();
+        // ContentListActivity can be the first screen in the process (deep link, restore after a
+        // process death, or opened straight from another app), and when it is, nobody has pointed
+        // ContentManager at the game's directories yet. ServerManager then has a null
+        // minecraftPeDir, so every add/delete server reported failure while worlds and packs
+        // happened to work. Pointing it at this screen's own resolution is self-sufficient and
+        // idempotent, so it also repairs the case where MainActivity wired a different storage
+        // type than the one the user picked here.
+        updateStorageDirectories();
         loadContent();
+    }
+
+    /**
+     * Wires ContentManager to the directories for this screen's current storage type.
+     *
+     * The directories are derived from the same {@code getGameDataDirForType} resolution the
+     * worlds and packs already use, so servers cannot drift onto a different root. It is a no-op
+     * when no instance is selected.
+     */
+    private void updateStorageDirectories() {
+        File gameDataDir = getGameDataDirForType(currentStorageType);
+        if (gameDataDir == null) {
+            return;
+        }
+        contentManager.setStorageDirectories(
+                new File(gameDataDir, "minecraftWorlds"),
+                new File(gameDataDir, "resource_packs"),
+                new File(gameDataDir, "behavior_packs"),
+                new File(gameDataDir, "skin_packs"),
+                new File(gameDataDir, "Screenshots"),
+                new File(gameDataDir, "minecraftpe"));
     }
 
     private void setupActivityResultLaunchers() {

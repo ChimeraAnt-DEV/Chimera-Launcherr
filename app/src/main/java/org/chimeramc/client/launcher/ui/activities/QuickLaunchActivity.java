@@ -15,10 +15,17 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.chimeramc.client.R;
+import org.chimeramc.client.core.content.ServerItem;
+import org.chimeramc.client.core.content.ServerManager;
+import org.chimeramc.client.core.versions.GameVersion;
+import org.chimeramc.client.core.versions.VersionManager;
+import org.chimeramc.client.settings.FeatureSettings;
 import org.chimeramc.client.ui.adapter.QuickLaunchAdapter;
 import org.chimeramc.client.util.MinecraftUriHandler;
+import org.chimeramc.client.util.LauncherStorage;
 import org.chimeramc.client.ui.animation.DynamicAnim;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -257,10 +264,45 @@ public class QuickLaunchActivity extends BaseActivity {
                         }
                     }
                     
-                    launchWithUri(MinecraftUriHandler.buildAddExternalServer(name, ip, port));
+                    // Persist the server directly rather than asking the game to add it via a
+                    // deep link. The old path handed a minecraft:// URI to IntentHandler, which
+                    // (when a session was already running) forwarded it to MinecraftActivity as
+                    // an extra the running game never read — so "Add server" failed with nothing
+                    // to show for it when the game was not in the foreground. Writing the game's
+                    // own external_servers.txt is the file it reads on the server-list screen.
+                    addServerToFile(name, ip, port);
                 })
                 .setNegativeButton(getString(R.string.cancel), null)
                 .show();
+    }
+
+    /**
+     * Writes a server into the selected instance's {@code external_servers.txt}.
+     *
+     * <p>Resolves the same game-data root the content screens use, so the server lands where the
+     * game will look for it. A missing instance or storage location is reported rather than
+     * silently doing nothing.
+     */
+    private void addServerToFile(String name, String ip, int port) {
+        VersionManager vm = VersionManager.get(this);
+        GameVersion version = vm.getSelectedVersion();
+        if (version == null) {
+            Toast.makeText(this, R.string.skins_no_version, Toast.LENGTH_LONG).show();
+            return;
+        }
+        FeatureSettings.StorageType storageType = LauncherStorage.normalizeContentStorageType(
+                LauncherStorage.readSavedContentStorageType(this), version.versionIsolation);
+        File gameDataDir = LauncherStorage.getContentGameDataDir(
+                this, version.getStorageProfileId(), storageType);
+        File serverFile = new File(new File(gameDataDir, "minecraftpe"), "external_servers.txt");
+
+        final ServerItem server = new ServerItem(name, ip, port);
+        new Thread(() -> {
+            boolean ok = ServerManager.writeServerToFile(serverFile, server);
+            runOnUiThread(() -> Toast.makeText(this,
+                    ok ? R.string.server_added : R.string.server_exists,
+                    Toast.LENGTH_SHORT).show());
+        }).start();
     }
 
     private void showRealmInviteDialog() {

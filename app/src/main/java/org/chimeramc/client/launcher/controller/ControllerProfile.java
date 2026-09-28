@@ -51,6 +51,16 @@ public class ControllerProfile {
     private float leftStickNoiseFloor = 0f;
     private float rightStickNoiseFloor = 0f;
 
+    /**
+     * Per-button click limits and hold-to-repeat rates, keyed by key code.
+     *
+     * Kept in the profile so they travel with it: a profile that exists to stop double-fire on a
+     * worn pad should carry that with it, not need re-setting per install. An absent key means
+     * off, which is why these are sparse maps rather than a fixed array.
+     */
+    private final Map<Integer, Integer> clickLimits = new HashMap<>();
+    private final Map<Integer, Integer> repeatRates = new HashMap<>();
+
     public ControllerProfile() {
         this("Profile");
     }
@@ -230,6 +240,39 @@ public class ControllerProfile {
         return Math.max(MIN_SENSITIVITY, Math.min(MAX_SENSITIVITY, sensitivity));
     }
 
+    /** The clicks-per-second cap for a button, or 0 when unlimited. */
+    public int getClickLimit(int keyCode) {
+        Integer value = clickLimits.get(keyCode);
+        return value == null ? CpsLimiter.OFF : value;
+    }
+
+    public void setClickLimit(int keyCode, int cps) {
+        if (cps <= CpsLimiter.OFF) {
+            clickLimits.remove(keyCode);
+        } else {
+            clickLimits.put(keyCode, Math.min(cps, CpsLimiter.MAX_CPS));
+        }
+    }
+
+    /** The hold-to-repeat rate for a button, or 0 when off. */
+    public int getRepeatRate(int keyCode) {
+        Integer value = repeatRates.get(keyCode);
+        return value == null ? CpsLimiter.OFF : value;
+    }
+
+    public void setRepeatRate(int keyCode, int cps) {
+        if (cps <= CpsLimiter.OFF) {
+            repeatRates.remove(keyCode);
+        } else {
+            repeatRates.put(keyCode, Math.min(cps, CpsLimiter.MAX_CPS));
+        }
+    }
+
+    /** Buttons with a repeat configured, for the settings UI and the warning. */
+    public Map<Integer, Integer> getRepeatRates() {
+        return new HashMap<>(repeatRates);
+    }
+
     public ControllerProfile copy() {
         ControllerProfile copy = new ControllerProfile(name);
         copy.leftDeadZone = leftDeadZone;
@@ -257,6 +300,10 @@ public class ControllerProfile {
 
         copy.buttonRemaps.clear();
         copy.buttonRemaps.putAll(buttonRemaps);
+        copy.clickLimits.clear();
+        copy.clickLimits.putAll(clickLimits);
+        copy.repeatRates.clear();
+        copy.repeatRates.putAll(repeatRates);
         return copy;
 
     }

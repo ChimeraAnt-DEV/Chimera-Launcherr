@@ -682,3 +682,121 @@ these are the conclusions.
   clearing the flag does not retroactively remove the highlight from the currently-focused view,
   so without `clearFocus()` the wash still appears mid-gesture for some builds. All three parts
   are needed: unfocusable root, cleared flag, released focus.
+
+## Mod Menu keybinds (keyboard + controller) and the in-game capture
+- The Mod Menu open bind is two independent prefs in `InbuiltModManager`:
+  `getModMenuKeybind()`/`setModMenuKeybind` (keyboard/mouse, captured via a dialog `OnKeyListener`)
+  and `getModMenuControllerBind()`/`setModMenuControllerBind` (controller). `matchesModMenuBind(
+  menuBind, controllerBind, keyCode, rawKeyCode)` is the **pure** match: an unbound (0) side never
+  matches, the sides do not cross-match, and a key matches on either its remapped or its **raw**
+  code so a profile that remaps the bound button still opens the menu. `ModMenuBindMatchTest` pins
+  all of it.
+- **The in-game picker must see the press before the preloader can consume it.** The preloader
+  dispatches keys first, so a captured button the preloader claims would never reach the picker.
+  `ModMenuOverlay.deliverBindKey(keyCode)` is a static sink the picker registers into
+  (`sBindCapture`), and `MinecraftActivity.dispatchKeyEvent` offers every raw ACTION_DOWN there
+  before anything else may swallow it. The dialog's own key listener still covers launcher-side
+  receivers. Register on open, clear on dismiss.
+- The controller bind row shows a **2D map of the connected pad with the bound control lit green**
+  (`refreshControllerBindIllustration` -> `ControllerIllustrationView.setRegionConfirmed`). A bare
+  key name ("BUTTON L1") does not say which physical button it is. The illustration is hidden
+  while no bind exists.
+
+## Per-button CPS limit and hold-to-repeat (`CpsLimiter`, `ControllerProfile`)
+- Two separate behaviours, deliberately not merged: **limit** drops presses above a per-button CPS
+  cap (safe; stops worn-button double-fire), **repeat** injects down/up at a fixed rate while held
+  (opt-in; on the attack button it is an autoclicker, so it is off by default, warns once, and is
+  labelled "may be against server rules"). `CpsLimiter.isAutoclickerLike(keyCode)` decides the
+  warning only -- the launcher cannot know a server's policy.
+- `CpsLimiter` is **pure**: it takes `nowMs` as a parameter, never reads a clock, so the rate rules
+  are unit-testable (`CpsLimiterTest`). The rolling one-second window counts from the **window
+  start** (not the last press) so a burst cannot exceed the cap; the window sentinel is **-1**, not
+  0, because event times legitimately start near zero at boot.
+- Limits/rates live in `ControllerProfile` (sparse maps, absent = off) so they travel with the
+  profile; `copy()` carries them. The **run state** (window, repeat schedule) lives in
+  `ControllerInputProcessor.cpsLimiter`, never persisted.
+- Wiring: `ControllerInputProcessor.onKeyDown` (called from `MinecraftActivity.dispatchKeyEvent`,
+  `repeatCount == 0` only so a held hardware key does not re-arm) applies the cap and arms repeat;
+  `onKeyUp` ends it. `tickCpsRepeats(SystemClock.uptimeMillis())` runs from
+  `InbuiltOverlayManager.tick()` (the game's own frame tick), so repeats inject at a steady rate.
+  A late tick fires once and re-aligns rather than bursting the backlog. Injected events go through
+  `PreloaderInput.onKeyEvent` -- the same path a real press uses.
+- `setActiveProfile` calls `resetCpsState()` so a profile change cannot carry a partial window over.
+
+## Controller illustration: triggers and shoulders
+- **`ControllerLayout` triggers were raised** (`lt`/`rt` y ~ 0.096 Xbox, 0.112 PlayStation) and
+  `Spec.halfHeight()` now returns the trigger's real extent (`r * 0.95f`, not the circle default).
+  At the old height the lever sat entirely behind the body and only an invisible sliver poked out --
+  the "back triggers don't show" report.
+- `drawTrigger` is a knee-raised lever (sides rise via knee segments to a lifted crown) with a lit
+  crown band and a **recessed piston face**, so a front-on trigger reads as a moving part rather
+  than a flat pill. It is intentionally not clipped to the shell; the crown is meant to poke above
+  the body edge. `ControllerLayoutTest.triggersStayWithinReachOfTheShell` bounds it.
+
+## Servers / content storage (the "add server always fails" bug)
+- **`ContentManager.setStorageDirectories` is what points `ServerManager` at a game-data root.**
+  `ContentListActivity.onCreate` now calls its own `updateStorageDirectories()` before `loadContent()`,
+  because the screen can be the first in the process (deep link / restore / opened from another app)
+  and then nobody had wired `ContentManager`, leaving `ServerManager.minecraftPeDir` null -- every
+  add/delete server failed while worlds and packs happened to work. The resolution matches the worlds
+  and packs path (`getGameDataDirForType`), so servers cannot drift onto a different root.
+- **`QuickLaunchActivity` writes `external_servers.txt` directly** (`ServerManager.writeServerToFile`)
+  rather than sending the game a `minecraft://` deep link. When a session was already running the
+  URI was forwarded as an extra the game never read, so "Add server" failed with nothing to show.
+  Format is the one the game reads: `id:name:ip:port:timestamp`, id one past the current maximum;
+  an existing name+ip+port is refused so the row cannot duplicate.
+
+## Blue firework touch layer (FireworkTouchLayer + BaseActivity)
+- One shared `FireworkTouchLayer` is attached by `BaseActivity.wrapWithNavBar` as a sibling drawn
+  over the whole screen (a `FrameLayout` holds the nav wrapper and the layer). It is only attached
+  where the nav bar is attached, so it never appears over Minecraft. `onTouchEvent` always returns
+  false — it observes the gesture and never consumes it, so a tap still reaches the screen below.
+- The effect is **pooled and single-`onDraw`**: a fixed `Spark[256]` array, no per-particle Views,
+  no allocation during a burst, additive blending (`BlendMode.PLUS` on Q+), capped at
+  `MAX_BURSTS = 6`, and the driver `ValueAnimator` cancels itself when nothing is alive so an idle
+  screen burns no frames. Intensity Low/Med/High sets the spark count (14/17/20).
+- It auto-disables under Battery Saver (`PowerManager.isPowerSaveMode`), Android's "remove
+  animations" (`ANIMATOR_DURATION_SCALE == 0`), and the personalization `isShowAnimations` gate.
+  `refresh(context)` re-reads all of them; `BaseActivity.onResume` calls it so a toggle applied
+  while backgrounded takes effect. Settings changes call `refreshFireworkLayer()` (a walk for the
+  layer in the view tree) so no recreate is needed.
+- Prefs live in `PersonalizationManager`: `isFireworkTouchEnabled` (default **off** — a flourish,
+  not chrome), `getFireworkIntensity`, `isFireworkFollowAccent` (off = blue palette). `resetAllCustomizations`
+  clears all three.
+
+## Cosmetics status diagnostic (CosmeticsDiagnostics + CosmeticsStatusActivity)
+- Capes ship as a texture-override resource pack (`CapeResourcePackBuilder`), whose own note says
+  the worst case is a *silent* invisible cape — so `CosmeticsDiagnostics` turns the silence into
+  named checks. Reached from the Skins screen ("Cosmetics status" button beside the cape note).
+- `run(gameDataDirs, stagingRoot, gameVersion)` is `File`-based and Android-light so it is
+  unit-testable (`CosmeticsDiagnosticsTest`): it checks the pack is written under a candidate root,
+  that its uuid is listed in `minecraftpe/global_resource_packs.json`, and that the manifest's
+  `min_engine_version` is <= the installed version. The two links only the game can answer —
+  whether a cape is equipped, and whether RenderDragon honours the override — are reported as
+  `MANUAL`, never invented. A missing `min_engine_version` reads as MANUAL, not FAIL.
+- The activity offers a **magenta test cape** so "did anything appear" is unambiguous, and a
+  copy-report button. Do not promise cosmetics in release notes until a device check confirms
+  which link fails.
+- `parseVersion` compares component-wise with missing components as zero, so `1.20` == `1.20.0.0`
+  and `26.51` > `1.20.0`.
+
+## 3D controller illustrations (Controller3DProjection + Controller3DView)
+- The flat `ControllerIllustrationView` read as a squashed top-down sketch and hid the shoulder
+  triggers behind the shell. `Controller3DView` is the replacement, used by the controller settings
+  screen, the mod-menu bind picker and the bind summary badge.
+- **The view owns no geometry.** `Controller3DProjection` (Android-free, in the controller package)
+  projects the same `ControllerLayout.regionTable` the 2D view uses through a small camera pitch and
+  a perspective divide, returning plain `x,y,radius,z`; the view only paints. That keeps the
+  projection testable — `Controller3DProjectionTest` pins the recede, the perspective sign, the
+  shoulder lift and the far-to-near sort, because a projection defect looks plausible on screen.
+- **Shoulder controls are lifted toward the camera (`SHOULDER_Z = -0.55f`), not pushed away.**
+  Pushing them "behind" the body under this pitch would draw them smaller and further out; the
+  lift toward the camera (so the tilt cannot bury them) plus the body painting over their lower
+  edge is what makes bumpers/triggers read as attached to the top. They draw in a shoulder pass
+  **before** the body.
+- `Controller3DView.animateConfirm(id)` is the green "got it": a `ValueAnimator` on two floats with
+  a single overshoot, invalidating only. Short and allocation-free per frame, so the bind dialog
+  never touches the game's frame budget.
+- Package split to remember: the view is `org.chimeramc.client.launcher.ui.views.Controller3DView`
+  while `ControllerLayout` is `org.chimeramc.client.ui.views`; XML refs must use the `launcher`
+  path or inflation fails.

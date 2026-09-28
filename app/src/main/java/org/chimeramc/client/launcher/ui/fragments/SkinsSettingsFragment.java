@@ -1,12 +1,19 @@
 package org.chimeramc.client.ui.fragments;
 
+import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.ProgressBar;
+import android.widget.RadioGroup;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -22,17 +29,23 @@ import org.chimeramc.client.core.content.ContentImporter;
 import org.chimeramc.client.core.content.ResourcePackItem;
 import org.chimeramc.client.core.content.ResourcePackManager;
 import org.chimeramc.client.core.content.SkinPackActivator;
+import org.chimeramc.client.core.content.SkinPackBuilder;
 import org.chimeramc.client.core.cosmetics.PlayerSkinProvider;
 import org.chimeramc.client.core.versions.GameVersion;
 import org.chimeramc.client.core.versions.VersionManager;
 import org.chimeramc.client.ui.adapter.SkinsAdapter;
 import org.chimeramc.client.ui.animation.DynamicAnim;
+import org.chimeramc.client.ui.dialogs.CustomAlertDialog;
+import org.chimeramc.client.ui.util.SkinPreviewRenderer;
 import org.chimeramc.client.util.LauncherStorage;
 import org.chimeramc.client.util.PersonalizationManager;
 
 import java.io.File;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /** Skin pack management, hosted inside {@code CustomizeActivity}. */
 public class SkinsSettingsFragment extends Fragment {
@@ -46,6 +59,23 @@ public class SkinsSettingsFragment extends Fragment {
     private View emptyView;
     private VersionManager versionManager;
     private ActivityResultLauncher<String> importLauncher;
+    private ActivityResultLauncher<String[]> multiImageLauncher;
+
+    /** Off the UI thread: decoding and re-encoding several skins is not instant. */
+    private ExecutorService ioExecutor;
+
+    private List<PendingSkin> pendingSelection = new ArrayList<>();
+
+    /** One decoded image queued for the import dialog. */
+    private static final class PendingSkin {
+        final String name;
+        final Bitmap bitmap;
+
+        PendingSkin(String name, Bitmap bitmap) {
+            this.name = name;
+            this.bitmap = bitmap;
+        }
+    }
 
     @Nullable
     @Override
@@ -57,6 +87,7 @@ public class SkinsSettingsFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        ioExecutor = Executors.newSingleThreadExecutor();
         PersonalizationManager pm = new PersonalizationManager(requireContext());
         view.setPadding(0, (int) ((pm.isCompactMode() ? 8 : 16) * getResources().getDisplayMetrics().density),
                 0, (int) ((pm.isCompactMode() ? 8 : 16) * getResources().getDisplayMetrics().density));
@@ -66,8 +97,16 @@ public class SkinsSettingsFragment extends Fragment {
         emptyView = view.findViewById(R.id.skins_empty);
         Button importButton = view.findViewById(R.id.skins_import_button);
         Button emptyImportButton = view.findViewById(R.id.skins_empty_import_button);
+        Button resetButton = view.findViewById(R.id.skins_reset_button);
         importButton.setOnClickListener(v -> startImport());
         emptyImportButton.setOnClickListener(v -> startImport());
+        if (resetButton != null) resetButton.setOnClickListener(v -> resetToDefaultSkin());
+        Button cosmeticsStatusButton = view.findViewById(R.id.skins_cosmetics_status_button);
+        if (cosmeticsStatusButton != null) {
+            cosmeticsStatusButton.setOnClickListener(v ->
+                    startActivity(new android.content.Intent(requireContext(),
+                            org.chimeramc.client.ui.activities.CosmeticsStatusActivity.class)));
+        }
 
         versionManager = VersionManager.get(requireContext());
         adapter = new SkinsAdapter();
@@ -84,11 +123,25 @@ public class SkinsSettingsFragment extends Fragment {
                 }
         );
 
+        // Multi-select so several PNGs can be wrapped into a single pack.
+        multiImageLauncher = registerForActivityResult(
+                new ActivityResultContracts.OpenMultipleDocuments(),
+                uris -> {
+                    if (uris != null && !uris.isEmpty()) {
+                        beginPngImport(uris);
+                    }
+                }
+        );
+
         loadSkins();
     }
 
     @Override
     public void onDestroyView() {
+        if (ioExecutor != null) {
+            ioExecutor.shutdownNow();
+            ioExecutor = null;
+        }
         recycler = null;
         adapter = null;
         loadingOverlay = null;
@@ -96,12 +149,240 @@ public class SkinsSettingsFragment extends Fragment {
         super.onDestroyView();
     }
 
+    /**
+     * Asks what kind of file is being imported.
+     *
+     * The picker used to open {@code *}/{@code *} and hand whatever came back to
+     * {@code ContentImporter}, which only understands pack archives — so a plain skin PNG was
+     * accepted by the picker and then silently ignored. Splitting the two paths here is what
+     * routes a bare image to {@link SkinPackBuilder} instead.
+     */
     private void startImport() {
         try {
-            importLauncher.launch("*/*");
+            String[] choices = {
+                    getString(R.string.skins_import_choice_png),
+                    getString(R.string.skins_import_choice_pack)
+            };
+            new CustomAlertDialog(requireContext())
+                    .setTitleText(getString(R.string.skins_import_choice_title))
+                    .setItems(choices, (dialog, which) -> {
+                        if (which == 0) {
+                            pickImages();
+                        } else {
+                            importLauncher.launch("*/*");
+                        }
+                    })
+                    .show();
         } catch (Exception e) {
             Toast.makeText(requireContext(), R.string.import_failed, Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void pickImages() {
+        try {
+            multiImageLauncher.launch(new String[]{"image/png", "image/*"});
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), R.string.import_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * Decodes the chosen images off the UI thread, then opens the preview/name/arm-model dialog.
+     *
+     * A single unreadable image aborts the whole selection with a clear message rather than
+     * building a pack that silently omits it.
+     */
+    private void beginPngImport(List<Uri> uris) {
+        final Context appContext = requireContext().getApplicationContext();
+        Toast.makeText(appContext, R.string.skins_loading, Toast.LENGTH_SHORT).show();
+        ioExecutor.execute(() -> {
+            List<PendingSkin> decoded = new ArrayList<>();
+            String error = null;
+            for (Uri uri : uris) {
+                Bitmap bitmap = decode(appContext, uri);
+                if (bitmap == null) {
+                    error = appContext.getString(R.string.skins_png_bad_image);
+                    break;
+                }
+                if (!SkinPackBuilder.isAcceptableSize(bitmap.getWidth(), bitmap.getHeight())) {
+                    error = appContext.getString(R.string.skins_png_invalid_size);
+                    break;
+                }
+                decoded.add(new PendingSkin(fileNameOf(uri), bitmap));
+            }
+            final List<PendingSkin> result = decoded;
+            final String failure = error;
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                View root = getView();
+                if (root == null) return;
+                if (failure != null) {
+                    Toast.makeText(requireContext(), failure, Toast.LENGTH_LONG).show();
+                    return;
+                }
+                pendingSelection = result;
+                showImportDialog();
+            });
+        });
+    }
+
+    private Bitmap decode(Context context, Uri uri) {
+        try (InputStream in = context.getContentResolver().openInputStream(uri)) {
+            if (in == null) return null;
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inScaled = false;
+            Bitmap raw = BitmapFactory.decodeStream(in, null, opts);
+            if (raw == null) return null;
+            // Force ARGB_8888 so getPixels below returns alpha rather than a downsampled config.
+            if (raw.getConfig() != Bitmap.Config.ARGB_8888) {
+                Bitmap converted = raw.copy(Bitmap.Config.ARGB_8888, false);
+                if (converted != null) {
+                    raw.recycle();
+                    raw = converted;
+                }
+            }
+            return raw;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String fileNameOf(Uri uri) {
+        String path = uri.getLastPathSegment();
+        if (path == null) return "skin";
+        int slash = path.lastIndexOf('/');
+        if (slash >= 0) path = path.substring(slash + 1);
+        int dot = path.lastIndexOf('.');
+        return dot > 0 ? path.substring(0, dot) : path;
+    }
+
+    /** Preview + arm model + name, then write the pack and activate it. */
+    private void showImportDialog() {
+        if (pendingSelection.isEmpty()) return;
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_skin_import, null);
+        ImageView preview = dialogView.findViewById(R.id.skin_import_preview);
+        ProgressBar previewProgress = dialogView.findViewById(R.id.skin_import_preview_progress);
+        RadioGroup armModel = dialogView.findViewById(R.id.skin_import_arm_model);
+        EditText nameEdit = dialogView.findViewById(R.id.skin_import_name);
+
+        String defaultName = pendingSelection.get(0).name;
+        if (pendingSelection.size() > 1) {
+            defaultName = getString(R.string.skins_png_multi_label, pendingSelection.size());
+        }
+        nameEdit.setText(defaultName);
+        nameEdit.setSelection(nameEdit.getText().length());
+
+        // Preview is rendered from an already-decoded bitmap, so this is a few hundred blits and
+        // not worth a thread switch now that decoding is done.
+        if (previewProgress != null) previewProgress.setVisibility(View.GONE);
+        if (preview != null) preview.setImageBitmap(SkinPreviewRenderer.render(pendingSelection.get(0).bitmap));
+
+        new CustomAlertDialog(requireContext())
+                .setTitleText(getString(R.string.skins_import_png))
+                .setCustomView(dialogView)
+                .setPositiveButton(getString(R.string.add), v -> {
+                    boolean slim = armModel != null
+                            && armModel.getCheckedRadioButtonId() == R.id.skin_import_arm_slim;
+                    buildAndApplyPack(nameEdit.getText().toString().trim(), slim);
+                })
+                .setNegativeButton(getString(R.string.cancel), null)
+                .show();
+    }
+
+    private void buildAndApplyPack(String packName, boolean slim) {
+        List<PendingSkin> selection = new ArrayList<>(pendingSelection);
+        final Context appContext = requireContext().getApplicationContext();
+        GameVersion version = versionManager.getSelectedVersion();
+        File gameDataDir = resolveGameDataDir(requireContext(), version);
+        File skinPacksDir = new File(gameDataDir, "skin_packs");
+
+        Toast.makeText(appContext, R.string.skins_loading, Toast.LENGTH_SHORT).show();
+        ioExecutor.execute(() -> {
+            String error = null;
+            SkinPackBuilder.BuiltPack built = null;
+            try {
+                List<SkinPackBuilder.SkinEntry> entries = new ArrayList<>();
+                for (PendingSkin skin : selection) {
+                    int w = skin.bitmap.getWidth();
+                    int h = skin.bitmap.getHeight();
+                    int[] argb = new int[w * h];
+                    skin.bitmap.getPixels(argb, 0, w, 0, 0, w, h);
+                    entries.add(new SkinPackBuilder.SkinEntry(skin.name, argb, w, h));
+                }
+                built = SkinPackBuilder.build(skinPacksDir, packName, entries, slim);
+            } catch (SkinPackBuilder.InvalidSkinException e) {
+                error = e.getMessage();
+            } catch (Exception e) {
+                error = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            }
+
+            final SkinPackBuilder.BuiltPack result = built;
+            final String failure = error;
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (getView() == null) return;
+                if (failure != null || result == null) {
+                    Toast.makeText(requireContext(),
+                            getString(R.string.skins_apply_failed, failure == null ? "" : failure),
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                activateBuiltPack(result);
+            });
+        });
+    }
+
+    /** Hands the freshly built pack to the existing activator so there is one install path. */
+    private void activateBuiltPack(SkinPackBuilder.BuiltPack built) {
+        GameVersion version = versionManager.getSelectedVersion();
+        if (version == null) {
+            Toast.makeText(requireContext(), R.string.skins_no_version, Toast.LENGTH_LONG).show();
+            return;
+        }
+        File gameDataDir = resolveGameDataDir(requireContext(), version);
+        SkinPackActivator.Result activation = SkinPackActivator.apply(built.directory, gameDataDir);
+        if (!activation.success) {
+            Toast.makeText(requireContext(),
+                    getString(R.string.skins_apply_failed, activation.message), Toast.LENGTH_LONG).show();
+            return;
+        }
+        PlayerSkinProvider.setAppliedSkinPackName(requireContext(), built.directory.getName());
+        Toast.makeText(requireContext(),
+                getString(R.string.skins_png_built, built.directory.getName()), Toast.LENGTH_SHORT).show();
+        Toast.makeText(requireContext(), R.string.skins_restart_hint, Toast.LENGTH_LONG).show();
+        loadSkins();
+    }
+
+    /**
+     * Clears the launcher's skin selection, returning the character to the default.
+     *
+     * Un-applies every pack this launcher applied (rather than guessing one) and clears the
+     * custom-skin path, so the preview and the game both fall back to the player's own skin. It
+     * only removes packs the launcher manages, never one the player activated in the game.
+     */
+    private void resetToDefaultSkin() {
+        GameVersion version = versionManager.getSelectedVersion();
+        if (version == null) {
+            Toast.makeText(requireContext(), R.string.skins_no_version, Toast.LENGTH_LONG).show();
+            return;
+        }
+        File gameDataDir = resolveGameDataDir(requireContext(), version);
+        ioExecutor.execute(() -> {
+            for (ResourcePackItem pack : readSkinPacks()) {
+                SkinPackActivator.PackIdentity identity = SkinPackActivator.readIdentity(pack.getFile());
+                if (identity != null && SkinPackActivator.isAppliedByLauncher(gameDataDir, identity.uuid)) {
+                    SkinPackActivator.unapply(gameDataDir, identity.uuid);
+                }
+            }
+            PlayerSkinProvider.setAppliedSkinPackName(requireContext(), null);
+            PlayerSkinProvider.setCustomSkinPath(requireContext(), null);
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (getView() == null) return;
+                Toast.makeText(requireContext(), R.string.skins_reset_done, Toast.LENGTH_SHORT).show();
+                loadSkins();
+            });
+        });
     }
 
     private void importSkinFile(Uri uri) {
@@ -183,7 +464,6 @@ public class SkinsSettingsFragment extends Fragment {
             Toast.makeText(requireContext(), R.string.skins_no_version, Toast.LENGTH_LONG).show();
             return;
         }
-        String profileId = version.getStorageProfileId();
         File gameDataDir = resolveGameDataDir(requireContext(), version);
         File source = pack.getFile();
         SkinPackActivator.PackIdentity identity = SkinPackActivator.readIdentity(source);
@@ -227,7 +507,7 @@ public class SkinsSettingsFragment extends Fragment {
     }
 
     private SharedPreferences prefs() {
-        return requireContext().getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE);
+        return requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
 
     /**
@@ -237,7 +517,7 @@ public class SkinsSettingsFragment extends Fragment {
      * storage setting rather than a fixed path. Falling back to the installed-profile id when no
      * version is selected keeps the import usable before an instance is chosen.
      */
-    private File resolveGameDataDir(android.content.Context context, GameVersion version) {
+    private File resolveGameDataDir(Context context, GameVersion version) {
         if (version == null) {
             return LauncherStorage.getActiveGameDataDir(
                     context,

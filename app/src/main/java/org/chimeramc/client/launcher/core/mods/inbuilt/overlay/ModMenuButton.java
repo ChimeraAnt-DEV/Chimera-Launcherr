@@ -278,6 +278,34 @@ public class ModMenuButton {
         return menuOverlay != null && menuOverlay.isShowing();
     }
 
+    /**
+     * Opens or closes the Mod Menu from a bound input, rather than a tap on the floating button.
+     *
+     * The bind is honoured in-game, where the button may be hidden or the player is looking
+     * straight ahead, so this exists separately from {@code onButtonClick()}.
+     */
+    public void toggleMenuFromBind() {
+        if (!isShowing) return;
+        if (menuOverlay != null && menuOverlay.isShowing()) {
+            menuOverlay.hide();
+            return;
+        }
+        if (menuOverlay == null) {
+            menuOverlay = new ModMenuOverlay(activity);
+            menuOverlay.setCallback(new ModMenuOverlay.ModMenuCallback() {
+                @Override
+                public void onModToggled(String modId, boolean enabled) {
+                }
+
+                @Override
+                public void onButtonOpacityChanged(int opacity) {
+                    applyButtonOpacity();
+                }
+            });
+        }
+        menuOverlay.show();
+    }
+
     public void hideMenu() {
         if (menuOverlay != null && menuOverlay.isShowing()) {
             menuOverlay.hide();

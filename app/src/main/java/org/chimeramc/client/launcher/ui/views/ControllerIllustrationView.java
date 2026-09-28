@@ -36,6 +36,8 @@ public class ControllerIllustrationView extends View {
     private ControllerType type = ControllerType.XBOX;
     private final List<ControllerLayout.Spec> regions = new ArrayList<>();
     private final Map<String, Float> glow = new HashMap<>();
+    /** Regions confirmed by the bind picker, drawn green rather than in the accent colour. */
+    private final java.util.Set<String> confirmed = new java.util.HashSet<>();
 
     private final Paint shellPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint shellDarkPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -225,12 +227,44 @@ public class ControllerIllustrationView extends View {
         if (getWidth() == 0 || getHeight() == 0) return;
         if (shadowPaint.getShader() == null) buildShaders();
         drawShadow(canvas);
+        // The shoulders render *behind* the shell so the triggers' curved tops poke above the
+        // body, the way they do on a real pad seen from the front. Drawing them after the body
+        // and clipping them to the silhouette hid them almost completely — the "back triggers
+        // don't show" complaint.
+        drawShoulderLayer(canvas);
         if (type == ControllerType.XBOX) {
             drawBodyXbox(canvas);
         } else {
             drawBodyPlayStation(canvas, type == ControllerType.DUAL_SENSE);
         }
-        for (ControllerLayout.Spec r : regions) drawRegion(canvas, r);
+        for (ControllerLayout.Spec r : regions) {
+            if (r.shape == Shape.TRIGGER) continue;
+            drawRegion(canvas, r);
+        }
+    }
+
+    /**
+     * Draws the triggers/back shoulders before the body.
+     *
+     * They are not clipped to the shell: the whole point is that the visible part sits just
+     * proud of the top edge, which reads as an analogue trigger emerging from behind the
+     * controller rather than a pill stuck to its face.
+     */
+    private void drawShoulderLayer(Canvas canvas) {
+        for (ControllerLayout.Spec r : regions) {
+            if (r.shape != Shape.TRIGGER) continue;
+            float px = cx + ControllerLayout.regionDx(r) * scale;
+            float py = cy + ControllerLayout.regionDy(r) * scale;
+            float pr = r.radius * 2f * scale;
+            Float strength = glow.get(r.id);
+            float g = strength == null ? 0f : strength;
+            if (g > 0.05f) {
+                glowPaint.setColor(accentColor != -1 ? accentColor : 0xFF6236E8);
+                glowPaint.setAlpha((int) (150 * g));
+                drawTrigger(canvas, px, py, pr * (1f + 0.3f * g), true);
+            }
+            drawTrigger(canvas, px, py, pr, false);
+        }
     }
 
     private void drawShadow(Canvas canvas) {
@@ -403,8 +437,12 @@ public class ControllerIllustrationView extends View {
         float pr = r.radius * 2f * scale;
         Float strength = glow.get(r.id);
         float g = strength == null ? 0f : strength;
+        boolean isConfirmed = confirmed.contains(r.id);
+        if (isConfirmed && g < 1f) g = 1f;
         if (g > 0.05f) {
-            glowPaint.setColor(accentColor != -1 ? accentColor : 0xFF6236E8);
+            // A confirmed picker region reads green ("selected"), the live hold glow reads accent.
+            glowPaint.setColor(isConfirmed ? 0xFF2FBF71
+                    : (accentColor != -1 ? accentColor : 0xFF6236E8));
             glowPaint.setAlpha((int) (150 * g));
             drawShape(canvas, r, px, py, pr * (1f + 0.3f * g), true);
         }
@@ -647,32 +685,90 @@ public class ControllerIllustrationView extends View {
     }
 
     /**
-     * Triggers sit behind the bumpers and curve back over the shoulder.
+     * A trigger is a curved lever that rises behind the shoulder and leans back.
      *
-     * The arc deliberately extends past the shell and is clipped to it, so the trigger reads
-     * as emerging from behind the body the way a real one does. A trigger fully inside the
-     * silhouette looks like a flat pill stuck to the face, and on the Xbox, whose shoulders
-     * angle steeply, it cannot fit inside at all without shrinking past legibility.
+     * It is deliberately <em>not</em> clipped to the shell. Clipping hid it: the original arc
+     * sat almost entirely under the body outline, so the "back triggers" were invisible. Here
+     * the crown pokes above the body edge, its lower half is dark (it is shaded by the shell it
+     * sits behind) and its top face catches the light, which is what sells the depth.
+     */
+    /**
+     * A shoulder trigger seen from the front: a wide lever whose crown is lifted above its base
+     * so the top edge clears the shell's shoulder and pokes out on screen.
+     *
+     * The old shape was a shallow rounded cap fully below its own centre, so once the body was
+     * drawn over it nothing of the lever remained — the "back triggers don't show" report. The
+     * sides are knee segments that rise toward the crown, and a recessed piston face sits on the
+     * crown so the part reads as depth rather than a printed pill.
      */
     private void drawTrigger(Canvas canvas, float px, float py, float pr, boolean glowMode) {
+        float halfW = pr * 1.9f;
+        float baseY = py + pr * 1.35f;
+        float crownY = py - pr * 0.95f;
+        // Knee points: partway up the sides, giving a moulded "s" rather than a plain dome.
+        float kneeY = py + pr * 0.30f;
+        float kneeInsetX = halfW * 0.78f;
+
         Path t = new Path();
-        t.moveTo(px - pr * 1.9f, py + pr * 0.62f);
-        t.cubicTo(px - pr * 1.9f, py - pr * 0.85f,
-                px + pr * 1.9f, py - pr * 0.85f,
-                px + pr * 1.9f, py + pr * 0.62f);
+        t.moveTo(px - halfW, baseY);
+        t.cubicTo(px - halfW * 1.02f, kneeY, px - kneeInsetX * 0.94f, crownY + pr * 0.30f,
+                px - halfW * 0.52f, crownY);
+        t.cubicTo(px - halfW * 0.22f, crownY - pr * 0.06f, px + halfW * 0.22f, crownY - pr * 0.06f,
+                px + halfW * 0.52f, crownY);
+        t.cubicTo(px + kneeInsetX * 0.94f, crownY + pr * 0.30f, px + halfW * 1.02f, kneeY,
+                px + halfW, baseY);
         t.close();
-        int save = canvas.save();
-        canvas.clipPath(shellPath);
+
         if (glowMode) {
             canvas.drawPath(t, glowPaint);
-        } else {
-            buttonDarkPaint.setColor(dark ? 0xFF333944 : 0xFFBFC5CD);
-            canvas.drawPath(t, buttonDarkPaint);
-            outlinePaint.setStrokeWidth(1.8f);
-            canvas.drawPath(t, outlinePaint);
-            outlinePaint.setStrokeWidth(2.5f);
+            return;
+        }
+
+        int save = canvas.save();
+        canvas.clipPath(t);
+
+        // Body of the lever: dark at the base (behind the shell) lifting to the lit crown.
+        buttonDarkPaint.setShader(new LinearGradient(
+                0f, crownY, 0f, baseY,
+                dark ? 0xFF5A626F : 0xFFE7EAEE,
+                dark ? 0xFF1D2128 : 0xFF969DA7,
+                android.graphics.Shader.TileMode.CLAMP));
+        canvas.drawPath(t, buttonDarkPaint);
+        buttonDarkPaint.setShader(null);
+
+        // Lit crown band: the narrow strip that actually catches light on a real trigger.
+        highlightPaint.setShader(new LinearGradient(
+                0f, crownY, 0f, crownY + pr * 0.42f,
+                dark ? 0x55FFFFFF : 0xCCFFFFFF, 0x00FFFFFF,
+                android.graphics.Shader.TileMode.CLAMP));
+        scratch.set(px - halfW * 0.9f, crownY - pr * 0.10f, px + halfW * 0.9f, crownY + pr * 0.42f);
+        canvas.drawRoundRect(scratch, pr * 0.34f, pr * 0.34f, highlightPaint);
+        highlightPaint.setShader(null);
+
+        // Recessed piston face on the crown: an inset rounded rect with a dark inner edge, which
+        // is what makes a front-on trigger read as a moving part and not a flat lobe.
+        float pistonHalfW = halfW * 0.60f;
+        scratch.set(px - pistonHalfW, crownY + pr * 0.16f, px + pistonHalfW, crownY + pr * 0.66f);
+        platePaint.setColor(dark ? 0xFF2B3038 : 0xFFD2D7DE);
+        canvas.drawRoundRect(scratch, pr * 0.2f, pr * 0.2f, platePaint);
+        shadePaint.setStyle(Paint.Style.STROKE);
+        shadePaint.setStrokeWidth(pr * 0.10f);
+        shadePaint.setColor(dark ? 0x66000000 : 0x38000000);
+        canvas.drawRoundRect(scratch, pr * 0.2f, pr * 0.2f, shadePaint);
+
+        // Grip ridges: three shallow grooves down the lever face.
+        groovePaint.setStyle(Paint.Style.STROKE);
+        groovePaint.setStrokeWidth(pr * 0.055f);
+        groovePaint.setColor(dark ? 0x55000000 : 0x33000000);
+        for (int i = -1; i <= 1; i++) {
+            float gx = px + i * pr * 0.55f;
+            canvas.drawLine(gx, crownY + pr * 0.78f, gx, baseY - pr * 0.10f, groovePaint);
         }
         canvas.restoreToCount(save);
+
+        outlinePaint.setStyle(Paint.Style.STROKE);
+        outlinePaint.setStrokeWidth(1.6f);
+        canvas.drawPath(t, outlinePaint);
     }
 
     private void drawCenterButton(Canvas canvas, float px, float py, float pr, boolean glowMode) {
@@ -751,6 +847,33 @@ public class ControllerIllustrationView extends View {
         }
         detailPaint.setColor(dark ? 0xFF262A32 : 0xFFC3C9D1);
         canvas.drawRoundRect(scratch, pr * 0.5f, pr * 0.5f, detailPaint);
+    }
+
+    /**
+     * Marks a region as confirmed, so it draws with the green success colour.
+     *
+     * The bind picker flashes the pressed button green for a moment to say "got it", which is
+     * distinct from the accent-coloured live glow used while a button is merely held.
+     */
+    public void setRegionConfirmed(String id, boolean on) {
+        if (id == null) return;
+        if (on) {
+            confirmed.add(id);
+        } else {
+            confirmed.remove(id);
+        }
+        invalidate();
+    }
+
+    public void clearConfirmed() {
+        if (confirmed.isEmpty()) return;
+        confirmed.clear();
+        invalidate();
+    }
+
+    /** The region id a physical key maps to, or null when the key is not on the pad. */
+    public String regionIdForKey(int keyCode) {
+        return regionForKey(keyCode);
     }
 
     public void handleKeyEvent(int keyCode, boolean down) {

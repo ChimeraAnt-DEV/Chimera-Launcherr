@@ -1203,6 +1203,43 @@
                             android:progressTint="@color/primary"
                             android:thumbTint="@color/primary" />
 
+                        <!-- Font Family Dropdown -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/font_family"
+                                android:fontFamily="@font/misans"
+                                android:textColor="@color/on_surface"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+
+                            <Spinner
+                                android:id="@+id/font_family_spinner"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:minWidth="160dp"
+                                android:background="@drawable/bg_spinner_outline" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/font_family_preview"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:text="@string/font_preview"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="15sp" />
+
                         <!-- Blur Intensity Slider -->
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -1301,6 +1338,104 @@
 
                             <com.google.android.material.switchmaterial.SwitchMaterial
                                 android:id="@+id/switch_enable_glow"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:thumbTint="@color/primary"
+                                android:trackTint="#555555" />
+                        </LinearLayout>
+
+                        <!-- Firework touch effect -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/firework_touch"
+                                    android:textColor="@color/on_surface"
+                                    android:textSize="15sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="@string/firework_touch_desc"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="12sp" />
+                            </LinearLayout>
+
+                            <com.google.android.material.switchmaterial.SwitchMaterial
+                                android:id="@+id/switch_firework_touch"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:thumbTint="@color/primary"
+                                android:trackTint="#555555" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/row_firework_intensity"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/firework_intensity"
+                                android:textColor="@color/on_surface"
+                                android:textSize="14sp" />
+
+                            <Spinner
+                                android:id="@+id/spinner_firework_intensity"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:minWidth="120dp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/row_firework_accent"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/firework_follow_accent"
+                                    android:textColor="@color/on_surface"
+                                    android:textSize="14sp" />
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/firework_follow_accent_desc"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="12sp" />
+                            </LinearLayout>
+
+                            <com.google.android.material.switchmaterial.SwitchMaterial
+                                android:id="@+id/switch_firework_accent"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:thumbTint="@color/primary"

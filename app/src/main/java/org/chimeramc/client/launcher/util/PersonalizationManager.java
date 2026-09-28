@@ -48,9 +48,21 @@ public class PersonalizationManager {
     private static final String KEY_CARD_ROUNDING = "card_rounding";
     private static final String KEY_ICON_SIZE = "icon_size";
     public static final String KEY_FONT_SCALE = "font_scale";
+    /** Persisted font key from {@link LauncherFonts}. */
+    public static final String KEY_FONT_FAMILY = "font_family";
     private static final String KEY_BLUR_INTENSITY = "blur_intensity";
     private static final String KEY_SHOW_ANIMATIONS = "show_animations";
     private static final String KEY_ENABLE_GLOW = "enable_glow_effects";
+
+    /** Blue firework touch effect (Part C1). */
+    private static final String KEY_FIREWORK_ENABLED = "firework_touch_enabled";
+    private static final String KEY_FIREWORK_INTENSITY = "firework_intensity";
+    private static final String KEY_FIREWORK_FOLLOW_ACCENT = "firework_follow_accent";
+
+    /** Intensity levels for the firework effect; Low/Med/High map to particle counts. */
+    public static final int FIREWORK_LOW = 0;
+    public static final int FIREWORK_MEDIUM = 1;
+    public static final int FIREWORK_HIGH = 2;
     private static final String KEY_COMPACT_MODE = "compact_mode";
     private static final String KEY_HAPTIC_FEEDBACK = "haptic_feedback";
     public static final String KEY_DYNAMIC_COLOR = "dynamic_color";
@@ -270,6 +282,20 @@ public class PersonalizationManager {
         sChangeGeneration++;
     }
 
+    /** The persisted font key; see {@link LauncherFonts}. */
+    public String getFontFamily() {
+        return prefs.getString(KEY_FONT_FAMILY,
+                LauncherFonts.DEFAULT_KEY);
+    }
+
+    public void setFontFamily(String key) {
+        String resolved = key == null
+                ? LauncherFonts.DEFAULT_KEY : key;
+        if (resolved.equals(getFontFamily())) return;
+        prefs.edit().putString(KEY_FONT_FAMILY, resolved).apply();
+        sChangeGeneration++;
+    }
+
     public int getBlurIntensity() {
         return prefs.getInt(KEY_BLUR_INTENSITY, BLUR_INTENSITY_DEFAULT);
     }
@@ -289,6 +315,34 @@ public class PersonalizationManager {
         if (isShowAnimations() == enabled) return;
         prefs.edit().putBoolean(KEY_SHOW_ANIMATIONS, enabled).apply();
         sChangeGeneration++;
+    }
+
+    /** Whether the blue firework touch layer is on. Off by default: it is a flourish, not chrome. */
+    public boolean isFireworkTouchEnabled() {
+        return prefs.getBoolean(KEY_FIREWORK_ENABLED, false);
+    }
+
+    public void setFireworkTouchEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_FIREWORK_ENABLED, enabled).apply();
+    }
+
+    public int getFireworkIntensity() {
+        return clamp(prefs.getInt(KEY_FIREWORK_INTENSITY, FIREWORK_MEDIUM),
+                FIREWORK_LOW, FIREWORK_HIGH);
+    }
+
+    public void setFireworkIntensity(int level) {
+        prefs.edit().putInt(KEY_FIREWORK_INTENSITY,
+                clamp(level, FIREWORK_LOW, FIREWORK_HIGH)).apply();
+    }
+
+    /** Whether the sparks follow the user's accent instead of the blue default palette. */
+    public boolean isFireworkFollowAccent() {
+        return prefs.getBoolean(KEY_FIREWORK_FOLLOW_ACCENT, false);
+    }
+
+    public void setFireworkFollowAccent(boolean follow) {
+        prefs.edit().putBoolean(KEY_FIREWORK_FOLLOW_ACCENT, follow).apply();
     }
 
     public boolean isEnableGlowEffects() {
@@ -352,9 +406,13 @@ public class PersonalizationManager {
             .remove(KEY_CARD_ROUNDING)
             .remove(KEY_ICON_SIZE)
             .remove(KEY_FONT_SCALE)
+            .remove(KEY_FONT_FAMILY)
             .remove(KEY_BLUR_INTENSITY)
             .remove(KEY_SHOW_ANIMATIONS)
             .remove(KEY_ENABLE_GLOW)
+            .remove(KEY_FIREWORK_ENABLED)
+            .remove(KEY_FIREWORK_INTENSITY)
+            .remove(KEY_FIREWORK_FOLLOW_ACCENT)
             .remove(KEY_COMPACT_MODE)
             .remove(KEY_HAPTIC_FEEDBACK)
             .remove(KEY_DYNAMIC_COLOR)
@@ -385,6 +443,31 @@ public class PersonalizationManager {
             applyAccentColorRecursive(rootView, accent, activity);
             applyNavBarAccent(activity, accent);
         }
+
+        applyFontFamilyToActivity(activity, rootView);
+    }
+
+    /**
+     * Re-skins every text view with the chosen font.
+     *
+     * Runs after the theme's own {@code android:fontFamily} so a chosen face wins, and is a
+     * no-op for the default face to avoid pointless work on the common path.
+     */
+    public void applyFontFamilyToActivity(Activity activity, ViewGroup rootView) {
+        LauncherFonts.Entry entry = null;
+        String key = getFontFamily();
+        for (LauncherFonts.Entry e
+                : LauncherFonts.entries()) {
+            if (e.key.equals(key)) {
+                entry = e;
+                break;
+            }
+        }
+        if (entry == null) return;
+        if (LauncherFonts.DEFAULT_KEY.equals(entry.key)) return;
+        android.graphics.Typeface typeface =
+                LauncherFonts.typeface(activity, entry.key);
+        LauncherFonts.applyRecursive(rootView, typeface);
     }
 
     private void applyNavBarAccent(Activity activity, int accent) {

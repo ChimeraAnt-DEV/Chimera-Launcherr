@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Tablet / large-window overrides for the top navigation bar. There is room for the wordmark
+    and for every tab label, so nothing needs to collapse.
+-->
+<resources>
+    <bool name="nav_show_app_name">true</bool>
+    <bool name="nav_compact_tabs">false</bool>
+</resources>
