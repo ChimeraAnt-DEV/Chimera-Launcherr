@@ -6,11 +6,9 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -19,24 +17,27 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.chimeramc.client.R;
+import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
 import org.chimeramc.client.core.voice.VoiceChannel;
+import org.chimeramc.client.core.voice.VoiceChannelCapacity;
 import org.chimeramc.client.core.voice.VoiceChannelDirectory;
 import org.chimeramc.client.core.voice.VoiceChatModule;
 import org.chimeramc.client.core.voice.VoicePeer;
-import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
-import org.chimeramc.client.core.mods.inbuilt.model.ModIds;
+import org.chimeramc.client.core.voice.VoiceProtocol;
 import org.chimeramc.client.ui.animation.DynamicAnim;
 
 import java.util.Collections;
 import java.util.List;
 
 /**
- * The Voice section of the in-game Mod Menu: the proximity chat module's channel, its members and
- * the public directory, without leaving the world.
+ * The Voice section of the in-game Mod Menu: the proximity chat module's channel, its members, the
+ * per-member mute controls, channel creation (public or private, with a capacity for public rooms)
+ * and the public directory, without leaving the world.
  *
  * <p>Built in code like the other Mod Menu sections, because everything on it is live data from
  * the voice module rather than fixed layout. It is the in-game home of the feature; the standalone
- * {@code VoiceChatActivity} remains for the launcher-side setup and is reached from the Mods tab.
+ * {@code VoiceChatActivity} mirrors it for the launcher side and both use {@link VoiceUiKit} so the
+ * treatments match.
  *
  * <p><b>The module is never started from inside a running game.</b> Starting a channel opens the
  * microphone and a UDP multicast socket, which is a deliberate user action; a tap on the menu
@@ -44,8 +45,13 @@ import java.util.List;
  * module lives in the Mods tab, so the only thing this panel changes is which channel the voice
  * link is on.
  *
- * <p>The channel controls are hidden while the module is stopped: a join button that appears to
- * work but reaches nobody is worse than saying the feature is off.
+ * <p><b>Per-member mute is client-side only.</b> Muting a member adds them to the local mute set;
+ * their audio is not mixed in for this listener and they are never told. See the module's
+ * {@code toggleMute}.
+ *
+ * <p><b>Capacity is advisory.</b> There is no server, so a host cannot eject anyone; the cap is
+ * advertised in the directory and a would-be joiner declines a full room. See
+ * {@link VoiceChannelCapacity}.
  */
 final class VoicePanel {
 
@@ -53,6 +59,7 @@ final class VoicePanel {
     private final InbuiltModManager manager;
     private final LinearLayout root;
     private final boolean compact;
+    private final int accent;
 
     private TextView statusLine;
     private TextView channelName;
@@ -61,17 +68,21 @@ final class VoicePanel {
     private LinearLayout membersContainer;
     private LinearLayout directoryContainer;
     private TextView directoryEmpty;
-    private Button leaveButton;
-    private Button copyButton;
-    private Button shareButton;
+    private TextView leaveButton;
+    private TextView copyButton;
+    private TextView shareButton;
     private EditText createName;
     private EditText joinCode;
+    private LinearLayout createCapacityRow;
     private LinearLayout controlColumn;
+
+    private boolean createPrivate;
 
     VoicePanel(Activity activity, boolean compact) {
         this.activity = activity;
         this.compact = compact;
         this.manager = InbuiltModManager.getInstance(activity);
+        this.accent = new ModMenuTheme(activity).accent();
 
         root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.HORIZONTAL);
@@ -110,9 +121,16 @@ final class VoicePanel {
         boolean isPrivate = manager.isVoiceChannelPrivate();
         String display = manager.getVoiceChannelName();
         channelName.setText(display.isEmpty() ? channelLabel(current) : display);
-        channelKind.setText(isPrivate
-                ? activity.getString(R.string.voice_channel_kind_private, current)
-                : activity.getString(R.string.voice_channel_kind_public));
+
+        int capacity = manager.getVoiceChannelCapacity();
+        if (isPrivate) {
+            channelKind.setText(activity.getString(R.string.voice_channel_kind_private, current));
+        } else if (capacity > VoiceProtocol.CAPACITY_NONE) {
+            channelKind.setText(activity.getString(
+                    R.string.voice_channel_kind_public_capped, capacity));
+        } else {
+            channelKind.setText(R.string.voice_channel_kind_public);
+        }
 
         boolean hasCode = isPrivate || VoiceChannel.isJoinCode(current);
         copyButton.setVisibility(hasCode ? View.VISIBLE : View.GONE);
@@ -154,9 +172,11 @@ final class VoicePanel {
         LinearLayout codeRow = new LinearLayout(activity);
         codeRow.setOrientation(LinearLayout.HORIZONTAL);
         codeRow.setPadding(0, dp(6), 0, 0);
-        copyButton = pillButton(R.string.voice_copy_code);
+        copyButton = VoiceUiKit.pillButton(activity,
+                activity.getString(R.string.voice_copy_code), accent, false, compact);
         copyButton.setOnClickListener(v -> copyToClipboard(manager.getVoiceChannel()));
-        shareButton = pillButton(R.string.voice_share_code);
+        shareButton = VoiceUiKit.pillButton(activity,
+                activity.getString(R.string.voice_share_code), accent, true, compact);
         shareButton.setOnClickListener(v -> shareCode(manager.getVoiceChannel()));
         codeRow.addView(copyButton);
         codeRow.addView(shareButton);
@@ -171,15 +191,31 @@ final class VoicePanel {
         membersContainer = new LinearLayout(activity);
         membersContainer.setOrientation(LinearLayout.VERTICAL);
         column.addView(membersContainer);
+        // The mute note sits under the list so the "you, not them" semantics are stated where the
+        // buttons are, not only in a dialog.
+        column.addView(hint(R.string.voice_mute_scope));
 
         // Controls that change the channel. Grouped so a single visibility flip hides the whole
         // block while the module is stopped.
         controlColumn = new LinearLayout(activity);
         controlColumn.setOrientation(LinearLayout.VERTICAL);
         controlColumn.setPadding(0, dp(12), 0, 0);
+        buildCreateControls();
+        buildJoinControls();
 
-        TextView createHeading = sectionHeading(R.string.voice_create_channel);
-        controlColumn.addView(createHeading);
+        ScrollView scroller = new ScrollView(activity);
+        scroller.setFillViewport(true);
+        scroller.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        scroller.addView(controlColumn, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        column.addView(scroller, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        return column;
+    }
+
+    /** The create-a-channel block: name, type toggle, hidden-until-public capacity and button. */
+    private void buildCreateControls() {
+        controlColumn.addView(sectionHeading(R.string.voice_create_channel));
 
         createName = new EditText(activity);
         createName.setHint(R.string.voice_channel_name_hint);
@@ -187,10 +223,42 @@ final class VoicePanel {
         createName.setSingleLine(true);
         controlColumn.addView(createName);
 
-        Button createButton = pillButton(R.string.voice_create_button);
-        createButton.setOnClickListener(v -> createPublicChannel());
-        controlColumn.addView(createButton);
+        createPrivate = false;
+        LinearLayout typeRow = VoiceUiKit.segmentedControl(activity,
+                new CharSequence[]{
+                        activity.getString(R.string.voice_channel_public),
+                        activity.getString(R.string.voice_channel_private_short)},
+                accent, compact, index -> {
+                    createPrivate = index == 1;
+                    // Capacity is public-only; a private channel has no cap to set because the
+                    // code already bounds who can join.
+                    createCapacityRow.setVisibility(createPrivate ? View.GONE : View.VISIBLE);
+                });
+        typeRow.setPadding(0, dp(6), 0, 0);
+        controlColumn.addView(typeRow);
 
+        createCapacityRow = new LinearLayout(activity);
+        createCapacityRow.setOrientation(LinearLayout.VERTICAL);
+        createCapacityRow.setPadding(0, dp(6), 0, 0);
+        createCapacityRow.addView(sectionHeading(R.string.voice_capacity_label));
+        int initialCapacity = Math.max(VoiceChannelCapacity.MIN_HOST_CAPACITY,
+                manager.getVoiceChannelCapacity() == VoiceProtocol.CAPACITY_NONE
+                        ? 8 : manager.getVoiceChannelCapacity());
+        LinearLayout stepper = VoiceUiKit.stepper(activity, accent, compact,
+                VoiceChannelCapacity.MIN_HOST_CAPACITY, VoiceChannelCapacity.MAX_HOST_CAPACITY,
+                initialCapacity,
+                value -> manager.setVoiceChannelCapacity(value));
+        createCapacityRow.addView(stepper);
+        createCapacityRow.addView(hint(R.string.voice_capacity_hint));
+        controlColumn.addView(createCapacityRow);
+
+        TextView createButton = VoiceUiKit.pillButton(activity,
+                activity.getString(R.string.voice_create_button), accent, true, compact);
+        createButton.setOnClickListener(v -> createChannel());
+        controlColumn.addView(createButton);
+    }
+
+    private void buildJoinControls() {
         controlColumn.addView(sectionHeading(R.string.voice_join_by_code));
 
         joinCode = new EditText(activity);
@@ -199,19 +267,18 @@ final class VoicePanel {
         joinCode.setSingleLine(true);
         controlColumn.addView(joinCode);
 
-        Button joinButton = pillButton(R.string.voice_join_button);
+        TextView joinButton = VoiceUiKit.pillButton(activity,
+                activity.getString(R.string.voice_join_button), accent, true, compact);
         joinButton.setOnClickListener(v -> joinTypedChannel());
         controlColumn.addView(joinButton);
 
-        leaveButton = pillButton(R.string.voice_leave_channel);
+        leaveButton = VoiceUiKit.pillButton(activity,
+                activity.getString(R.string.voice_leave_channel), accent, false, compact);
         leaveButton.setOnClickListener(v -> {
             manager.joinVoiceChannel(VoiceChannel.WORLD, "", false);
             announceAndRefresh();
         });
         controlColumn.addView(leaveButton);
-
-        column.addView(controlColumn);
-        return column;
     }
 
     private View buildDirectoryColumn() {
@@ -246,10 +313,24 @@ final class VoicePanel {
         return scroller;
     }
 
-    /** Creates and joins a public channel; private codes are made from the launcher screen. */
-    private void createPublicChannel() {
+    /** Creates and joins a channel, applying the public capacity or generating a private code. */
+    private void createChannel() {
         String typed = createName.getText() == null
                 ? "" : createName.getText().toString().trim();
+
+        if (createPrivate) {
+            // The code is both the id and the invite; a typed name is only a label, so the
+            // channel is still creatable with the field left blank.
+            String id = VoiceChannel.generateCode();
+            String displayName = typed.isEmpty() ? id : typed;
+            manager.joinVoiceChannel(id, displayName, true);
+            createName.setText("");
+            announceAndRefresh();
+            copyToClipboard(id);
+            shareCode(id);
+            return;
+        }
+
         if (typed.isEmpty()) {
             Toast.makeText(activity, R.string.voice_channel_name_required, Toast.LENGTH_SHORT).show();
             return;
@@ -262,13 +343,25 @@ final class VoicePanel {
     }
 
     private void joinTypedChannel() {
+        if (joinCode == null) return;
         String typed = joinCode.getText() == null ? "" : joinCode.getText().toString().trim();
         if (typed.isEmpty()) {
             Toast.makeText(activity, R.string.voice_join_code_required, Toast.LENGTH_SHORT).show();
             return;
         }
         String normalized = VoiceChannel.normalize(typed);
-        manager.joinVoiceChannel(normalized, typed, VoiceChannel.isJoinCode(normalized));
+        boolean isPrivate = VoiceChannel.isJoinCode(normalized);
+        if (!isPrivate) {
+            VoiceChannelDirectory.Channel target = findPublicChannel(normalized);
+            if (target != null && !VoiceChannelCapacity.canJoin(
+                    target.memberCount, target.capacity, false)) {
+                Toast.makeText(activity,
+                        activity.getString(R.string.voice_channel_full, target.name),
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+        manager.joinVoiceChannel(normalized, typed, isPrivate);
         joinCode.setText("");
         announceAndRefresh();
         Toast.makeText(activity, activity.getString(R.string.voice_joined_channel, normalized),
@@ -276,10 +369,27 @@ final class VoicePanel {
     }
 
     private void joinPublicChannel(VoiceChannelDirectory.Channel channel) {
+        // Capacity is advisory (no server can eject), so a full room is refused here rather than
+        // joined with a promise that cannot be kept.
+        if (!VoiceChannelCapacity.canJoin(channel.memberCount, channel.capacity, false)) {
+            Toast.makeText(activity, activity.getString(R.string.voice_channel_full, channel.name),
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
         manager.joinVoiceChannel(channel.id, channel.name, false);
         announceAndRefresh();
         Toast.makeText(activity, activity.getString(R.string.voice_joined_channel, channel.name),
                 Toast.LENGTH_SHORT).show();
+    }
+
+    /** The directory entry for a channel id, or null when it is not currently advertised. */
+    private VoiceChannelDirectory.Channel findPublicChannel(String id) {
+        VoiceChatModule module = VoiceChatModule.peek();
+        if (module == null) return null;
+        for (VoiceChannelDirectory.Channel channel : module.publicChannels()) {
+            if (channel.id.equals(id)) return channel;
+        }
+        return null;
     }
 
     /** Pushes the new channel to running peers, then re-reads. Only a live module needs telling. */
@@ -322,8 +432,49 @@ final class VoicePanel {
             return;
         }
         for (VoicePeer peer : members) {
-            membersContainer.addView(memberRow(peer.name, true));
+            membersContainer.addView(buildMemberRow(module, peer));
         }
+        VoiceUiKit.staggerIn(membersContainer, dp(12));
+    }
+
+    /**
+     * One member row: the peer's name plus a mute pill.
+     *
+     * <p>The pill's label and treatment reflect the local mute only -- the peer is never told, so
+     * the wording is "Mute"/"Unmute" as a viewer's choice, not a status they would see.
+     */
+    private View buildMemberRow(VoiceChatModule module, VoicePeer peer) {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(3), 0, dp(3));
+
+        TextView name = new TextView(activity);
+        name.setText(peer.name);
+        name.setTextSize(compact ? 11f : 12f);
+        name.setTextColor(0xFFE6E9EC);
+        row.addView(name, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        if (module == null) return row;
+        boolean muted = module.isMuted(peer.id);
+        TextView mute = VoiceUiKit.pillButton(activity, activity.getString(
+                muted ? R.string.voice_unmute : R.string.voice_mute), accent, !muted, compact);
+        mute.setOnClickListener(v -> {
+            module.toggleMute(peer.id);
+            // Re-render just this button so the toggle feels instant; a full refresh would rebuild
+            // the list and lose the pulse.
+            updateMuteButton(mute, module.isMuted(peer.id));
+        });
+        row.addView(mute);
+        return row;
+    }
+
+    private void updateMuteButton(TextView button, boolean muted) {
+        button.setText(activity.getString(muted ? R.string.voice_unmute : R.string.voice_mute));
+        VoiceUiKit.applyPillBackground(button, accent, !muted);
+        button.setTextColor(muted ? 0xFFFFFFFF : VoiceUiKit.lighten(accent, 0.35f));
+        VoiceUiKit.pulse(button);
     }
 
     private void renderDirectory(VoiceChatModule module) {
@@ -332,36 +483,63 @@ final class VoicePanel {
                 ? Collections.emptyList() : module.publicChannels();
         directoryEmpty.setVisibility(channels.isEmpty() ? View.VISIBLE : View.GONE);
         for (VoiceChannelDirectory.Channel channel : channels) {
-            boolean current = channel.current;
-            TextView row = new TextView(activity);
-            row.setText(activity.getString(R.string.voice_directory_row,
-                    channel.name,
-                    activity.getResources().getQuantityString(
-                            R.plurals.voice_member_count, channel.memberCount, channel.memberCount)));
-            row.setTextSize(compact ? 11f : 12f);
-            row.setTextColor(current ? 0xFF6236E8 : 0xFFE6E9EC);
-            row.setPadding(dp(8), dp(8), dp(8), dp(8));
-
-            GradientDrawable background = new GradientDrawable();
-            background.setColor(0xFF1B1E22);
-            background.setCornerRadius(dp(8));
-            background.setStroke(dp(1), current ? 0xFF6236E8 : 0x22FFFFFF);
-            row.setBackground(background);
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            params.bottomMargin = dp(6);
-            row.setLayoutParams(params);
-
-            // Tapping the channel you are already on would be a no-op; disable it rather than
-            // leave a control that looks active and does nothing.
-            if (current) {
-                row.setAlpha(0.8f);
-            } else {
-                row.setOnClickListener(v -> joinPublicChannel(channel));
-                DynamicAnim.applyPressScale(row);
-            }
-            directoryContainer.addView(row);
+            directoryContainer.addView(buildDirectoryRow(channel));
         }
+        VoiceUiKit.staggerIn(directoryContainer, dp(16));
+    }
+
+    private View buildDirectoryRow(VoiceChannelDirectory.Channel channel) {
+        boolean current = channel.current;
+        boolean full = !current && channel.isFull();
+
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.VERTICAL);
+        float density = activity.getResources().getDisplayMetrics().density;
+        int padH = dp(10);
+        int padV = dp(8);
+        row.setPadding(padH, padV, padH, padV);
+        row.setBackground(VoiceUiKit.roundedFill(
+                current ? VoiceUiKit.blend(0xFF1B1E22, accent, 0.12f) : 0xFF1B1E22,
+                VoiceUiKit.RADIUS_DP * density,
+                current ? accent : 0x22FFFFFF,
+                Math.max(1f, density)));
+
+        TextView name = new TextView(activity);
+        name.setText(current
+                ? activity.getString(R.string.voice_directory_current, channel.name)
+                : channel.name);
+        name.setTextSize(compact ? 12f : 13f);
+        name.setTextColor(current ? accent : 0xFFE6E9EC);
+        name.setTypeface(name.getTypeface(), Typeface.BOLD);
+        row.addView(name);
+
+        TextView meta = new TextView(activity);
+        if (channel.capacity > VoiceProtocol.CAPACITY_NONE) {
+            meta.setText(activity.getString(R.string.voice_directory_capacity,
+                    VoiceChannelCapacity.describe(channel.memberCount, channel.capacity)));
+        } else {
+            meta.setText(activity.getResources().getQuantityString(
+                    R.plurals.voice_member_count, channel.memberCount, channel.memberCount));
+        }
+        meta.setTextSize(compact ? 10f : 11f);
+        meta.setTextColor(full ? 0xFFE5484D : 0xFF8F979F);
+        row.addView(meta);
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.bottomMargin = dp(6);
+        row.setLayoutParams(params);
+
+        // Tapping the channel you are already on would be a no-op; a full room refuses politely.
+        if (current) {
+            row.setAlpha(0.8f);
+        } else {
+            row.setAlpha(full ? 0.7f : 1f);
+            row.setClickable(true);
+            row.setOnClickListener(v -> joinPublicChannel(channel));
+            DynamicAnim.applyPressScale(row);
+        }
+        return row;
     }
 
     private TextView memberRow(String label, boolean present) {
@@ -378,21 +556,18 @@ final class VoicePanel {
         heading.setText(textRes);
         heading.setTextSize(compact ? 10f : 11f);
         heading.setTextColor(0xFF8F979F);
+        heading.setTypeface(heading.getTypeface(), Typeface.BOLD);
         heading.setPadding(0, dp(8), 0, dp(2));
         return heading;
     }
 
-    private Button pillButton(int textRes) {
-        Button button = new Button(activity);
-        button.setText(textRes);
-        button.setTextSize(compact ? 11f : 12f);
-        button.setAllCaps(false);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.topMargin = dp(4);
-        button.setLayoutParams(params);
-        DynamicAnim.applyPressScale(button);
-        return button;
+    private TextView hint(int textRes) {
+        TextView hint = new TextView(activity);
+        hint.setText(textRes);
+        hint.setTextSize(compact ? 9f : 10f);
+        hint.setTextColor(0xFF6E767E);
+        hint.setPadding(0, dp(2), 0, 0);
+        return hint;
     }
 
     private String channelLabel(String channel) {
