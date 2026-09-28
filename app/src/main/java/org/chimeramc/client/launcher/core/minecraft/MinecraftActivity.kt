@@ -446,7 +446,10 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
             overlayManager?.notifyAttack()
         }
 
-        val unicodeChar = event.unicodeChar
+        // Android reports a control code point for dedicated keys (Enter is '\n' on many IMEs).
+        // Forwarding that as a "character" alongside the key press is what crashed the instance
+        // when Enter was pressed in chat; a control point reads as "no character" instead.
+        val unicodeChar = TextInputSanitizer.sanitizeUnicodeChar(event.unicodeChar)
         val remappedKey = ControllerInputProcessor.processKeyEvent(event.keyCode)
         // Per-button CPS limit and hold-to-repeat. The limit only drops the press the game sees
         // when the button is over its cap; the real press still drives hit-timing above.

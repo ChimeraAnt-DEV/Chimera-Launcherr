@@ -407,6 +407,17 @@ public class SettingsActivity extends BaseActivity {
             }
         });
 
+        SwitchMaterial switchFpsOptimizer = findViewById(R.id.switch_fps_optimizer);
+        if (switchFpsOptimizer != null) {
+            switchFpsOptimizer.setChecked(fs.isFpsOptimizerEnabled());
+            switchFpsOptimizer.setOnCheckedChangeListener((btn, checked) -> {
+                fs.setFpsOptimizerEnabled(checked);
+                // Re-evaluate immediately so the choice applies to a session already running,
+                // not only to the next launch.
+                org.chimeramc.client.core.minecraft.FpsOptimizationService.apply();
+            });
+        }
+
         setupCurseForgeKeyRow();
     }
 
@@ -450,6 +461,7 @@ public class SettingsActivity extends BaseActivity {
         if (reduceLatency != null) {
             reduceLatency.setChecked(fs.isReduceNetworkLatencyEnabled());
         }
+        org.chimeramc.client.core.minecraft.FpsOptimizationService.apply();
         org.chimeramc.client.launcher.controller.ControllerInputProcessor.reload(this);
     }
 
@@ -1099,6 +1111,14 @@ public class SettingsActivity extends BaseActivity {
             switchReduceNetworkLatency.setThumbTintList(new ColorStateList(states, new int[]{accent, 0xFFAAAAAA}));
             int trackChecked = Color.argb(100, Color.red(accent), Color.green(accent), Color.blue(accent));
             switchReduceNetworkLatency.setTrackTintList(new ColorStateList(states, new int[]{trackChecked, 0xFF555555}));
+        }
+
+        SwitchMaterial switchFpsOptimizer = findViewById(R.id.switch_fps_optimizer);
+        if (switchFpsOptimizer != null && accent != 0) {
+            int[][] states = {{android.R.attr.state_checked}, {}};
+            switchFpsOptimizer.setThumbTintList(new ColorStateList(states, new int[]{accent, 0xFFAAAAAA}));
+            int trackChecked = Color.argb(100, Color.red(accent), Color.green(accent), Color.blue(accent));
+            switchFpsOptimizer.setTrackTintList(new ColorStateList(states, new int[]{trackChecked, 0xFF555555}));
         }
 
         TextView navAppName = findViewById(R.id.nav_app_name);

@@ -447,12 +447,21 @@ val modsDir = modManager.currentVersion?.modsDir?.absolutePath
             trace.mark("Shader compatibility fixer skipped", "32-bit device")
             return
         }
+        if (!LibBindings.isAvailable()) {
+            listener.onLog("Shader compatibility fixer unavailable on this build")
+            trace.mark("Shader compatibility fixer skipped", "native library missing")
+            return
+        }
         listener.onLog("Loading shader compatibility fixer (mtbinloader2)")
         trace.mark("Shader compatibility fixer load started")
         try {
+            // The fixer is range-gated: it needs the version up front or it cannot tell which
+            // material-bin revision it is looking at. Setting it first is what makes the two
+            // autofixers below actually engage.
+            LibBindings.applyAutofixVersions(version.versionCode)
             LibBindings.setLightmapAutofixer(true)
             LibBindings.setTextureLodAutofixer(true)
-            listener.onLog("Shader compatibility fixer loaded")
+            listener.onLog("Shader compatibility fixer loaded for ${version.versionCode}")
             trace.mark("Shader compatibility fixer load finished")
         } catch (throwable: Throwable) {
             listener.onLog("Failed to load shader compatibility fixer: ${throwable.message ?: throwable.javaClass.simpleName}")

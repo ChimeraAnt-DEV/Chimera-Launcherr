@@ -58,11 +58,18 @@ public final class PlaytimeManager {
                 .putLong(KEY_ACTIVE_START, sActiveStartElapsed)
                 .apply();
         LowLatencyNetworkManager.setGameSessionActive(true);
+        // A fresh session clears any memory-pressure reading left over from the last one, then
+        // re-evaluates so the FPS optimizer's quiet window starts with the game.
+        FpsOptimizationService.setLowMemory(false);
+        FpsOptimizationService.apply();
     }
 
     public static void heartbeat() {
         if (sActiveProfileId == null) return;
         accumulateNow();
+        // Thermal severity and battery saver change while the game runs, so the optimizer is
+        // re-evaluated on the same heartbeat that keeps playtime fresh.
+        FpsOptimizationService.apply();
     }
 
     public static void stopSession() {

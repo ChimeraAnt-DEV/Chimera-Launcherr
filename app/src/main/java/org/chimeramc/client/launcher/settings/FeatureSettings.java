@@ -13,6 +13,7 @@ public class FeatureSettings {
     private boolean foregroundServiceEnabled = false;
     private Boolean gxcoreEnabled = false;
     private boolean reduceNetworkLatencyEnabled = false;
+    private boolean fpsOptimizerEnabled = false;
 
     public enum StorageType {
         INTERNAL,
@@ -79,6 +80,17 @@ public class FeatureSettings {
 
     public boolean isGxCoreEnabled() { return gxcoreEnabled != null && gxcoreEnabled; }
     public void setGxCoreEnabled(boolean enabled) { this.gxcoreEnabled = enabled; autoSave(); }
+
+    /**
+     * Whether the FPS optimization module may quiet the host during a session.
+     *
+     * <p>Off by default, like anti stick drift: enabling it changes how the launcher behaves on
+     * every launch, so an existing setup cannot be altered silently. It only ever reduces
+     * launcher-side work during a session -- see {@code FpsOptimizer} for what that does and,
+     * more importantly, what it deliberately does not do.
+     */
+    public boolean isFpsOptimizerEnabled() { return fpsOptimizerEnabled; }
+    public void setFpsOptimizerEnabled(boolean enabled) { this.fpsOptimizerEnabled = enabled; autoSave(); }
 
     public boolean isReduceNetworkLatencyEnabled() { return reduceNetworkLatencyEnabled; }
     public void setReduceNetworkLatencyEnabled(boolean enabled) {
