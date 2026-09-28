@@ -232,4 +232,10 @@ Chimera Client is an independent project. It stands on the shoulders of the open
 
 **Made with ❤️ by the Chimera Team Community**
 
+<br>
+
+<sub><span style="color: #808080;">All rights reserved.</span></sub>
+
+<sub><span style="color: #808080;">This account is shared among the 20 members of the Official ChimeraTeam.</span></sub>
+
 </div>
