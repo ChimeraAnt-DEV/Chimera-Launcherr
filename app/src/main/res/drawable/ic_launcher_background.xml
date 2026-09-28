@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Adaptive-icon background: the new launcher art's own purple gradient, sampled from the
+    top-left and bottom-right of the source icon. The foreground layer carries the same
+    gradient full-bleed, so this is the fallback surface for masks that expose it.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="315"
+        android:startColor="#221958"
+        android:endColor="#7E32AA" />
+</shape>
