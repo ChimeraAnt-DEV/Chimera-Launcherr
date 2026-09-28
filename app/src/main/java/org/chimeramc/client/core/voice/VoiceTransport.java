@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * bytes to send; {@link VoiceProtocol} owns the meaning. That split keeps the protocol testable
  * off a network and this class small.
  */
-public final class VoiceTransport {
+public final class VoiceTransport implements VoiceLink {
 
     private static final String TAG = "VoiceTransport";
 
@@ -37,10 +37,11 @@ public final class VoiceTransport {
     public static final String GROUP = "239.255.42.99";
     public static final int PORT = 47901;
 
-    /** What a received datagram triggers. Runs on the receive thread. */
-    public interface Listener {
-        void onDatagram(byte[] data, int length);
-        void onStopped(String reason);
+    /**
+     * What a received datagram triggers. Kept as its own name for the existing call sites; it is
+     * the same contract as {@link VoiceLink.Listener}.
+     */
+    public interface Listener extends VoiceLink.Listener {
     }
 
     private final Context context;
@@ -56,6 +57,7 @@ public final class VoiceTransport {
     }
 
     /** Opens the socket and starts receiving; returns false when the network refuses. */
+    @Override
     public boolean start() {
         if (running.get()) return true;
         try {
@@ -93,11 +95,13 @@ public final class VoiceTransport {
         }
     }
 
+    @Override
     public boolean isRunning() {
         return running.get();
     }
 
     /** Sends one datagram to the group; a failure is reported as false, never thrown. */
+    @Override
     public boolean send(byte[] data) {
         MulticastSocket target = socket;
         if (target == null || data == null || data.length == 0) return false;
@@ -139,6 +143,7 @@ public final class VoiceTransport {
         }
     }
 
+    @Override
     public void stop() {
         if (!running.compareAndSet(true, false)) {
             closeQuietly();

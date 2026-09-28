@@ -39,20 +39,51 @@ public final class VoiceChatModule {
 
     private static volatile VoiceChatModule instance;
 
+    /** Frames of jitter buffer kept per peer; the relay's own default depth is well under this. */
+    private static final int JITTER_CAPACITY = VoiceJitterBuffer.MAX_DEPTH * 4;
+
     private final Context context;
     private final VoiceRegistry registry = new VoiceRegistry();
     private final VoiceMutes mutes = new VoiceMutes();
     private final String peerId;
     private final String displayName;
     private final VoiceAudioEngine audio = new VoiceAudioEngine();
-    private VoiceTransport transport;
+    private final VoiceMixer mixer = new VoiceMixer();
+    private final VoiceCodec codec = VoiceCodec.create();
+    /** One reorder buffer per peer; sequencing only means anything within one sender's stream. */
+    private final java.util.concurrent.ConcurrentHashMap<String, PeerStream> streams =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private VoiceLink transport;
     private PositionSource positionSource;
     private Thread beaconThread;
+    private Thread playbackThread;
     private volatile boolean running;
     private volatile boolean transmit = true;
     private volatile int sequence;
     private volatile long lastSendMs;
     private volatile String lastError;
+
+    /**
+     * One peer's receive state: where its frames wait and the gain to play them at.
+     *
+     * <p>The two transports queue differently. The relay's frames arrive out of order and need the
+     * {@link VoiceJitterBuffer}; the LAN's arrive in order, so a plain queue is right and adding
+     * 60&nbsp;ms of reorder latency to a link that has none would be pure loss. Either way the
+     * frame waits here and only the playback thread touches the mixer, so the receive thread and
+     * the mixer can never race on the same buffer.
+     */
+    private static final class PeerStream {
+        final VoiceJitterBuffer buffer = VoiceJitterBuffer.forRelay();
+        final java.util.concurrent.ConcurrentLinkedQueue<byte[]> pending =
+                new java.util.concurrent.ConcurrentLinkedQueue<>();
+        volatile boolean relayMode;
+        volatile float gain = 1f;
+        volatile long lastSeenMs;
+
+        byte[] nextFrame(long nowMs) {
+            return relayMode ? buffer.poll(nowMs) : pending.poll();
+        }
+    }
 
     private VoiceChatModule(Context context, String displayName) {
         this.context = context.getApplicationContext();
@@ -125,9 +156,68 @@ public final class VoiceChatModule {
         return lastError;
     }
 
-    /** True while no position feed is installed, so distance cannot be applied. */
+    /**
+     * True while no position feed is installed at all, so distance can never be applied.
+     *
+     * <p>This is the persistent state; for "can I read a position this frame" use
+     * {@link #hasLivePosition()}, which is false here <em>and</em> whenever the fail-closed native
+     * read has nothing live to report.
+     */
     public boolean isChannelMode() {
         return positionSource == null;
+    }
+
+    /**
+     * Whether a position can be read <em>right now</em>, as opposed to whether a feed is installed.
+     *
+     * <p>The feed is fail-closed: with no world loaded — before the first frame, during a loading
+     * screen, after leaving a session — the native read returns null. That is a different state
+     * from "no feed", and treating it as a real origin would make the distance rule fire against
+     * a phantom (0,0,0) and mute or mis-gain every peer. So the live read, not the field, decides.
+     */
+    public boolean hasLivePosition() {
+        return sanitizePosition(readFromSource()) != null;
+    }
+
+    /** The local position, or the origin when no live read is possible. */
+    private float[] localPosition() {
+        float[] value = readLocalPosition();
+        return value != null ? value : new float[]{0f, 0f, 0f};
+    }
+
+    /**
+     * The local position, or null when the feed is absent or has nothing live to report.
+     *
+     * <p>Callers that apply the distance rule must use this, not the origin-returning
+     * {@link #localPosition()}: the origin is only meaningful on the wire, never as "where the
+     * player is".
+     */
+    private float[] readLocalPosition() {
+        return sanitizePosition(readFromSource());
+    }
+
+    private float[] readFromSource() {
+        PositionSource source = positionSource;
+        if (source == null) return null;
+        try {
+            return source.read();
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * Accepts a raw feed value only when it is three finite numbers; otherwise null. A NaN from a
+     * torn native read would otherwise propagate through the distance math and produce NaN gain,
+     * which silences audio with no diagnosable cause. Pure, so the fail-closed rule is testable.
+     */
+    static float[] sanitizePosition(float[] raw) {
+        if (raw == null || raw.length < 3) return null;
+        if (Float.isNaN(raw[0]) || Float.isNaN(raw[1]) || Float.isNaN(raw[2])) return null;
+        if (Float.isInfinite(raw[0]) || Float.isInfinite(raw[1]) || Float.isInfinite(raw[2])) {
+            return null;
+        }
+        return raw;
     }
 
     /**
@@ -158,18 +248,8 @@ public final class VoiceChatModule {
         audio.setFrameSink(this::onCapturedFrame);
         audio.setVolumePercent(manager.getVoiceVolumePercent());
 
-        transport = new VoiceTransport(context, new VoiceTransport.Listener() {
-            @Override
-            public void onDatagram(byte[] data, int length) {
-                VoiceChatModule.this.onDatagram(data, length);
-            }
-
-            @Override
-            public void onStopped(String reason) {
-                lastError = reason;
-            }
-        });
-        if (!transport.start()) {
+        transport = createLink(manager);
+        if (transport == null || !transport.start()) {
             audio.stop();
             transport = null;
             lastError = "could not open the network";
@@ -180,7 +260,73 @@ public final class VoiceChatModule {
         beaconThread = new Thread(this::beaconLoop, "voice-beacon");
         beaconThread.setDaemon(true);
         beaconThread.start();
+        playbackThread = new Thread(this::playbackLoop, "voice-mix");
+        playbackThread.setDaemon(true);
+        playbackThread.start();
         return true;
+    }
+
+    /**
+     * Builds the link the session should run on.
+     *
+     * <p>Relay when the player has enabled it and given a usable address, multicast otherwise.
+     * A configured-but-unparseable address falls back to multicast rather than failing the whole
+     * module: the LAN path is always available, so a typo in the server field degrades to "works
+     * at home" instead of "voice is broken".
+     */
+    private VoiceLink createLink(InbuiltModManager manager) {
+        if (manager != null && manager.isVoiceRelayEnabled()) {
+            VoiceRelayAddress parsed = VoiceRelayAddress.parse(manager.getVoiceRelayAddress());
+            if (parsed != null) {
+                return new VoiceRelayTransport(parsed, displayName,
+                        manager.getVoiceRelayPassword(), currentChannel(), new VoiceLink.Listener() {
+                    @Override
+                    public void onDatagram(byte[] data, int length) {
+                        VoiceChatModule.this.onDatagram(data, length);
+                    }
+
+                    @Override
+                    public void onStopped(String reason) {
+                        lastError = reason;
+                    }
+                });
+            }
+            lastError = "relay address is not valid; using LAN";
+        }
+        return new VoiceTransport(context, new VoiceTransport.Listener() {
+            @Override
+            public void onDatagram(byte[] data, int length) {
+                VoiceChatModule.this.onDatagram(data, length);
+            }
+
+            @Override
+            public void onStopped(String reason) {
+                lastError = reason;
+            }
+        });
+    }
+
+    /** Whether the running (or last-started) session is on the relay rather than the LAN. */
+    public boolean isRelayMode() {
+        return transport instanceof VoiceRelayTransport;
+    }
+
+    /** The relay's connection state, for the status line; false on the LAN transport. */
+    public boolean isRelayConnected() {
+        VoiceLink link = transport;
+        return link instanceof VoiceRelayTransport && ((VoiceRelayTransport) link).isConnected();
+    }
+
+    /** The server-assigned client id, or 0 on the LAN transport / before the handshake. */
+    public long relayClientId() {
+        VoiceLink link = transport;
+        return link instanceof VoiceRelayTransport ? ((VoiceRelayTransport) link).clientId() : 0L;
+    }
+
+    /** True while the audio path is encoding to Opus (the relay) rather than sending raw PCM. */
+    public boolean isUsingOpus() {
+        VoiceLink link = transport;
+        return link != null && link.prefersOpus() && codec.isAvailable();
     }
 
     public synchronized void stop() {
@@ -199,12 +345,23 @@ public final class VoiceChatModule {
                 Thread.currentThread().interrupt();
             }
         }
+        Thread playback = playbackThread;
+        playbackThread = null;
+        if (playback != null) {
+            playback.interrupt();
+            try {
+                playback.join(400);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
         if (transport != null) {
             transport.stop();
             transport = null;
         }
         audio.stop();
         registry.clear();
+        streams.clear();
     }
 
     public void applyConfig(InbuiltModManager manager) {
@@ -279,56 +436,78 @@ public final class VoiceChatModule {
     }
 
     private void sendBeacon() {
-        VoiceTransport active = transport;
+        VoiceLink active = transport;
         if (active == null) return;
         float[] position = localPosition();
-        active.send(VoiceProtocol.encodeBeacon(peerId, displayName, currentChannel(),
-                currentChannelVisibility(), currentChannelName(), currentChannelCapacity(),
-                localLevel(), localSelfMuted(),
+        active.send(encodeOutgoing(VoiceProtocol.TYPE_BEACON, null,
                 position[0], position[1], position[2], sequence++));
     }
 
     private void sendBye() {
-        VoiceTransport active = transport;
+        VoiceLink active = transport;
         if (active == null) return;
         float[] position = localPosition();
-        active.send(VoiceProtocol.encodeBye(peerId, displayName, currentChannel(),
-                currentChannelVisibility(), currentChannelName(),
-                position[0], position[1], position[2]));
+        active.send(encodeOutgoing(VoiceProtocol.TYPE_BYE, null,
+                position[0], position[1], position[2], 0));
     }
 
-    /** The local position, or the origin when no source is installed (channel mode). */
-    private float[] localPosition() {
-        PositionSource source = positionSource;
-        if (source == null) return new float[]{0f, 0f, 0f};
-        try {
-            float[] value = source.read();
-            return value != null && value.length >= 3 ? value : new float[]{0f, 0f, 0f};
-        } catch (Throwable t) {
-            return new float[]{0f, 0f, 0f};
+    /**
+     * Frames one outgoing packet, on whichever transport is active.
+     *
+     * <p>The LAN transport keeps the v3 shape with raw PCM so an existing local peer is unaffected;
+     * the relay uses v4, carrying the server-assigned client id and the codec byte. Keeping the
+     * branch here — one place that knows the transport's format — means the session logic above it
+     * never has to.
+     */
+    private byte[] encodeOutgoing(byte type, byte[] payload, float x, float y, float z, int seq) {
+        VoiceLink active = transport;
+        byte codecByte = payload != null && isUsingOpus()
+                ? VoiceProtocol.CODEC_OPUS : VoiceProtocol.CODEC_PCM;
+        if (active instanceof VoiceRelayTransport) {
+            VoiceRelayTransport relay = (VoiceRelayTransport) active;
+            return VoiceProtocol.encodeRelayBeacon(relay.clientId(), type, peerId, displayName,
+                    currentChannel(), currentChannelVisibility(), currentChannelName(),
+                    currentChannelCapacity(), localLevel(), localSelfMuted(),
+                    x, y, z, seq, codecByte, payload);
         }
+        return VoiceProtocol.encodeLegacy(type, peerId, displayName, currentChannel(),
+                currentChannelVisibility(), currentChannelName(), currentChannelCapacity(),
+                localLevel(), localSelfMuted(), x, y, z, seq, payload);
     }
 
     private void onCapturedFrame(byte[] pcm, int length) {
-        VoiceTransport active = transport;
+        VoiceLink active = transport;
         if (active == null || !running) return;
         long now = android.os.SystemClock.uptimeMillis();
         lastSendMs = now;
         float[] position = localPosition();
-        active.send(VoiceProtocol.encodeAudio(peerId, displayName, currentChannel(),
-                currentChannelVisibility(), currentChannelName(), currentChannelCapacity(),
-                localLevel(), localSelfMuted(),
-                position[0], position[1], position[2], sequence++, pcm));
+
+        byte[] payload = pcm;
+        int payloadLength = length;
+        if (isUsingOpus()) {
+            byte[] encoded = codec.encode(pcm, length);
+            if (encoded == null) return; // a failed encode drops one frame, never falls back mid-stream
+            payload = encoded;
+            payloadLength = encoded.length;
+        }
+        byte[] frame = new byte[payloadLength];
+        System.arraycopy(payload, 0, frame, 0, payloadLength);
+
+        active.send(encodeOutgoing(VoiceProtocol.TYPE_AUDIO, frame,
+                position[0], position[1], position[2], sequence++));
     }
 
     private void onDatagram(byte[] data, int length) {
         VoiceProtocol.Packet packet = VoiceProtocol.decode(data);
         if (packet == null) return;
-        if (peerId.equals(packet.peerId)) return; // our own echo
+        // On the LAN our own multicast echo is filtered by the transport; on the relay the server
+        // rewrites the sender id, so the peer id is still the reliable "is this me" test.
+        if (peerId.equals(packet.peerId)) return;
 
         long now = android.os.SystemClock.uptimeMillis();
         if (packet.type == VoiceProtocol.TYPE_BYE) {
             registry.remove(packet.peerId);
+            streams.remove(packet.peerId);
             return;
         }
 
@@ -343,24 +522,104 @@ public final class VoiceChatModule {
 
         if (packet.type == VoiceProtocol.TYPE_AUDIO) {
             registry.put(peer);
-            // A peer the listener muted locally is not mixed in; they are never told. The beacon
-            // they keep sending already carries their self-mute state, so this only has to cover
-            // the local mute. Their self-mute needs no handling here: the microphone being off
-            // means no audio frames arrive at all.
+            // A peer the listener muted locally is not mixed in; they are never told. Their own
+            // self-mute needs no handling here: the microphone being off means no frames arrive.
             if (mutes.isMuted(packet.peerId)) {
+                streams.remove(packet.peerId);
                 return;
             }
-            String listenerChannel = currentChannel();
-            float gain;
-            if (isChannelMode()) {
-                gain = VoiceChannel.canHear(listenerChannel, channel) ? 1f : 0f;
+            PeerStream stream = streams.computeIfAbsent(packet.peerId, k -> new PeerStream());
+            stream.gain = gainFor(packet, channel);
+            stream.lastSeenMs = now;
+
+            byte[] pcm = packet.isOpus() ? codec.decode(packet.payload, packet.payload.length)
+                    : packet.payload;
+            if (pcm == null) return; // a frame that would not decode is dropped, not substituted
+            // The LAN path arrives in order and needs no reordering; only the relay path buffers.
+            // Feeding a LAN stream through a buffer would add 60 ms of latency for nothing.
+            if (transport instanceof VoiceRelayTransport) {
+                stream.relayMode = true;
+                stream.buffer.offer(packet.sequence, pcm, now);
             } else {
-                float[] position = localPosition();
-                float distance = (float) Math.sqrt(
-                        sq(packet.x - position[0]) + sq(packet.y - position[1]) + sq(packet.z - position[2]));
-                gain = VoiceChannel.gain(distance, currentRange(), listenerChannel, channel);
+                stream.relayMode = false;
+                // Bound the queue so a peer flooding faster than 50 fps cannot grow it without end.
+                if (stream.pending.size() < 64) {
+                    stream.pending.add(pcm);
+                }
             }
-            audio.play(packet.payload, packet.payload.length, gain);
+        }
+    }
+
+    /** The gain a peer's audio should be played at, from distance and channel. */
+    private float gainFor(VoiceProtocol.Packet packet, String channel) {
+        return gainFor(packet, channel, currentChannel(), currentRange(), readLocalPosition());
+    }
+
+    /**
+     * The gain decision, as a pure function of the live position.
+     *
+     * <p>Separated from {@link #gainFor} so the three states — no feed, no live read, and a real
+     * position — are unit-testable without a device or a running session. The middle state is the
+     * one that matters: the native feed is fail-closed, so a frame arriving between world loads
+     * has no position, and measuring it against a phantom origin would drop audio that should be
+     * playing. With no position the channel rule stands in, which is the module's documented
+     * channel mode; it is never silently "distance from (0,0,0)".
+     */
+    static float gainFor(VoiceProtocol.Packet packet, String channel, String listenerChannel,
+                         float rangeBlocks, float[] position) {
+        if (!VoiceChannel.canHear(listenerChannel, channel)) {
+            return 0f;
+        }
+        if (position == null) {
+            return 1f;
+        }
+        float distance = (float) Math.sqrt(
+                sq(packet.x - position[0]) + sq(packet.y - position[1]) + sq(packet.z - position[2]));
+        return VoiceChannel.gain(distance, rangeBlocks, listenerChannel, channel);
+    }
+
+    /**
+     * Pumps the mixer and every jitter buffer on a fixed clock.
+     *
+     * <p>Playback must be paced by the audio device's frame rate, not by packet arrival: releasing
+     * on arrival is what produces choppy audio over a jittery link. Every tick this drains one
+     * frame from each peer's reorder buffer, mixes them into a single frame, and writes it once.
+     * That also fixes the multi-talker case — two people at once are summed here instead of two
+     * interleaved {@code AudioTrack} writes.
+     */
+    private void playbackLoop() {
+        long nextTick = android.os.SystemClock.uptimeMillis();
+        while (running) {
+            nextTick += VoiceAudioEngine.FRAME_MS;
+            long now = android.os.SystemClock.uptimeMillis();
+            long wait = nextTick - now;
+            if (wait > 0) {
+                try {
+                    Thread.sleep(wait);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            } else if (wait < -VoiceAudioEngine.FRAME_MS * 4) {
+                // Fell far behind (a stalled thread); resync rather than trying to catch up.
+                nextTick = now;
+            }
+
+            long stamp = android.os.SystemClock.uptimeMillis();
+            mixer.clear();
+            for (java.util.Map.Entry<String, PeerStream> entry : streams.entrySet()) {
+                PeerStream stream = entry.getValue();
+                if (stamp - stream.lastSeenMs > 2000) {
+                    streams.remove(entry.getKey(), stream);
+                    continue;
+                }
+                byte[] frame = stream.nextFrame(stamp);
+                if (frame != null) {
+                    mixer.add(frame, frame.length, stream.gain);
+                }
+            }
+            mixer.setFrameBytes(VoiceAudioEngine.FRAME_BYTES);
+            mixer.mixInto((pcm, len) -> audio.play(pcm, len, 1f));
         }
     }
 
@@ -402,6 +661,21 @@ public final class VoiceChatModule {
             if (peerId.equals(peer.id)) return peer;
         }
         return null;
+    }
+
+    /** The audio engine, for the relay/codec status line and the mic meter. */
+    public boolean isOpusCodecAvailable() {
+        return codec.isAvailable();
+    }
+
+    /** The last failure reason, or null. */
+    public String transportError() {
+        VoiceLink link = transport;
+        if (link instanceof VoiceRelayTransport) {
+            String error = ((VoiceRelayTransport) link).lastError();
+            if (error != null) return error;
+        }
+        return lastError;
     }
 
     // --- Per-member client-side mute ------------------------------------------------------
@@ -461,8 +735,8 @@ public final class VoiceChatModule {
 
     /** Peers currently audible, for the overlay. */
     public List<VoiceRegistry.Audible> audibleNow() {
-        float[] position = localPosition();
-        if (!isChannelMode()) {
+        float[] position = readLocalPosition();
+        if (position != null) {
             return registry.audible(position[0], position[1], position[2],
                     currentChannel(), currentRange());
         }

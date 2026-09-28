@@ -1490,6 +1490,8 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="voice_channel_kind_public">Public - listed for nearby players, anyone can join</string>
     <string name="voice_channel_kind_public_capped" formatted="false">Public - up to %1$d players, listed for nearby players</string>
     <string name="voice_channel_kind_private" formatted="false">Private - code %1$s, share it to invite</string>
+    <string name="voice_proximity_on">Distance applies - read from your world position; louder up close, silent past your hearing range</string>
+    <string name="voice_proximity_waiting">All audible players are at full volume - no world position yet (loading, or not in a world). Distance applies once you are in a world.</string>
     <string name="voice_channel_name_hint">Channel name</string>
     <string name="voice_channel_public">Public</string>
     <string name="voice_channel_private_short">Private</string>
@@ -1513,6 +1515,19 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="voice_joined_channel" formatted="false">Joined %1$s</string>
     <string name="voice_public_directory">Public channels nearby</string>
     <string name="voice_directory_empty">No public channels are advertising nearby yet. Private channels never appear here - join one with its code.</string>
+
+    <!-- Relay server (internet voice) -->
+    <string name="voice_relay_title">Relay server</string>
+    <string name="voice_relay_address_hint">host or host:port (e.g. voice.example.com:47902)</string>
+    <string name="voice_relay_password_hint">Server password (optional)</string>
+    <string name="voice_relay_apply">Apply &amp; reconnect</string>
+    <string name="voice_relay_off">LAN only - not using a relay server</string>
+    <string name="voice_relay_connecting">Connecting to %1$s\u2026</string>
+    <string name="voice_relay_connected_codec">Connected to %1$s as client %2$d \u00b7 %3$s</string>
+    <string name="voice_relay_address_invalid">Enter a host or host:port, e.g. voice.example.com:47902</string>
+    <string name="voice_relay_reconnecting">Reconnecting to %1$s\u2026</string>
+    <string name="voice_relay_error">%1$s</string>
+    <string name="voice_relay_scope_note">The relay forwards voice between players who are not on the same Wi-Fi. Leave this off to stay on the local network. Audio is Opus-compressed and is not end-to-end encrypted - the server carries your voice, so only use one you trust.</string>
     <string name="voice_directory_current" formatted="false">%1$s (you are here)</string>
     <string name="voice_leave_channel">Leave channel (back to world)</string>
     <string name="voice_copy_code">Copy code</string>
