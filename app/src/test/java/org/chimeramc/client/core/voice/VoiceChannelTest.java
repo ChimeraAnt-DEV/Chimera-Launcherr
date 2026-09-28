@@ -102,10 +102,10 @@ public class VoiceChannelTest {
     @Test
     public void isJoinCodeRejectsPlainNamesAndMalformedCodes() {
         assertFalse(VoiceChannel.isJoinCode("team"));
-        assertFalse(VoiceChannel.isJoinCode("CHIMERA-TOOLONG"));
-        assertFalse(VoiceChannel.isJoinCode("CHIMERA-"));
-        assertFalse(VoiceChannel.isJoinCode("CHIMERA-OOOO")); // ambiguous letters are not in the alphabet
-        assertTrue(VoiceChannel.isJoinCode(" chimera-7f2q "));
+        assertFalse(VoiceChannel.isJoinCode("GLOWBERRY-TOOLONG"));
+        assertFalse(VoiceChannel.isJoinCode("GLOWBERRY-"));
+        assertFalse(VoiceChannel.isJoinCode("GLOWBERRY-OOOO")); // ambiguous letters are not in the alphabet
+        assertTrue(VoiceChannel.isJoinCode(" glowberry-7f2q "));
     }
 
     @Test

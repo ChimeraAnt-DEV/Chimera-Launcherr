@@ -25,7 +25,7 @@
             <ImageView
                 android:layout_width="32dp"
                 android:layout_height="32dp"
-                android:src="@drawable/ic_chimera_ant" />
+                android:src="@drawable/ic_glowberry_logo" />
 
             <TextView
                 android:id="@+id/title"

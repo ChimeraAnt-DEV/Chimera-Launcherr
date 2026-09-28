@@ -5,7 +5,6 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.content.Intent;
-import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
@@ -426,8 +425,9 @@ public class SplashActivity extends BaseActivity {
     private void applySplashTheme() {
         int accent = resolveAccentColor();
         binding.tvAppName.setTextColor(accent);
-        // The ant is drawn as a white vector so it can follow the user's accent.
-        binding.imgLeaf.setImageTintList(ColorStateList.valueOf(accent));
+        // The Glowberry mark is full-colour art, so it keeps its own palette; only the wordmark
+        // and the halo follow the user's accent.
+        binding.imgLeaf.setImageTintList(null);
         binding.logoGlow.setBackground(createRadialGlow(accent));
         binding.tvPreparing.setTextColor(blendColors(
                 getColor(R.color.text_secondary),

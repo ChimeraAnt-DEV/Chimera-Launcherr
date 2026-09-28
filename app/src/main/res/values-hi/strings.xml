@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Common -->
-    <string name="app_name">Chimera Client</string>
+    <string name="app_name">GlowberryClient</string>
     <string name="minecraft">Minecraft</string>
     <string name="launch">लॉन्च करें</string>
     <string name="beta_badge">बीटा</string>
@@ -23,7 +23,7 @@
 
     <!-- About -->
     <string name="about_title">☕ बारे में</string>
-    <string name="copyright">©2024–2026 ChimeraMC. सर्वाधिकार सुरक्षित।</string>
+    <string name="copyright">©2024–2026 GlowberryClient. सर्वाधिकार सुरक्षित।</string>
     <string name="font_license">यह ऐप Misans फ़ॉन्ट का उपयोग करता है।</string>
     <string name="about_footer_github">GitHub: https://github.com/ChimeraAnt-DEV/ChimeraLauncher</string>
     <string name="quick_actions_title">त्वरित कार्य</string>
@@ -61,7 +61,7 @@
 
     <!-- Permissions -->
     <string name="storage_permission_title">स्टोरेज माइग्रेशन अनुमति</string>
-    <string name="storage_permission_message">कृपया Chimera Client को पुराने games/org.chimeramc फ़ोल्डर से डेटा कॉपी करने के लिए स्टोरेज अनुमति दें। यह अनुमति केवल माइग्रेशन चरण के लिए आवश्यक है।</string>
+    <string name="storage_permission_message">कृपया GlowberryClient को पुराने games/org.chimeramc फ़ोल्डर से डेटा कॉपी करने के लिए स्टोरेज अनुमति दें। यह अनुमति केवल माइग्रेशन चरण के लिए आवश्यक है।</string>
     <string name="grant_permission">अनुमति दें</string>
     <string name="cancel">रद्द करें</string>
 
@@ -160,7 +160,7 @@
     <string name="repair_processing">लाइब्रेरीज़ निकाली जा रही हैं…</string>
     <string name="repair_finalizing">मरम्मत पूरी की जा रही है…</string>
     <string name="storage_migration_title">स्टोरेज माइग्रेशन आवश्यक है</string>
-    <string name="storage_migration_message">Chimera Client को जारी रखने से पहले games/org.chimeramc से डेटा %1$s में माइग्रेट करना होगा।
+    <string name="storage_migration_message">GlowberryClient को जारी रखने से पहले games/org.chimeramc से डेटा %1$s में माइग्रेट करना होगा।
 
 यह स्टोरेज बदलाव Google Play पर प्रकाशित करने की आवश्यकताओं को पूरा करने के लिए जरूरी है। पुराना फ़ोल्डर जस का तस रहेगा, लेकिन माइग्रेशन के बाद उसका उपयोग नहीं होगा।
 
@@ -182,11 +182,11 @@
 
 पुराना games/org.chimeramc फ़ोल्डर हटाया नहीं गया और अब उपयोग नहीं होगा।</string>
     <string name="storage_migration_partial_title">माइग्रेशन अधूरा है</string>
-    <string name="storage_migration_partial_message">%2$d में से %1$d फ़ाइलें कॉपी नहीं हो सकीं। Chimera Client जारी रखने से पहले माइग्रेशन पूरा होना चाहिए।</string>
+    <string name="storage_migration_partial_message">%2$d में से %1$d फ़ाइलें कॉपी नहीं हो सकीं। GlowberryClient जारी रखने से पहले माइग्रेशन पूरा होना चाहिए।</string>
     <string name="storage_migration_failed_title">माइग्रेशन विफल</string>
     <string name="storage_migration_failed_message">माइग्रेशन जारी नहीं रह सका: %1$s
 
-Chimera Client जारी रखने से पहले माइग्रेशन पूरा होना चाहिए।</string>
+GlowberryClient जारी रखने से पहले माइग्रेशन पूरा होना चाहिए।</string>
     <string name="migration_cleanup_title">पुरानी डायरेक्टरी साफ़ करें</string>
     <string name="migration_cleanup_desc">पुरानी games/org.chimeramc डायरेक्टरी को तभी हटाएँ जब आपने पुष्टि कर ली हो कि सभी इंस्टेंस सामान्य रूप से शुरू होते हैं और world, resource pack, behavior pack या settings गायब नहीं हैं। हटाए गए पुराने डेटा को इस डायरेक्टरी से वापस नहीं लाया जा सकेगा।</string>
     <string name="migration_cleanup_button">पुरानी डायरेक्टरी साफ़ करें</string>
@@ -211,8 +211,8 @@ Chimera Client जारी रखने से पहले माइग्र�
 
     <string name="error_no_browser">कोई ब्राउज़र उपलब्ध नहीं है</string>
 
-    <string name="eula_title">Chimera Client लाइसेंस समझौता</string>
-    <string name="eula_message"><b>Chimera Client में आपका स्वागत है</b>\n\nइस सॉफ़्टवेयर का उपयोग करके आप सहमत हैं:\n\n• यह एक <b>अनौपचारिक</b> Minecraft लॉन्चर है\n• आपके पास Minecraft की एक <b>लाइसेंस प्राप्त</b> प्रति होनी चाहिए\n• किसी भी प्रकार की पायरेसी या धोखाधड़ी निषिद्ध है\n• मॉड्स/रिसोर्स पैक्स का उपयोग आपके अपने जोखिम पर है\n• Mojang/Microsoft से संबद्ध नहीं है\n\nनिरंतर उपयोग समझौते का गठन करता है</string>
+    <string name="eula_title">GlowberryClient लाइसेंस समझौता</string>
+    <string name="eula_message"><b>GlowberryClient में आपका स्वागत है</b>\n\nइस सॉफ़्टवेयर का उपयोग करके आप सहमत हैं:\n\n• यह एक <b>अनौपचारिक</b> Minecraft लॉन्चर है\n• आपके पास Minecraft की एक <b>लाइसेंस प्राप्त</b> प्रति होनी चाहिए\n• किसी भी प्रकार की पायरेसी या धोखाधड़ी निषिद्ध है\n• मॉड्स/रिसोर्स पैक्स का उपयोग आपके अपने जोखिम पर है\n• Mojang/Microsoft से संबद्ध नहीं है\n\nनिरंतर उपयोग समझौते का गठन करता है</string>
     <string name="eula_agree">स्वीकार करें</string>
     <string name="eula_exit">अस्वीकार करें</string>
 
@@ -453,7 +453,7 @@ Chimera Client जारी रखने से पहले माइग्र�
     <string name="ms_active_badge">सक्रिय</string>
     <string name="ms_account_subtitle_format">यूज़र आईडी: %1$s • अपडेट किया गया: %2$s</string>
     <string name="xbox_avatar">Xbox अवतार</string>
-    <string name="launcher_managed_mc_login">Chimera Client के साथ Minecraft में साइन इन करें</string>
+    <string name="launcher_managed_mc_login">GlowberryClient के साथ Minecraft में साइन इन करें</string>
     <string name="dialog_title_login_required">साइन-इन आवश्यक है</string>
     <string name="dialog_message_login_required">लॉन्चर-प्रबंधित लॉगिन सक्षम है, लेकिन कोई खाता साइन इन नहीं है। साइन इन करने के लिए खातों में जाएं।</string>
     <string name="go_to_accounts">खाते</string>
@@ -672,25 +672,25 @@ Chimera Client जारी रखने से पहले माइग्र�
     <string name="vanilla_prefix">वैनिला %s</string>
 
     <string name="about_page_title">बारे में</string>
-    <string name="about_subtitle">Chimera Client — एक आधुनिक Minecraft Bedrock लॉन्चर</string>
+    <string name="about_subtitle">GlowberryClient — एक आधुनिक Minecraft Bedrock लॉन्चर</string>
     <string name="about_authors_title">👥 लेखक और मेंटेनर</string>
     <string name="about_author_name">DreamGuXiang</string>
     <string name="about_author_badge">लेखक</string>
-    <string name="about_author_role">Chimera Client के लेखक</string>
+    <string name="about_author_role">GlowberryClient के लेखक</string>
     <string name="about_afdian">Afdian</string>
     <string name="about_patreon">Patreon</string>
     <string name="about_source_title">सोर्स कोड और ओपन सोर्स</string>
-    <string name="about_github_repo">GitHub · Chimera Client</string>
+    <string name="about_github_repo">GitHub · GlowberryClient</string>
     <string name="about_github_org">ChimeraAnt-DEV</string>
     <string name="about_license_note">लाइसेंस विवरण के लिए रिपॉजिटरी में LICENSE देखें।</string>
     <string name="about_contribute_title">योगदान करें</string>
-    <string name="about_contribute_desc">Chimera Client को बेहतर बनाने के लिए Issues या Pull Requests के माध्यम से योगदान का स्वागत है।</string>
+    <string name="about_contribute_desc">GlowberryClient को बेहतर बनाने के लिए Issues या Pull Requests के माध्यम से योगदान का स्वागत है।</string>
     <string name="about_issues">Issue</string>
     <string name="about_star_fork">Star / Fork</string>
 
     <string-array name="launcher_tips">
         <item>सेटिंग्स आपको अपने सेटअप से मेल खाने के लिए थीम, रंग, पृष्ठभूमि और अन्य उपस्थिति विकल्पों को समायोजित करने देती है।</item>
-        <item>Chimera Client ओपन सोर्स है। लॉन्चर समस्याओं की रिपोर्ट करने या सुधार का सुझाव देने के लिए GitHub issues का उपयोग करें।</item>
+        <item>GlowberryClient ओपन सोर्स है। लॉन्चर समस्याओं की रिपोर्ट करने या सुधार का सुझाव देने के लिए GitHub issues का उपयोग करें।</item>
         <item>वर्तमान इंस्टेंस को जल्दी से स्विच करने के लिए संस्करण ड्रॉपडाउन का उपयोग करें।</item>
         <item>क्या लोग वास्तव में इन्हें पढ़ते हैं?</item>
         <item>आप मॉड्स को उनके लोड प्राथमिकता को फिर से क्रमित करने के लिए खींच सकते हैं।</item>
@@ -798,7 +798,7 @@ Chimera Client जारी रखने से पहले माइग्र�
     <string name="delete_account_title">खाता हटाएँ</string>
     <string name="delete_account_confirm">क्या आप वाकई यह खाता हटाना चाहते हैं?</string>
     <string name="instance_backup_title">इंस्टेंस बैकअप</string>
-    <string name="instance_backup_desc">इस इंस्टेंस का पूरा बैकअप Download/Chimera Client/Backups में बनाएँ।</string>
+    <string name="instance_backup_desc">इस इंस्टेंस का पूरा बैकअप Download/GlowberryClient/Backups में बनाएँ।</string>
     <string name="instance_backup_button">इंस्टेंस का बैकअप लें</string>
     <string name="instance_backup_confirm_message">क्या अभी इस इंस्टेंस का पूरा बैकअप बनाना है? यदि Minecraft चल रहा है तो पहले उसे बंद करें, ताकि बैकअप के दौरान फ़ाइलें न बदलें।</string>
     <string name="instance_backup_in_progress">इंस्टेंस का बैकअप लिया जा रहा है…</string>
@@ -837,9 +837,9 @@ Chimera Client जारी रखने से पहले माइग्र�
     <string name="ms_device_code_login_desc">पहले से भरे डिवाइस कोड के साथ एक निजी ब्राउज़र सत्र खोलें।</string>
     <string name="ms_webview_login">एम्बेडेड साइन-इन खोलें</string>
     <string name="ms_webview_option_title">एम्बेडेड WebView</string>
-    <string name="ms_webview_login_desc">Chimera Client छोड़े बिना साइन इन करें। जब ब्राउज़र प्रक्रिया उपलब्ध न हो तब इसका उपयोग करें।</string>
+    <string name="ms_webview_login_desc">GlowberryClient छोड़े बिना साइन इन करें। जब ब्राउज़र प्रक्रिया उपलब्ध न हो तब इसका उपयोग करें।</string>
     <string name="ms_device_code_title">डिवाइस कोड से साइन इन करें</string>
-    <string name="ms_device_code_instructions">Microsoft का डिवाइस साइन-इन पेज खोलें, यह कोड दर्ज करें और फिर एक्सेस स्वीकृत करें। Chimera Client अपने-आप पूरा कर देगा।</string>
+    <string name="ms_device_code_instructions">Microsoft का डिवाइस साइन-इन पेज खोलें, यह कोड दर्ज करें और फिर एक्सेस स्वीकृत करें। GlowberryClient अपने-आप पूरा कर देगा।</string>
     <string name="ms_device_code_label">Microsoft डिवाइस कोड</string>
     <string name="ms_device_code_requesting">सुरक्षित कोड का अनुरोध किया जा रहा है…</string>
     <string name="ms_device_code_waiting_code">--------</string>
@@ -853,7 +853,7 @@ Chimera Client जारी रखने से पहले माइग्र�
     <string name="ms_device_code_copied">कोड कॉपी किया गया</string>
     <string name="ms_device_code_open_browser">Microsoft साइन-इन खोलें</string>
     <string name="ms_device_code_step_title">अपने ब्राउज़र में साइन-इन पूरा करें</string>
-    <string name="ms_device_code_browser_note">Chimera Client आपके डिफ़ॉल्ट ब्राउज़र को निजी सत्र में खोलता है, कोड अपने-आप भरता है और नया Microsoft साइन-इन अनुरोध करता है।</string>
+    <string name="ms_device_code_browser_note">GlowberryClient आपके डिफ़ॉल्ट ब्राउज़र को निजी सत्र में खोलता है, कोड अपने-आप भरता है और नया Microsoft साइन-इन अनुरोध करता है।</string>
     <string name="ms_choose_other_method">अन्य तरीका</string>
     <string name="ms_no_browser">इस डिवाइस पर कोई ब्राउज़र उपलब्ध नहीं है।</string>
     <string name="ms_default_browser_no_private_mode">आपका डिफ़ॉल्ट ब्राउज़र निजी साइन-इन का समर्थन नहीं करता। इसे अपडेट करें या WebView लॉगिन का उपयोग करें।</string>
@@ -861,7 +861,7 @@ Chimera Client जारी रखने से पहले माइग्र�
     <string name="ms_login_state_failed">Microsoft साइन-इन प्रतिक्रिया सत्यापित नहीं की जा सकी। फिर से साइन-इन शुरू करें।</string>
     <string name="ms_login_missing_code">Microsoft ने साइन-इन कोड नहीं दिया। फिर से साइन-इन शुरू करें या डिवाइस कोड लॉगिन का उपयोग करें।</string>
     <string name="ms_feature_disabled_title">सुविधा अक्षम है</string>
-    <string name="ms_feature_disabled_desc">Microsoft खाते प्रबंधित करने के लिए सेटिंग्स में “Chimera Client के साथ Minecraft में साइन इन करें” सक्षम करें।</string>
+    <string name="ms_feature_disabled_desc">Microsoft खाते प्रबंधित करने के लिए सेटिंग्स में “GlowberryClient के साथ Minecraft में साइन इन करें” सक्षम करें।</string>
     <string name="ms_activated">सक्रिय</string>
     <string name="inbuilt_mod_gyro">जाइरोस्कोप</string>
     <string name="inbuilt_mod_gyro_desc">कैमरा घुमाव नियंत्रित करने के लिए डिवाइस के जाइरोस्कोप का उपयोग करें</string>

@@ -30,7 +30,7 @@ public final class VoiceChannel {
     public static final String WORLD = "world";
 
     /** Prefix of a generated private-channel join code. */
-    public static final String CODE_PREFIX = "CHIMERA-";
+    public static final String CODE_PREFIX = "GLOWBERRY-";
 
     /**
      * Code alphabet. Every character is a digit or an unambiguously-shaped uppercase letter, so a
@@ -47,7 +47,7 @@ public final class VoiceChannel {
     }
 
     /**
-     * Generates a short, human-readable join code: {@code CHIMERA-XXXX}.
+     * Generates a short, human-readable join code: {@code GLOWBERRY-XXXX}.
      *
      * <p>A private channel's id <em>is</em> its join code, so "invite a friend" is nothing more
      * than sharing this string -- typing it in selects the same channel id and the existing

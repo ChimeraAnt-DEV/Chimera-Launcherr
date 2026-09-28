@@ -38,7 +38,7 @@
                 android:layout_height="84dp"
                 android:layout_gravity="center"
                 android:contentDescription="@string/splash_logo_desc"
-                android:src="@drawable/ic_chimera_ant" />
+                android:src="@drawable/ic_glowberry_logo" />
         </FrameLayout>
 
         <LinearLayout

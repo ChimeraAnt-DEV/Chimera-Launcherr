@@ -184,7 +184,7 @@ class GamePackageManager private constructor(
         if (declared.isNullOrBlank()) return null
         if (abiCompatibility(version) != AbiCompatibility.INCOMPATIBLE) return null
         return buildString {
-            append("This Minecraft version ships only $declared libraries, but Chimera Client ")
+            append("This Minecraft version ships only $declared libraries, but GlowberryClient ")
             append("runs as a 64-bit process, and a 64-bit process cannot load 32-bit native code.")
             append(" Use a 64-bit build of this version.")
         }

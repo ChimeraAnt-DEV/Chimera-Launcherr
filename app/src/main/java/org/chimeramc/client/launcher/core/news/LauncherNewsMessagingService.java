@@ -24,8 +24,8 @@ public final class LauncherNewsMessagingService extends FirebaseMessagingService
             if (title == null) title = message.getNotification().getTitle();
             if (body == null) body = message.getNotification().getBody();
         }
-        if (title == null || title.trim().isEmpty()) title = "Chimera Client news";
-        if (body == null) body = "Open Chimera Client to read the latest news.";
+        if (title == null || title.trim().isEmpty()) title = "GlowberryClient news";
+        if (body == null) body = "Open GlowberryClient to read the latest news.";
 
         NewsState.recordPush(this, id, publishedAt);
         if (!LowLatencyNetworkManager.isGameSessionActive()) {

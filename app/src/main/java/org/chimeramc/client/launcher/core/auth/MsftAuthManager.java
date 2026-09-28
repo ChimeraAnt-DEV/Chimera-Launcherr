@@ -438,7 +438,7 @@ public final class MsftAuthManager {
 
     private static HttpClient createHttpClient() {
         String version = TextUtils.isEmpty(BuildConfig.VERSION_NAME) ? "unknown" : BuildConfig.VERSION_NAME;
-        return MinecraftAuth.createHttpClient("Chimera Client/" + version + " Android");
+        return MinecraftAuth.createHttpClient("GlowberryClient/" + version + " Android");
     }
 
     private static String normalizeError(String error) {

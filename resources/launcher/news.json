@@ -34,7 +34,7 @@
     {
       "id": "2026-08-26-android-17-compatibility",
       "title": "Android 17 compatibility issue",
-      "summary": "Chimera Client currently does not support Android 17. If you rely on Chimera Client, do not update your device to Android 17 yet. Please wait until Android 17 support is announced.",
+      "summary": "GlowberryClient currently does not support Android 17. If you rely on GlowberryClient, do not update your device to Android 17 yet. Please wait until Android 17 support is announced.",
       "publishedAt": "2026-08-26T21:13:00Z",
       "category": "Important",
       "url": "",
@@ -44,7 +44,7 @@
     {
       "id": "2026-08-26-launcher-news",
       "title": "Launcher news is now built in",
-      "summary": "Tap the bell at the top of Chimera Client to see announcements, release information, and important notices in one place.",
+      "summary": "Tap the bell at the top of GlowberryClient to see announcements, release information, and important notices in one place.",
       "publishedAt": "2026-08-26T18:00:00Z",
       "category": "Launcher",
       "url": "https://github.com/ChimeraAnt-DEV/ChimeraLauncher/releases",

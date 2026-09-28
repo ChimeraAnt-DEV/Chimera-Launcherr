@@ -1,10 +1,10 @@
 # Native Mod 快速开始
 
-本页面描述 ChimeraClient native mod 的受支持开发路径。公开 SDK 位于
+本页面描述 GlowberryClient native mod 的受支持开发路径。公开 SDK 位于
 [ChimeraAnt-DEV/preloader-android](https://github.com/ChimeraAnt-DEV/preloader-android)。
 
 独立第三方 mod 建议从
-[Chimera Client Android mod template](https://github.com/QYCottage/levilauncher-android-mod-template)
+[GlowberryClient Android mod template](https://github.com/QYCottage/levilauncher-android-mod-template)
 开始。
 
 推荐以 `examples/full-cpp-mod` 作为参考实现。它包含生命周期注册、类型化

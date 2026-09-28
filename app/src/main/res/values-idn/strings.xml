@@ -1,6 +1,6 @@
 <resources>
     <!-- Common -->
-    <string name="app_name">Chimera Client</string>
+    <string name="app_name">GlowberryClient</string>
     <string name="minecraft">Minecraft</string>
     <string name="launch">Luncurkan</string>
     <string name="beta_badge">Beta</string>
@@ -19,7 +19,7 @@
 
     <!-- About -->
     <string name="about_title">☕ Tentang</string>
-    <string name="copyright">©2024–2026 ChimeraMC. All rights reserved.</string>
+    <string name="copyright">©2024–2026 GlowberryClient. All rights reserved.</string>
     <string name="font_license">Aplikasi ini menggunakan font Misans..</string>
     <string name="about_footer_github">GitHub: https://github.com/ChimeraAnt-DEV/ChimeraLauncher</string>
     <string name="quick_actions_title">Tindakan Cepat</string>
@@ -49,7 +49,7 @@
 
     <!-- Permissions -->
     <string name="storage_permission_title">Izin Migrasi Penyimpanan</string>
-    <string name="storage_permission_message">Berikan izin penyimpanan agar Chimera Client dapat menyalin data dari folder lama games/org.chimeramc. Izin ini hanya diperlukan untuk proses migrasi.</string>
+    <string name="storage_permission_message">Berikan izin penyimpanan agar GlowberryClient dapat menyalin data dari folder lama games/org.chimeramc. Izin ini hanya diperlukan untuk proses migrasi.</string>
     <string name="grant_permission">Izinkan</string>
     <string name="cancel">Batal</string>
 
@@ -143,7 +143,7 @@
     <string name="repair_processing">Mengekstrak pustaka…</string>
     <string name="repair_finalizing">Menyelesaikan perbaikan…</string>
     <string name="storage_migration_title">Migrasi Penyimpanan Diperlukan</string>
-    <string name="storage_migration_message">Chimera Client harus memigrasikan data dari games/org.chimeramc ke %1$s sebelum melanjutkan.
+    <string name="storage_migration_message">GlowberryClient harus memigrasikan data dari games/org.chimeramc ke %1$s sebelum melanjutkan.
 
 Perubahan penyimpanan ini diperlukan untuk memenuhi persyaratan rilis di Google Play. Folder lama tetap dibiarkan, tetapi tidak akan digunakan lagi setelah migrasi.
 
@@ -165,11 +165,11 @@ Migrasi dapat memakan waktu. Anda bisa membiarkan aplikasi berjalan di latar bel
 
 Folder lama games/org.chimeramc tidak dihapus dan tidak lagi digunakan.</string>
     <string name="storage_migration_partial_title">Migrasi Belum Selesai</string>
-    <string name="storage_migration_partial_message">%1$d dari %2$d file tidak dapat disalin. Migrasi harus selesai sebelum Chimera Client dapat melanjutkan.</string>
+    <string name="storage_migration_partial_message">%1$d dari %2$d file tidak dapat disalin. Migrasi harus selesai sebelum GlowberryClient dapat melanjutkan.</string>
     <string name="storage_migration_failed_title">Migrasi Gagal</string>
     <string name="storage_migration_failed_message">Migrasi tidak dapat dilanjutkan: %1$s
 
-Migrasi harus selesai sebelum Chimera Client dapat melanjutkan.</string>
+Migrasi harus selesai sebelum GlowberryClient dapat melanjutkan.</string>
     <string name="migration_cleanup_title">Bersihkan Direktori Riwayat</string>
     <string name="migration_cleanup_desc">Hapus direktori lama games/org.chimeramc hanya setelah memastikan semua instans dapat diluncurkan normal dan world, resource pack, behavior pack, serta pengaturan tidak hilang. Data riwayat yang dihapus tidak dapat dipulihkan dari direktori ini.</string>
     <string name="migration_cleanup_button">Bersihkan Direktori Riwayat</string>
@@ -194,8 +194,8 @@ Migrasi harus selesai sebelum Chimera Client dapat melanjutkan.</string>
 
     <string name="error_no_browser">Tidak ada peramban yang tersedia.</string>
 
-    <string name="eula_title">Chimera Client License Agreement</string>
-    <string name="eula_message"><b>Selamat datang di Chimera Client</b>\n\nBy using this software you agree to:\n\n• This is an <b>unofficial</b> Minecraft launcher\n• You must own a <b>licensed</b> copy of Minecraft\n• Any form of piracy or cheating is prohibited\n• Mods/resource packs are used at your own risk\n• Not affiliated with Mojang/Microsoft\n\nContinued use constitutes agreement</string>
+    <string name="eula_title">GlowberryClient License Agreement</string>
+    <string name="eula_message"><b>Selamat datang di GlowberryClient</b>\n\nBy using this software you agree to:\n\n• This is an <b>unofficial</b> Minecraft launcher\n• You must own a <b>licensed</b> copy of Minecraft\n• Any form of piracy or cheating is prohibited\n• Mods/resource packs are used at your own risk\n• Not affiliated with Mojang/Microsoft\n\nContinued use constitutes agreement</string>
     <string name="eula_agree">Terima</string>
     <string name="eula_exit">Tolak</string>
 
@@ -401,7 +401,7 @@ Migrasi harus selesai sebelum Chimera Client dapat melanjutkan.</string>
     <string name="ms_active_badge">Aktif</string>
     <string name="ms_account_subtitle_format">ID Pengguna: %1$s • Diperbarui: %2$s</string>
     <string name="xbox_avatar">Avatar Xbox</string>
-    <string name="launcher_managed_mc_login">Masuk ke Minecraft menggunakan Chimera Client</string>
+    <string name="launcher_managed_mc_login">Masuk ke Minecraft menggunakan GlowberryClient</string>
     <string name="dialog_title_login_required">Login diperlukan</string>
     <string name="dialog_message_login_required">Login yang dikelola oleh launcher diaktifkan, tetapi belum ada akun yang masuk. Buka Akun untuk masuk.</string>
     <string name="go_to_accounts">Akun</string>
@@ -670,24 +670,24 @@ Migrasi harus selesai sebelum Chimera Client dapat melanjutkan.</string>
     <string name="tag_custom">Kustom</string>
     <string name="vanilla_prefix">Vanilla %s</string>
     <string name="about_page_title">Tentang</string>
-    <string name="about_subtitle">Chimera Client — Launcher Minecraft Bedrock Modern</string>
+    <string name="about_subtitle">GlowberryClient — Launcher Minecraft Bedrock Modern</string>
     <string name="about_authors_title">👥 Penulis &amp; Pemelihara</string>
     <string name="about_author_name">DreamGuXiang</string>
     <string name="about_author_badge">Penulis</string>
-    <string name="about_author_role">Penulis Chimera Client</string>
+    <string name="about_author_role">Penulis GlowberryClient</string>
     <string name="about_afdian">Afdian</string>
     <string name="about_patreon">Patreon</string>
     <string name="about_source_title">Kode Sumber &amp; Open Source</string>
-    <string name="about_github_repo">GitHub · Chimera Client</string>
+    <string name="about_github_repo">GitHub · GlowberryClient</string>
     <string name="about_github_org">ChimeraAnt-DEV</string>
     <string name="about_license_note">Lihat LICENSE di repositori untuk detail lisensi.</string>
     <string name="about_contribute_title">Berkontribusi</string>
-    <string name="about_contribute_desc">Kontribusi melalui Issues atau Pull Requests dipersilakan untuk meningkatkan Chimera Client.</string>
+    <string name="about_contribute_desc">Kontribusi melalui Issues atau Pull Requests dipersilakan untuk meningkatkan GlowberryClient.</string>
     <string name="about_issues">Issue</string>
     <string name="about_star_fork">Star / Fork</string>
     <string-array name="launcher_tips">
         <item>Pengaturan memungkinkan Anda menyesuaikan tema, warna, latar belakang, dan opsi tampilan lain agar sesuai dengan setup Anda.</item>
-        <item>Chimera Client bersifat open source. Gunakan GitHub issues untuk melaporkan masalah launcher atau menyarankan perbaikan.</item>
+        <item>GlowberryClient bersifat open source. Gunakan GitHub issues untuk melaporkan masalah launcher atau menyarankan perbaikan.</item>
         <item>Gunakan dropdown versi untuk mengganti instans saat ini dengan cepat.</item>
         <item>Apakah ada yang benar-benar membaca ini?</item>
         <item>Anda dapat menyeret mod untuk mengubah prioritas pemuatannya.</item>
@@ -794,7 +794,7 @@ Migrasi harus selesai sebelum Chimera Client dapat melanjutkan.</string>
     <string name="delete_account_title">Hapus Akun</string>
     <string name="delete_account_confirm">Yakin ingin menghapus akun ini?</string>
     <string name="instance_backup_title">Cadangkan Instans</string>
-    <string name="instance_backup_desc">Buat cadangan lengkap instans ini di Download/Chimera Client/Backups.</string>
+    <string name="instance_backup_desc">Buat cadangan lengkap instans ini di Download/GlowberryClient/Backups.</string>
     <string name="instance_backup_button">Cadangkan Instans</string>
     <string name="instance_backup_confirm_message">Buat cadangan lengkap instans ini sekarang? Tutup Minecraft terlebih dahulu jika sedang berjalan agar file tidak berubah selama pencadangan.</string>
     <string name="instance_backup_in_progress">Mencadangkan instans…</string>
@@ -833,9 +833,9 @@ Migrasi harus selesai sebelum Chimera Client dapat melanjutkan.</string>
     <string name="ms_device_code_login_desc">Buka sesi browser privat dengan kode perangkat yang sudah terisi.</string>
     <string name="ms_webview_login">Buka masuk tertanam</string>
     <string name="ms_webview_option_title">WebView Tertanam</string>
-    <string name="ms_webview_login_desc">Masuk tanpa meninggalkan Chimera Client. Gunakan saat alur browser tidak tersedia.</string>
+    <string name="ms_webview_login_desc">Masuk tanpa meninggalkan GlowberryClient. Gunakan saat alur browser tidak tersedia.</string>
     <string name="ms_device_code_title">Masuk dengan Kode Perangkat</string>
-    <string name="ms_device_code_instructions">Buka halaman masuk perangkat Microsoft, masukkan kode ini, lalu setujui akses. Chimera Client akan menyelesaikannya secara otomatis.</string>
+    <string name="ms_device_code_instructions">Buka halaman masuk perangkat Microsoft, masukkan kode ini, lalu setujui akses. GlowberryClient akan menyelesaikannya secara otomatis.</string>
     <string name="ms_device_code_label">Kode perangkat Microsoft</string>
     <string name="ms_device_code_requesting">Meminta kode aman…</string>
     <string name="ms_device_code_waiting_code">--------</string>
@@ -849,7 +849,7 @@ Migrasi harus selesai sebelum Chimera Client dapat melanjutkan.</string>
     <string name="ms_device_code_copied">Kode disalin</string>
     <string name="ms_device_code_open_browser">Buka masuk Microsoft</string>
     <string name="ms_device_code_step_title">Selesaikan proses masuk di browser Anda</string>
-    <string name="ms_device_code_browser_note">Chimera Client membuka browser default Anda dalam sesi privat, mengisi kode secara otomatis, dan meminta proses masuk Microsoft yang baru.</string>
+    <string name="ms_device_code_browser_note">GlowberryClient membuka browser default Anda dalam sesi privat, mengisi kode secara otomatis, dan meminta proses masuk Microsoft yang baru.</string>
     <string name="ms_choose_other_method">Metode lain</string>
     <string name="ms_no_browser">Tidak ada browser yang tersedia di perangkat ini.</string>
     <string name="ms_default_browser_no_private_mode">Browser default Anda tidak mendukung masuk secara privat. Perbarui browser atau gunakan login WebView.</string>
@@ -857,7 +857,7 @@ Migrasi harus selesai sebelum Chimera Client dapat melanjutkan.</string>
     <string name="ms_login_state_failed">Respons masuk Microsoft tidak dapat diverifikasi. Mulai proses masuk lagi.</string>
     <string name="ms_login_missing_code">Microsoft tidak mengembalikan kode masuk. Mulai proses masuk lagi atau gunakan login Kode Perangkat.</string>
     <string name="ms_feature_disabled_title">Fitur Dinonaktifkan</string>
-    <string name="ms_feature_disabled_desc">Aktifkan “Masuk ke Minecraft dengan Chimera Client” di Pengaturan untuk mengelola akun Microsoft.</string>
+    <string name="ms_feature_disabled_desc">Aktifkan “Masuk ke Minecraft dengan GlowberryClient” di Pengaturan untuk mengelola akun Microsoft.</string>
     <string name="ms_activated">Diaktifkan</string>
     <string name="inbuilt_mod_gyro">Giroskop</string>
     <string name="inbuilt_mod_gyro_desc">Gunakan giroskop perangkat untuk mengontrol rotasi kamera</string>

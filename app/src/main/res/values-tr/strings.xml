@@ -1,6 +1,6 @@
 <resources>
     <!-- Common -->
-    <string name="app_name">Chimera Client</string>
+    <string name="app_name">GlowberryClient</string>
     <string name="minecraft">Minecraft</string>
     <string name="launch">Başlat</string>
     <string name="beta_badge">Beta</string>
@@ -22,7 +22,7 @@
 
     <!-- About -->
     <string name="about_title">☕ Hakkında</string>
-    <string name="copyright">©2024–2026 ChimeraMC. Tüm hakları saklıdır.</string>
+    <string name="copyright">©2024–2026 GlowberryClient. Tüm hakları saklıdır.</string>
     <string name="font_license">Bu uygulama Misans yazı tipini kullanmaktadır.</string>
     <string name="about_footer_github">GitHub: https://github.com/ChimeraAnt-DEV/ChimeraLauncher</string>
     <string name="quick_actions_title">Hızlı İşlemler</string>
@@ -60,7 +60,7 @@
 
     <!-- Permissions -->
     <string name="storage_permission_title">Depolama Taşıma İzni</string>
-    <string name="storage_permission_message">Lütfen depolama iznini verin; böylece Chimera Client eski games/org.chimeramc dizinindeki verileri kopyalayabilsin. Bu izin yalnızca taşıma adımı için gereklidir.</string>
+    <string name="storage_permission_message">Lütfen depolama iznini verin; böylece GlowberryClient eski games/org.chimeramc dizinindeki verileri kopyalayabilsin. Bu izin yalnızca taşıma adımı için gereklidir.</string>
     <string name="grant_permission">İzin Ver</string>
     <string name="cancel">İptal</string>
 
@@ -160,7 +160,7 @@
     <string name="repair_finalizing">Onarım tamamlanıyor…</string>
 
     <string name="storage_migration_title">Depolama Taşıması Gerekli</string>
-    <string name="storage_migration_message">Chimera Client, devam etmeden önce verileri games/org.chimeramc konumundan %1$s konumuna taşımalıdır.
+    <string name="storage_migration_message">GlowberryClient, devam etmeden önce verileri games/org.chimeramc konumundan %1$s konumuna taşımalıdır.
 
 Bu depolama değişikliği Google Play listeleme uyumluluğu için zorunludur. Eski dizin dokunulmadan kalacak ancak taşımanın ardından artık kullanılmayacaktır.
 
@@ -182,11 +182,11 @@ Taşıma biraz zaman alabilir. Uygulama arka planda çalışırken ayrılabilirs
 
 Eski games/org.chimeramc dizini silinmedi ve artık kullanılmıyor.</string>
     <string name="storage_migration_partial_title">Taşıma Tamamlanamadı</string>
-    <string name="storage_migration_partial_message">%1$d dosyadan %2$d tanesi kopyalanamadı. Chimera Client\'ın devam edebilmesi için taşımanın tamamlanması gerekiyor.</string>
+    <string name="storage_migration_partial_message">%1$d dosyadan %2$d tanesi kopyalanamadı. GlowberryClient\'ın devam edebilmesi için taşımanın tamamlanması gerekiyor.</string>
     <string name="storage_migration_failed_title">Taşıma Başarısız</string>
     <string name="storage_migration_failed_message">Taşıma devam edemedi: %1$s
 
-Chimera Client\'ın devam edebilmesi için taşımanın tamamlanması gerekiyor.</string>
+GlowberryClient\'ın devam edebilmesi için taşımanın tamamlanması gerekiyor.</string>
     <string name="migration_cleanup_title">Eski Dizini Temizle</string>
     <string name="migration_cleanup_desc">Eski games/org.chimeramc dizinini yalnızca tüm örneklerin normal başlatıldığını ve dünyaların, kaynak paketlerin, davranış paketlerinin ve ayarların eksiksiz olduğunu doğruladıktan sonra kaldırın. Silinen veriler bu dizinden geri yüklenemez.</string>
     <string name="migration_cleanup_button">Eski Dizini Temizle</string>
@@ -211,8 +211,8 @@ Chimera Client\'ın devam edebilmesi için taşımanın tamamlanması gerekiyor.
 
     <string name="error_no_browser">Kullanılabilir tarayıcı yok</string>
 
-    <string name="eula_title">Chimera Client Lisans Sözleşmesi</string>
-    <string name="eula_message"><b>Chimera Client\'a Hoş Geldiniz</b>\n\nBu yazılımı kullanarak aşağıdakileri kabul etmiş olursunuz:\n\n• Bu <b>resmi olmayan</b> bir Minecraft başlatıcısıdır\n• <b>Lisanslı</b> bir Minecraft kopyasına sahip olmanız gerekir\n• Her türlü korsan kullanım veya hile yasaktır\n• Modlar/kaynak paketleri kendi sorumluluğunuzda kullanılır\n• Mojang/Microsoft ile bağlantılı değildir\n\nKullanmaya devam etmek kabul anlamına gelir</string>
+    <string name="eula_title">GlowberryClient Lisans Sözleşmesi</string>
+    <string name="eula_message"><b>GlowberryClient\'a Hoş Geldiniz</b>\n\nBu yazılımı kullanarak aşağıdakileri kabul etmiş olursunuz:\n\n• Bu <b>resmi olmayan</b> bir Minecraft başlatıcısıdır\n• <b>Lisanslı</b> bir Minecraft kopyasına sahip olmanız gerekir\n• Her türlü korsan kullanım veya hile yasaktır\n• Modlar/kaynak paketleri kendi sorumluluğunuzda kullanılır\n• Mojang/Microsoft ile bağlantılı değildir\n\nKullanmaya devam etmek kabul anlamına gelir</string>
     <string name="eula_agree">Kabul Et</string>
     <string name="eula_exit">Reddet</string>
 
@@ -255,7 +255,7 @@ Chimera Client\'ın devam edebilmesi için taşımanın tamamlanması gerekiyor.
     <string name="instance_delete_confirm_title">Örneği Sil</string>
     <string name="instance_delete_confirm_msg">Bu örneği silmek istediğinizden emin misiniz? Dünyalar dahil tüm veriler kalıcı olarak kaldırılacak.</string>
     <string name="instance_backup_title">Örneği Yedekle</string>
-    <string name="instance_backup_desc">Bu örneğin tam yedeklemesini İndirilenler/Chimera Client/Yedekler konumuna oluştur.</string>
+    <string name="instance_backup_desc">Bu örneğin tam yedeklemesini İndirilenler/GlowberryClient/Yedekler konumuna oluştur.</string>
     <string name="instance_backup_button">Örneği Yedekle</string>
     <string name="instance_backup_confirm_message">Bu örneğin tam yedeği şimdi oluşturulsun mu? Yedekleme sırasında dosyaların değişmemesi için Minecraft çalışıyorsa önce çıkın.</string>
     <string name="instance_backup_in_progress">Örnek yedekleniyor…</string>
@@ -520,7 +520,7 @@ Chimera Client\'ın devam edebilmesi için taşımanın tamamlanması gerekiyor.
     <string name="ms_active_badge">Etkin</string>
     <string name="ms_account_subtitle_format">Kullanıcı Kimliği: %1$s • Güncelleme: %2$s</string>
     <string name="xbox_avatar">Xbox avatarı</string>
-    <string name="launcher_managed_mc_login">Chimera Client ile Minecraft\'ta oturum aç</string>
+    <string name="launcher_managed_mc_login">GlowberryClient ile Minecraft\'ta oturum aç</string>
     <string name="dialog_title_login_required">Oturum açma gerekli</string>
     <string name="dialog_message_login_required">Başlatıcı yönetimli giriş etkin, ancak oturum açılmamış. Oturum açmak için Hesaplar\'a gidin.</string>
     <string name="go_to_accounts">Hesaplar</string>
@@ -739,25 +739,25 @@ Chimera Client\'ın devam edebilmesi için taşımanın tamamlanması gerekiyor.
     <string name="vanilla_prefix">Vanilla %s</string>
 
     <string name="about_page_title">Hakkında</string>
-    <string name="about_subtitle">Chimera Client — Modern Bir Minecraft Bedrock Başlatıcısı</string>
+    <string name="about_subtitle">GlowberryClient — Modern Bir Minecraft Bedrock Başlatıcısı</string>
     <string name="about_authors_title">👥 Yazarlar ve Bakımcılar</string>
     <string name="about_author_name">DreamGuXiang</string>
     <string name="about_author_badge">Yazar</string>
-    <string name="about_author_role">Chimera Client Yazarları</string>
+    <string name="about_author_role">GlowberryClient Yazarları</string>
     <string name="about_afdian">Afdian</string>
     <string name="about_patreon">Patreon</string>
     <string name="about_source_title">Kaynak Kodu ve Açık Kaynak</string>
-    <string name="about_github_repo">GitHub · Chimera Client</string>
+    <string name="about_github_repo">GitHub · GlowberryClient</string>
     <string name="about_github_org">ChimeraAnt-DEV</string>
     <string name="about_license_note">Lisans ayrıntıları için depo içindeki LICENSE dosyasına bakın.</string>
     <string name="about_contribute_title">Katkıda Bulun</string>
-    <string name="about_contribute_desc">Chimera Client\'ı geliştirmek için Issue veya Pull Request aracılığıyla katkıda bulunabilirsiniz.</string>
+    <string name="about_contribute_desc">GlowberryClient\'ı geliştirmek için Issue veya Pull Request aracılığıyla katkıda bulunabilirsiniz.</string>
     <string name="about_issues">Sorun Bildir</string>
     <string name="about_star_fork">Yıldızla / Çatalla</string>
 
     <string-array name="launcher_tips">
         <item>Ayarlar; tema, renk, arka plan ve diğer görünüm seçeneklerini isteğinize göre düzenlemenizi sağlar.</item>
-        <item>Chimera Client açık kaynaklıdır. Başlatıcı sorunlarını bildirmek veya iyileştirme önermek için GitHub sorunlarını kullanın.</item>
+        <item>GlowberryClient açık kaynaklıdır. Başlatıcı sorunlarını bildirmek veya iyileştirme önermek için GitHub sorunlarını kullanın.</item>
         <item>Mevcut örneği hızlıca değiştirmek için sürüm açılır menüsünü kullanın.</item>
         <item>İnsanlar gerçekten bunları okuyor mu?</item>
         <item>Modları yükleme önceliğini değiştirmek için sürükleyebilirsiniz.</item>
@@ -836,9 +836,9 @@ Chimera Client\'ın devam edebilmesi için taşımanın tamamlanması gerekiyor.
     <string name="ms_device_code_login_desc">Cihaz kodu önceden doldurulmuş özel bir tarayıcı oturumu açın.</string>
     <string name="ms_webview_login">Gömülü oturum açmayı aç</string>
     <string name="ms_webview_option_title">Gömülü WebView</string>
-    <string name="ms_webview_login_desc">Chimera Client’dan çıkmadan oturum açın. Tarayıcı akışı kullanılamadığında bunu kullanın.</string>
+    <string name="ms_webview_login_desc">GlowberryClient’dan çıkmadan oturum açın. Tarayıcı akışı kullanılamadığında bunu kullanın.</string>
     <string name="ms_device_code_title">Cihaz Koduyla Oturum Aç</string>
-    <string name="ms_device_code_instructions">Microsoft’un cihaz oturum açma sayfasını açın, bu kodu girin ve erişimi onaylayın. Chimera Client otomatik olarak tamamlayacaktır.</string>
+    <string name="ms_device_code_instructions">Microsoft’un cihaz oturum açma sayfasını açın, bu kodu girin ve erişimi onaylayın. GlowberryClient otomatik olarak tamamlayacaktır.</string>
     <string name="ms_device_code_label">Microsoft cihaz kodu</string>
     <string name="ms_device_code_requesting">Güvenli kod isteniyor…</string>
     <string name="ms_device_code_waiting_code">--------</string>
@@ -852,7 +852,7 @@ Chimera Client\'ın devam edebilmesi için taşımanın tamamlanması gerekiyor.
     <string name="ms_device_code_copied">Kod kopyalandı</string>
     <string name="ms_device_code_open_browser">Microsoft oturum açmayı aç</string>
     <string name="ms_device_code_step_title">Oturum açmayı tarayıcınızda tamamlayın</string>
-    <string name="ms_device_code_browser_note">Chimera Client varsayılan tarayıcınızı özel bir oturumda açar, kodu otomatik doldurur ve yeni bir Microsoft oturum açması ister.</string>
+    <string name="ms_device_code_browser_note">GlowberryClient varsayılan tarayıcınızı özel bir oturumda açar, kodu otomatik doldurur ve yeni bir Microsoft oturum açması ister.</string>
     <string name="ms_choose_other_method">Diğer yöntem</string>
     <string name="ms_no_browser">Bu cihazda kullanılabilir tarayıcı yok.</string>
     <string name="ms_default_browser_no_private_mode">Varsayılan tarayıcınız özel oturum açmayı desteklemiyor. Güncelleyin veya WebView oturum açmayı kullanın.</string>
@@ -860,7 +860,7 @@ Chimera Client\'ın devam edebilmesi için taşımanın tamamlanması gerekiyor.
     <string name="ms_login_state_failed">Microsoft oturum açma yanıtı doğrulanamadı. Oturum açmayı yeniden başlatın.</string>
     <string name="ms_login_missing_code">Microsoft bir oturum açma kodu döndürmedi. Oturum açmayı yeniden başlatın veya Cihaz Kodu ile oturum açmayı kullanın.</string>
     <string name="ms_feature_disabled_title">Özellik Devre Dışı</string>
-    <string name="ms_feature_disabled_desc">Microsoft hesaplarını yönetmek için Ayarlar’da “Chimera Client ile Minecraft’ta oturum aç” seçeneğini etkinleştirin.</string>
+    <string name="ms_feature_disabled_desc">Microsoft hesaplarını yönetmek için Ayarlar’da “GlowberryClient ile Minecraft’ta oturum aç” seçeneğini etkinleştirin.</string>
     <string name="ms_activated">Etkinleştirildi</string>
     <string name="inbuilt_mod_gyro">Jiroskop</string>
     <string name="inbuilt_mod_gyro_desc">Kamera dönüşünü kontrol etmek için cihaz jiroskobunu kullanın</string>

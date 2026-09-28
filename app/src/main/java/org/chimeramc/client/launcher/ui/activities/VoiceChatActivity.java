@@ -53,7 +53,7 @@ import java.util.List;
  * (a later game session reuses the same module).
  *
  * <p>Private channels are join-by-code only and never appear in the directory. Creating a private
- * channel generates a {@code CHIMERA-XXXX} code and offers it in the system share sheet, which is
+ * channel generates a {@code GLOWBERRY-XXXX} code and offers it in the system share sheet, which is
  * the whole invitation mechanism: the code <em>is</em> the channel id, so a friend typing it in
  * lands on the same channel with no server involved.
  *

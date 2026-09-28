@@ -1,6 +1,6 @@
 <resources>
     <!-- Common -->
-    <string name="app_name">Chimera Client</string>
+    <string name="app_name">GlowberryClient</string>
     <string name="minecraft">Minecraft</string>
     <string name="launch">启动</string>
 
@@ -17,7 +17,7 @@
 
     <!-- About -->
     <string name="about_title">☕ 关于</string>
-    <string name="copyright">©2024–2026 ChimeraMC. 保留所有权利</string>
+    <string name="copyright">©2024–2026 GlowberryClient. 保留所有权利</string>
     <string name="font_license">本软件使用 Misans 字体</string>
     <string name="quick_actions_title">快捷操作</string>
     <string name="content_management_subtitle">管理世界、资源包和行为包</string>
@@ -60,7 +60,7 @@
 
     <!-- Permissions -->
     <string name="storage_permission_title">存储迁移权限</string>
-    <string name="storage_permission_message">请授予存储权限，以便 Chimera Client 从旧的 games/org.chimeramc 目录复制数据。此权限仅用于迁移步骤。</string>
+    <string name="storage_permission_message">请授予存储权限，以便 GlowberryClient 从旧的 games/org.chimeramc 目录复制数据。此权限仅用于迁移步骤。</string>
     <string name="grant_permission">授予权限</string>
     <string name="cancel">取消</string>
 
@@ -127,7 +127,7 @@
     <string name="repair_processing">正在提取库文件…</string>
     <string name="repair_finalizing">正在完成修复…</string>
     <string name="storage_migration_title">需要迁移存储目录</string>
-    <string name="storage_migration_message">Chimera Client 必须先将数据从 games/org.chimeramc 迁移到 %1$s，才能继续使用。
+    <string name="storage_migration_message">GlowberryClient 必须先将数据从 games/org.chimeramc 迁移到 %1$s，才能继续使用。
 
 这次存储迁移是为了满足 Google Play 上架合规要求，不得不这么做。旧目录会保持不变，但迁移后不再作为运行目录使用。
 
@@ -149,11 +149,11 @@
 
 旧的 games/org.chimeramc 目录未被删除，后续不再使用。</string>
     <string name="storage_migration_partial_title">迁移未完成</string>
-    <string name="storage_migration_partial_message">%1$d/%2$d 个文件未能复制。必须完成迁移后才能继续使用 Chimera Client。</string>
+    <string name="storage_migration_partial_message">%1$d/%2$d 个文件未能复制。必须完成迁移后才能继续使用 GlowberryClient。</string>
     <string name="storage_migration_failed_title">迁移失败</string>
     <string name="storage_migration_failed_message">迁移无法继续：%1$s
 
-必须完成迁移后才能继续使用 Chimera Client。</string>
+必须完成迁移后才能继续使用 GlowberryClient。</string>
     <string name="migration_cleanup_title">清理历史目录</string>
     <string name="migration_cleanup_desc">仅在确认所有实例都能正常启动，世界、资源包、行为包和设置均未缺失后，再移除旧的 games/org.chimeramc 目录。删除后无法再从该历史目录恢复数据。</string>
     <string name="migration_cleanup_button">清理历史目录</string>
@@ -193,8 +193,8 @@
     <string name="dialog_positive_ok">确定</string>
 
 
-    <string name="eula_title">Chimera Client 用户协议</string>
-    <string name="eula_message"><b>欢迎使用 Chimera Client</b>\n\n使用本软件即表示您同意：\n\n• 此为<b>非官方</b> Minecraft 启动器\n• 您需拥有<b>合法授权</b>的 Minecraft 副本\n• 禁止任何形式的盗版或作弊行为\n• 模组/资源包使用风险自负\n• 与 Mojang/Microsoft 无关联\n\n继续使用视为接受条款</string>
+    <string name="eula_title">GlowberryClient 用户协议</string>
+    <string name="eula_message"><b>欢迎使用 GlowberryClient</b>\n\n使用本软件即表示您同意：\n\n• 此为<b>非官方</b> Minecraft 启动器\n• 您需拥有<b>合法授权</b>的 Minecraft 副本\n• 禁止任何形式的盗版或作弊行为\n• 模组/资源包使用风险自负\n• 与 Mojang/Microsoft 无关联\n\n继续使用视为接受条款</string>
     <string name="eula_agree">接受</string>
     <string name="eula_exit">拒绝</string>
 
@@ -438,7 +438,7 @@
     <string name="ms_login_failed">Microsoft 登录失败</string>
     <string name="ms_login_failed_detail">登录失败：%1$s</string>
     <string name="xbox_avatar">Xbox头像</string>
-    <string name="launcher_managed_mc_login">使用 Chimera Client 登录 Minecraft</string>
+    <string name="launcher_managed_mc_login">使用 GlowberryClient 登录 Minecraft</string>
     <string name="dialog_title_login_required">需要登录</string>
     <string name="dialog_message_login_required">已开启使用启动器登录，但当前未登录。请前往账号管理登录后再启动。</string>
     <string name="go_to_accounts">账号管理</string>
@@ -714,7 +714,7 @@
     <string name="instance_delete_confirm_title">删除实例</string>
     <string name="instance_delete_confirm_msg">确定要删除此实例吗？包括世界在内的所有数据都将被永久移除。</string>
     <string name="instance_backup_title">备份实例</string>
-    <string name="instance_backup_desc">将此实例完整备份到 Download/Chimera Client/Backups。</string>
+    <string name="instance_backup_desc">将此实例完整备份到 Download/GlowberryClient/Backups。</string>
     <string name="instance_backup_button">备份实例</string>
     <string name="instance_backup_confirm_message">现在创建此实例的完整备份吗？如果 Minecraft 正在运行，建议先退出游戏，避免备份过程中数据变化。</string>
     <string name="instance_backup_in_progress">正在备份实例…</string>
@@ -773,24 +773,24 @@
     <string name="tag_custom">自定义</string>
     <string name="vanilla_prefix">原版 %s</string>
     <string name="about_page_title">关于</string>
-    <string name="about_subtitle">Chimera Client — 现代 Minecraft 基岩版启动器</string>
+    <string name="about_subtitle">GlowberryClient — 现代 Minecraft 基岩版启动器</string>
     <string name="about_authors_title">👥 作者与维护者</string>
     <string name="about_author_name">DreamGuXiang</string>
     <string name="about_author_badge">作者</string>
-    <string name="about_author_role">Chimera Client 作者</string>
+    <string name="about_author_role">GlowberryClient 作者</string>
     <string name="about_afdian">爱发电</string>
     <string name="about_patreon">Patreon</string>
     <string name="about_source_title">源代码与开源</string>
-    <string name="about_github_repo">GitHub · Chimera Client</string>
+    <string name="about_github_repo">GitHub · GlowberryClient</string>
     <string name="about_github_org">ChimeraAnt-DEV</string>
     <string name="about_license_note">许可证详情请参阅仓库中的 LICENSE。</string>
     <string name="about_contribute_title">参与贡献</string>
-    <string name="about_contribute_desc">欢迎通过 Issues 或 Pull Requests 改进 Chimera Client。</string>
+    <string name="about_contribute_desc">欢迎通过 Issues 或 Pull Requests 改进 GlowberryClient。</string>
     <string name="about_issues">Issue</string>
     <string name="about_star_fork">Star / Fork</string>
     <string-array name="launcher_tips">
         <item>在设置中可以调整主题、颜色、背景和其他外观选项，让启动器更符合你的使用习惯。</item>
-        <item>Chimera Client 是开源项目。你可以通过 GitHub Issues 反馈启动器问题或提出改进建议。</item>
+        <item>GlowberryClient 是开源项目。你可以通过 GitHub Issues 反馈启动器问题或提出改进建议。</item>
         <item>使用版本下拉菜单可以快速切换当前实例。</item>
         <item>真的有人会读这些提示吗？</item>
         <item>你可以拖动模组来调整加载优先级。</item>
@@ -830,9 +830,9 @@
     <string name="ms_device_code_login_desc">打开一个已自动填入设备代码的私密浏览器会话。</string>
     <string name="ms_webview_login">打开内嵌登录</string>
     <string name="ms_webview_option_title">内嵌 WebView</string>
-    <string name="ms_webview_login_desc">无需离开 Chimera Client 即可登录。当浏览器流程不可用时使用此方式。</string>
+    <string name="ms_webview_login_desc">无需离开 GlowberryClient 即可登录。当浏览器流程不可用时使用此方式。</string>
     <string name="ms_device_code_title">使用设备代码登录</string>
-    <string name="ms_device_code_instructions">打开 Microsoft 设备登录页面，输入此代码，然后批准访问。Chimera Client 会自动完成后续操作。</string>
+    <string name="ms_device_code_instructions">打开 Microsoft 设备登录页面，输入此代码，然后批准访问。GlowberryClient 会自动完成后续操作。</string>
     <string name="ms_device_code_label">Microsoft 设备代码</string>
     <string name="ms_device_code_requesting">正在请求安全代码…</string>
     <string name="ms_device_code_waiting_code">--------</string>
@@ -846,7 +846,7 @@
     <string name="ms_device_code_copied">代码已复制</string>
     <string name="ms_device_code_open_browser">打开 Microsoft 登录</string>
     <string name="ms_device_code_step_title">在浏览器中完成登录</string>
-    <string name="ms_device_code_browser_note">Chimera Client 会在私密会话中打开默认浏览器，自动填写代码，并请求一次新的 Microsoft 登录。</string>
+    <string name="ms_device_code_browser_note">GlowberryClient 会在私密会话中打开默认浏览器，自动填写代码，并请求一次新的 Microsoft 登录。</string>
     <string name="ms_choose_other_method">其他方式</string>
     <string name="ms_no_browser">此设备上没有可用的浏览器。</string>
     <string name="ms_default_browser_no_private_mode">默认浏览器不支持私密登录。请更新浏览器或使用 WebView 登录。</string>
@@ -854,7 +854,7 @@
     <string name="ms_login_state_failed">无法验证 Microsoft 登录响应。请重新开始登录。</string>
     <string name="ms_login_missing_code">Microsoft 未返回登录代码。请重新开始登录或使用设备代码登录。</string>
     <string name="ms_feature_disabled_title">功能已禁用</string>
-    <string name="ms_feature_disabled_desc">请在设置中启用“使用 Chimera Client 登录 Minecraft”，以管理 Microsoft 账户。</string>
+    <string name="ms_feature_disabled_desc">请在设置中启用“使用 GlowberryClient 登录 Minecraft”，以管理 Microsoft 账户。</string>
     <string name="ms_activated">已激活</string>
     <string name="inbuilt_mod_gyro">陀螺仪</string>
     <string name="inbuilt_mod_gyro_desc">使用设备陀螺仪控制摄像机旋转</string>

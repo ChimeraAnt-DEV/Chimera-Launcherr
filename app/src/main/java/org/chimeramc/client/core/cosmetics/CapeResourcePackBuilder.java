@@ -125,7 +125,7 @@ public final class CapeResourcePackBuilder {
                 + "  \"format_version\": " + FORMAT_VERSION + ",\n"
                 + "  \"header\": {\n"
                 + "    \"name\": \"" + PACK_NAME + "\",\n"
-                + "    \"description\": \"Chimera Client cape (texture override).\",\n"
+                + "    \"description\": \"GlowberryClient cape (texture override).\",\n"
                 + "    \"uuid\": \"" + PACK_UUID + "\",\n"
                 + "    \"version\": [" + versionArray(PACK_VERSION) + "],\n"
                 + "    \"min_engine_version\": [1, 20, 0]\n"

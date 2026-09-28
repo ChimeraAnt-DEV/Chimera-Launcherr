@@ -64,7 +64,7 @@ public class InstanceBackupManager {
     private static final String RUNTIME_LIBS_PREFIX = "runtime_libs/";
     private static final String PACKAGE_PREFIX = "package/";
     private static final String DOWNLOAD_RELATIVE_PATH =
-            Environment.DIRECTORY_DOWNLOADS + "/Chimera Client/Backups";
+            Environment.DIRECTORY_DOWNLOADS + "/GlowberryClient/Backups";
     private static final Gson GSON = new GsonBuilder().serializeNulls().setPrettyPrinting().create();
 
     private final Context context;
@@ -340,7 +340,7 @@ public class InstanceBackupManager {
 
         File backupDir = new File(
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                "Chimera Client/Backups"
+                "GlowberryClient/Backups"
         );
         if (!backupDir.exists() && !backupDir.mkdirs()) {
             throw new IOException("Failed to create backup directory: " + backupDir.getAbsolutePath());

@@ -1,4 +1,4 @@
-# F-Droid Build Instructions for Chimera Client
+# F-Droid Build Instructions for GlowberryClient
 
 ## Prerequisites
 - Android SDK 35+

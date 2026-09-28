@@ -1,6 +1,6 @@
 <resources>
     <!--
-        Chimera Client brand palette.
+        GlowberryClient brand palette.
 
         One violet/magenta/amber identity, not the inherited Bedrock green/cyan. These
         tokens are the single source of truth: screens reference them (or the theme
