@@ -36,7 +36,7 @@ import org.chimeramc.client.launcher.controller.StickCalibrationSession;
 import org.chimeramc.client.launcher.controller.StickCurve;
 import org.chimeramc.client.launcher.controller.TriggerCurve;
 import org.chimeramc.client.ui.dialogs.CustomAlertDialog;
-import org.chimeramc.client.ui.views.ControllerIllustrationView;
+import org.chimeramc.client.launcher.ui.views.Controller3DView;
 import org.chimeramc.client.ui.views.CurvePreviewView;
 import org.chimeramc.client.util.PersonalizationManager;
 
@@ -54,7 +54,7 @@ import java.util.List;
  */
 public class ControllerSettingsFragment extends Fragment {
 
-    private ControllerIllustrationView illustration;
+    private Controller3DView illustration;
     private TextView statusText;
     private TextView illustrationLabel;
     private LinearLayout profileChips;

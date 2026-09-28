@@ -763,3 +763,40 @@ these are the conclusions.
 - Prefs live in `PersonalizationManager`: `isFireworkTouchEnabled` (default **off** — a flourish,
   not chrome), `getFireworkIntensity`, `isFireworkFollowAccent` (off = blue palette). `resetAllCustomizations`
   clears all three.
+
+## Cosmetics status diagnostic (CosmeticsDiagnostics + CosmeticsStatusActivity)
+- Capes ship as a texture-override resource pack (`CapeResourcePackBuilder`), whose own note says
+  the worst case is a *silent* invisible cape — so `CosmeticsDiagnostics` turns the silence into
+  named checks. Reached from the Skins screen ("Cosmetics status" button beside the cape note).
+- `run(gameDataDirs, stagingRoot, gameVersion)` is `File`-based and Android-light so it is
+  unit-testable (`CosmeticsDiagnosticsTest`): it checks the pack is written under a candidate root,
+  that its uuid is listed in `minecraftpe/global_resource_packs.json`, and that the manifest's
+  `min_engine_version` is <= the installed version. The two links only the game can answer —
+  whether a cape is equipped, and whether RenderDragon honours the override — are reported as
+  `MANUAL`, never invented. A missing `min_engine_version` reads as MANUAL, not FAIL.
+- The activity offers a **magenta test cape** so "did anything appear" is unambiguous, and a
+  copy-report button. Do not promise cosmetics in release notes until a device check confirms
+  which link fails.
+- `parseVersion` compares component-wise with missing components as zero, so `1.20` == `1.20.0.0`
+  and `26.51` > `1.20.0`.
+
+## 3D controller illustrations (Controller3DProjection + Controller3DView)
+- The flat `ControllerIllustrationView` read as a squashed top-down sketch and hid the shoulder
+  triggers behind the shell. `Controller3DView` is the replacement, used by the controller settings
+  screen, the mod-menu bind picker and the bind summary badge.
+- **The view owns no geometry.** `Controller3DProjection` (Android-free, in the controller package)
+  projects the same `ControllerLayout.regionTable` the 2D view uses through a small camera pitch and
+  a perspective divide, returning plain `x,y,radius,z`; the view only paints. That keeps the
+  projection testable — `Controller3DProjectionTest` pins the recede, the perspective sign, the
+  shoulder lift and the far-to-near sort, because a projection defect looks plausible on screen.
+- **Shoulder controls are lifted toward the camera (`SHOULDER_Z = -0.55f`), not pushed away.**
+  Pushing them "behind" the body under this pitch would draw them smaller and further out; the
+  lift toward the camera (so the tilt cannot bury them) plus the body painting over their lower
+  edge is what makes bumpers/triggers read as attached to the top. They draw in a shoulder pass
+  **before** the body.
+- `Controller3DView.animateConfirm(id)` is the green "got it": a `ValueAnimator` on two floats with
+  a single overshoot, invalidating only. Short and allocation-free per frame, so the bind dialog
+  never touches the game's frame budget.
+- Package split to remember: the view is `org.chimeramc.client.launcher.ui.views.Controller3DView`
+  while `ControllerLayout` is `org.chimeramc.client.ui.views`; XML refs must use the `launcher`
+  path or inflation fails.

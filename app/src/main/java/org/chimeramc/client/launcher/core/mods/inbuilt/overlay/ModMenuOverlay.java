@@ -102,7 +102,7 @@ public class ModMenuOverlay {
     private TextView keyboardBindText;
     private TextView controllerBindText;
     /** The connected pad's 2D illustration shown beside the controller bind row. */
-    private org.chimeramc.client.ui.views.ControllerIllustrationView controllerBindIllustration;
+    private org.chimeramc.client.launcher.ui.views.Controller3DView controllerBindIllustration;
 
     /** Delivers a hardware key to an open bind picker. Returns true when one consumed it. */
     public interface BindCapture {
@@ -810,7 +810,7 @@ public class ModMenuOverlay {
                         : org.chimeramc.client.launcher.controller.ControllerType.XBOX;
 
         View content = LayoutInflater.from(activity).inflate(R.layout.dialog_mod_menu_bind, null);
-        final org.chimeramc.client.ui.views.ControllerIllustrationView illustration =
+        final org.chimeramc.client.launcher.ui.views.Controller3DView illustration =
                 content.findViewById(R.id.bind_dialog_illustration);
         final TextView statusText = content.findViewById(R.id.bind_dialog_status);
         illustration.setType(type);
@@ -835,6 +835,7 @@ public class ModMenuOverlay {
             String region = illustration.regionIdForKey(keyCode);
             if (region == null) return;
             illustration.setRegionConfirmed(region, true);
+            illustration.animateConfirm(region);
             statusText.setText(activity.getString(R.string.mod_menu_bind_detected, bindLabel(keyCode)));
             modManager.setModMenuControllerBind(keyCode);
             refreshControllerBindLabel(modManager);
@@ -853,6 +854,7 @@ public class ModMenuOverlay {
             String region = illustration.regionIdForKey(keyCode);
             if (region == null) return true; // a gamepad key we do not map: swallow, keep waiting
             illustration.setRegionConfirmed(region, true);
+            illustration.animateConfirm(region);
             statusText.setText(activity.getString(R.string.mod_menu_bind_detected, bindLabel(keyCode)));
             modManager.setModMenuControllerBind(keyCode);
             refreshControllerBindLabel(modManager);
