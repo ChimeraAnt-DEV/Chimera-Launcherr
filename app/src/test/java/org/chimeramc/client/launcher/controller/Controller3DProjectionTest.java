@@ -97,6 +97,51 @@ public class Controller3DProjectionTest {
         }
     }
 
+    /**
+     * The fit comes from {@code unitBounds}, so every region must lie inside it.
+     *
+     * <p>This is the regression gate for the "back triggers don't show" report: the old view fitted
+     * the pad from the shell alone, and the triggers project above the shell's shoulder, so they
+     * were clipped off the top edge. Any control that escapes the measured bounds would be clipped
+     * again.
+     */
+    @Test
+    public void everyRegionFitsInsideTheMeasuredBounds() {
+        for (ControllerType type : ControllerType.values()) {
+            float[] b = Controller3DProjection.unitBounds(type, 14);
+            assertTrue("bounds are non-empty for " + type, b[2] > b[0] && b[3] > b[1]);
+            for (Controller3DProjection.Projected p : Controller3DProjection.project(type, 1f, 0f, 0f)) {
+                float hw = p.spec.halfWidth() * p.perspective;
+                float hh = p.spec.halfHeight() * p.perspective;
+                assertTrue(type + "." + p.spec.id + " left edge inside",
+                        p.x - hw >= b[0] - 1e-3f);
+                assertTrue(type + "." + p.spec.id + " right edge inside",
+                        p.x + hw <= b[2] + 1e-3f);
+                assertTrue(type + "." + p.spec.id + " top edge inside",
+                        p.y - hh >= b[1] - 1e-3f);
+                assertTrue(type + "." + p.spec.id + " bottom edge inside",
+                        p.y + hh <= b[3] + 1e-3f);
+            }
+        }
+    }
+
+    /**
+     * The triggers must be the reason the bounds extend upward.
+     *
+     * <p>If this ever stops being true, the shoulder placement has moved back behind the body and
+     * the triggers will be invisible again.
+     */
+    @Test
+    public void theTriggersExtendAboveTheShell() {
+        float[] b = Controller3DProjection.unitBounds(ControllerType.XBOX, 14);
+        float[] shell = Controller3DProjection.projectShell(ControllerType.XBOX, 14, 1f, 0f, 0f);
+        float shellTop = Float.MAX_VALUE;
+        for (int i = 1; i < shell.length; i += 2) {
+            shellTop = Math.min(shellTop, shell[i]);
+        }
+        assertTrue("a trigger is drawn above the shell's top edge", b[1] < shellTop);
+    }
+
     @Test
     public void aZeroScaleDoesNotProduceNaN() {
         // The view guards this, but the projection should not invent NaN if it is ever called

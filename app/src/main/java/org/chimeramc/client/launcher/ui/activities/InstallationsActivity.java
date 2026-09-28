@@ -421,6 +421,13 @@ public class InstallationsActivity extends BaseActivity {
     private void onImportSucceeded() {
         // Only a completed import may remove the package; that ordering is the point of staging.
         boolean deleted = pendingFile != null && store.delete(pendingFile);
+        // The row was moved to IMPORTING when the download finished. Nothing moves it back, so
+        // without this the action button keeps saying "Importing" forever even though the
+        // instance is installed. Return it to IDLE first, then let markInstalledVersions flip it
+        // to the "Reinstall" label.
+        if (pendingPageUrl != null) {
+            adapter.setState(pendingPageUrl, InstallationAdapter.State.IDLE);
+        }
         pendingFile = null;
         pendingVersionName = null;
         pendingPageUrl = null;

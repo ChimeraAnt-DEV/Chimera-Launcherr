@@ -157,6 +157,8 @@ import okhttp3.OkHttpClient;
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private Runnable pulseRunnable;
     private boolean pulseRunning;
+    /** True while a launch is in flight, so the hero card and Play button cannot double-fire. */
+    private boolean launchInProgress;
     private ValueAnimator activeProgressAnimator;
 
     private final StorageMigrationService.MigrationListener storageMigrationListener =
@@ -670,7 +672,7 @@ import okhttp3.OkHttpClient;
     private void onVersionManagerReady() {
         if (versionManager == null || binding == null) return;
         fileHandler = new FileHandler(this, viewModel, versionManager);
-        binding.launchButton.setEnabled(true);
+        resetLaunchButton();
         if (!handleInstanceShortcutLaunch()) {
             setTextMinecraftVersion();
             updateViewModelVersion();
@@ -1116,7 +1118,7 @@ import okhttp3.OkHttpClient;
             refreshContentCounts();
         }
         if (binding != null && versionManager != null) {
-            binding.launchButton.setEnabled(true);
+            resetLaunchButton();
         }
     }
 
@@ -1583,12 +1585,23 @@ import okhttp3.OkHttpClient;
         startActivity(intent);
     }
 
-
     private void launchGame() {
         if (!isVersionManagerReady()) return;
         performActualLaunch();
     }
+
+    /** Clears the in-flight flag and re-enables the Play button after a launch is abandoned. */
+    private void resetLaunchButton() {
+        launchInProgress = false;
+        if (binding != null) binding.launchButton.setEnabled(true);
+    }
+
     private void performActualLaunch() {
+        // Both the hero card and the Play button call this. Only the button was disabled, so
+        // tapping the hero card while a launch was already in flight started a second session —
+        // the "duplicate Play" report. One flag guards every entry point.
+        if (launchInProgress) return;
+        launchInProgress = true;
         binding.launchButton.setEnabled(false);
         LaunchTrace trace = LaunchTrace.create(null);
         trace.milestone("Launch requested");
@@ -1597,7 +1610,7 @@ import okhttp3.OkHttpClient;
 
         if (version == null) {
             trace.warning("Launch cancelled", "No version selected");
-            binding.launchButton.setEnabled(true);
+            resetLaunchButton();
             new CustomAlertDialog(this)
                     .setTitleText(getString(R.string.dialog_title_no_version))
                     .setMessage(getString(R.string.dialog_message_no_version))
@@ -1612,7 +1625,7 @@ import okhttp3.OkHttpClient;
             boolean loggedIn = active != null && active.minecraftUsername != null && !active.minecraftUsername.isEmpty();
             if (!loggedIn) {
                 trace.warning("Launch cancelled", "Minecraft account is missing");
-                binding.launchButton.setEnabled(true);
+                resetLaunchButton();
                 new CustomAlertDialog(this)
                         .setTitleText(getString(R.string.dialog_title_login_required))
                         .setMessage(getString(R.string.dialog_message_login_required))
@@ -1627,7 +1640,7 @@ import okhttp3.OkHttpClient;
 
         if (!PlayStoreValidator.isMinecraftInstalled(this)) {
             trace.warning("Launch cancelled", "Minecraft package is not installed");
-            binding.launchButton.setEnabled(true);
+            resetLaunchButton();
             PlayStoreValidationDialog.showNotInstalledDialog(this);
             return;
         }
@@ -1648,13 +1661,13 @@ import okhttp3.OkHttpClient;
                 public void onLaunchFailed(Exception e) {
                     trace.error("Launch failed before loading screen", e.getMessage());
                     runOnUiThread(() -> {
-                        if (binding != null) binding.launchButton.setEnabled(true);
+                        resetLaunchButton();
                     });
                 }
             });
         } catch (Exception e) {
             trace.error("Launch failed before activity start", e.getMessage());
-            binding.launchButton.setEnabled(true);
+            resetLaunchButton();
             new CustomAlertDialog(this)
                     .setTitleText(getString(R.string.dialog_title_launch_failed))
                     .setMessage(getString(R.string.dialog_message_launch_failed, e.getMessage()))

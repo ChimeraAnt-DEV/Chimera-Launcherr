@@ -19,6 +19,7 @@ class LauncherApplication : Application() {
         FeatureSettings.init(applicationContext)
         LowLatencyNetworkManager.init(applicationContext)
         ThermalGovernor.init(applicationContext)
+        org.chimeramc.client.core.minecraft.FpsOptimizationService.init(applicationContext)
         CrashReporter.init(this)
         // Mirror the persisted haptics preference into the static feedback layer so the
         // very first interaction honours it, before Settings is ever opened.
@@ -34,6 +35,23 @@ class LauncherApplication : Application() {
         PlaytimeManager.init(applicationContext)
 
         preferences = PreferenceManager.getDefaultSharedPreferences(this)
+    }
+
+    /**
+     * Feeds the OS memory-pressure signal to the FPS optimizer.
+     *
+     * <p>{@code onTrimMemory} is the only place the platform tells the host it is being squeezed,
+     * and the optimizer treats it as one of the reasons to shed background work during a session.
+     * The constant is {@code ComponentCallbacks2.TRIM_MEMORY_RUNNING_*} — referencing the int is
+     * safe on minSdk 28 because it is a compile-time constant, not a type.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        val critical = level >= TRIM_MEMORY_RUNNING_CRITICAL
+        org.chimeramc.client.core.minecraft.FpsOptimizationService.setLowMemory(critical)
+        if (critical) {
+            org.chimeramc.client.core.minecraft.FpsOptimizationService.apply()
+        }
     }
 
     companion object {

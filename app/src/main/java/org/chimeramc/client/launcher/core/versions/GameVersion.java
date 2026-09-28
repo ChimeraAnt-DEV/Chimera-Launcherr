@@ -106,4 +106,34 @@ public class GameVersion implements Parcelable {
         if (isInstalled) return LauncherStorage.INSTALLED_MINECRAFT_PROFILE_ID;
         return LauncherStorage.sanitizeProfileId(directoryName);
     }
+
+    /**
+     * Identity is the instance directory, not the object reference.
+     *
+     * <p>A {@code GameVersion} reaches a screen either from {@code VersionManager}'s own list or
+     * re-materialised from an {@code Intent} extra. Without this, {@code equals} was reference
+     * equality, so a delete performed from the settings screen compared the parceled copy against
+     * the manager's instance, never matched, and left the deleted version selected — which is why
+     * it kept showing as "last played" after being removed.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof GameVersion)) return false;
+        GameVersion other = (GameVersion) o;
+        if (versionDir != null && other.versionDir != null) {
+            return versionDir.getAbsolutePath().equals(other.versionDir.getAbsolutePath());
+        }
+        if (directoryName != null && other.directoryName != null) {
+            return directoryName.equals(other.directoryName);
+        }
+        return versionCode != null && versionCode.equals(other.versionCode);
+    }
+
+    @Override
+    public int hashCode() {
+        if (versionDir != null) return versionDir.getAbsolutePath().hashCode();
+        if (directoryName != null) return directoryName.hashCode();
+        return versionCode == null ? 0 : versionCode.hashCode();
+    }
 }

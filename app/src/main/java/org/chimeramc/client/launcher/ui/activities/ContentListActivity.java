@@ -1143,7 +1143,18 @@ public class ContentListActivity extends BaseActivity {
 
     private File getGameDataDirForType(FeatureSettings.StorageType storageType) {
         GameVersion currentVersion = versionManager.getSelectedVersion();
-        if (currentVersion == null) return null;
+        // With no instance selected there is still a place the game keeps its servers, and that is
+        // the shared root. Returning null here meant ServerManager was handed a null directory and
+        // every "add server" reported failure until an instance happened to be selected — the
+        // "servers don't work" report. The shared resolution needs no profile, so it is a sound
+        // fallback rather than a guess.
+        if (currentVersion == null) {
+            return LauncherStorage.getContentGameDataDir(
+                    this,
+                    LauncherStorage.INSTALLED_MINECRAFT_PROFILE_ID,
+                    LauncherStorage.normalizeContentStorageType(storageType, false)
+            );
+        }
         FeatureSettings.StorageType resolvedType = LauncherStorage.normalizeContentStorageType(
                 storageType,
                 currentVersion.versionIsolation

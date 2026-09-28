@@ -663,6 +663,8 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="low_input_delay_desc">Reduces input lag the launcher controls: controller profiles use a tightened dead zone and a faster response curve so the same stick travel turns further, controller event handling does no locking, and idle overlay redraws are skipped</string>
     <string name="reduce_network_latency_title">Reduce Network Latency</string>
     <string name="reduce_network_latency_desc">Removes Nagle and delayed-ACK delays on launcher connections, keeps connections pooled so handshakes are already done, prefetches DNS for launcher and Bedrock server addresses, and stops background polls while you play. Cannot change the distance to a game server or its own response time.</string>
+    <string name="fps_optimizer_title">FPS Optimization</string>
+    <string name="fps_optimizer_desc">While a game is running, keeps the launcher out of the way: serves cached news and update data instead of polling, and steps further back automatically when the device gets hot, low on memory, or battery saver is on. It only reduces work the launcher itself does — it never changes Minecraft\'s own graphics or framerate.</string>
     <string name="playtime_label">%1$s played</string>
     <string name="recent_playtime_label">%1$s played on this instance</string>
     <string name="gxcore_title">gxcore native bootstrap</string>

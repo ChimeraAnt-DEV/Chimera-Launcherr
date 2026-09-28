@@ -800,3 +800,41 @@ these are the conclusions.
 - Package split to remember: the view is `org.chimeramc.client.launcher.ui.views.Controller3DView`
   while `ControllerLayout` is `org.chimeramc.client.ui.views`; XML refs must use the `launcher`
   path or inflation fails.
+
+
+## FPS optimizer (org.chimeramc.client.core.minecraft.FpsOptimizer + FpsOptimizationService)
+- Settings -> Basic "FPS Optimization" toggle (`FeatureSettings.isFpsOptimizerEnabled`). It is a
+  **thin coordinator over existing signals**, exactly like PerformancePresetManager: it never
+  touches Minecraft's own graphics or framerate, and the class docs / string say so. What it
+  does is keep the *launcher* quiet while a session runs (serve cached news/update data rather
+  than polling - the same path `LowLatencyNetworkManager.isGameSessionActive()` already gates)
+  and shed speculative work under thermal pressure (`ThermalGovernor.severity()`), battery saver,
+  or critical memory.
+- `FpsOptimizer.decide(...)` is pure and unit-tested (`FpsOptimizerTest`); it returns
+  NONE / QUIET_HOST / SHED_BACKGROUND. `describe()` must never contain a digit followed by "fps"
+  - the launcher cannot measure the game's frame rate, and a number there would be the same
+  dishonesty as promising a ping. The test pins that.
+- Re-evaluated from the existing session lifecycle, not a second timer: `PlaytimeManager
+  .startSession` (apply + clear low-memory) and `heartbeat()` (15s, picks up thermal/battery
+  changes). `Application.onTrimMemory` feeds `setLowMemory`. `Application.onCreate` calls
+  `FpsOptimizationService.init`.
+- The switch re-applies immediately (`apply()`), so toggling it mid-session works without a
+  restart; `syncPerformanceDependentSwitches` also re-applies after a preset change.
+
+## Pure-rule extraction for JVM tests (VersionCodeNormalizer)
+- A rule that lives inside a class whose **static initializer loads a native library** cannot be
+  unit-tested: initialising `LibBindings` in a plain JVM test throws `ExceptionInInitializerError`
+  (its `System.loadLibrary` + `android.util.Log` fail off-device). The fix is to extract the pure
+  part (here version parsing) into a standalone class - `VersionCodeNormalizer` - and have the JNI
+  class delegate to it. `VersionCodeNormalizerTest` then covers the rule with no device and no
+  mocks. Apply the same shape to any other pure rule otherwise trapped behind a native-loading
+  class.
+
+## Text input path (Enter-in-chat crash)
+- A committed control code point (Enter arrives as `'\n'` from several IMEs) must not be replayed
+  as a synthetic character key - that is what crashed the instance. `TextInputSanitizer`
+  (`sanitizeUnicodeChar` for the hardware path, `isKeyFallbackCodePoint` for the synthetic-key
+  fallback) encodes the rule; the preloader's `nativeOnTextInput` skips non-printable code points
+  too, and the dedicated key code still delivers the Enter press. The preloader also wraps every
+  registered input callback in a try/catch so a throwing mod reads as "not consumed" instead of
+  unwinding through the game's dispatch and killing the session.

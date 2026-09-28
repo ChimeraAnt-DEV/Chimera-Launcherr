@@ -39,6 +39,9 @@ import java.util.Set;
  */
 public class Controller3DView extends View {
 
+    /** Bezier samples per shell segment used for the fit; matches the draw path. */
+    private static final int SHELL_SAMPLES = 14;
+
     private ControllerType type = ControllerType.XBOX;
     private final Set<String> glow = new HashSet<>();
     private final Set<String> confirmed = new HashSet<>();
@@ -223,20 +226,46 @@ public class Controller3DView extends View {
         return getHeight() / 2f;
     }
 
-    /** Uniform scale so the pad fits with a margin; the projected region radius is the pad's own. */
+    /**
+     * Uniform scale so the whole pad, shoulder controls included, fits with a margin.
+     *
+     * <p>Fitted from {@link Controller3DProjection#unitBounds} rather than a fixed divisor: the
+     * triggers and bumpers sit above the shell and are drawn larger by perspective, so the drawn
+     * shape is taller than the body. A fixed {@code height / 2.1} left them off the top edge,
+     * which is why the back triggers never showed.
+     */
     private float scale() {
         float w = getWidth();
         float h = getHeight();
-        float s = Math.min(w / 3.1f, h / 2.1f);
-        return s <= 0 ? 1f : s;
+        if (w <= 0 || h <= 0) return 1f;
+        float[] b = Controller3DProjection.unitBounds(type, SHELL_SAMPLES);
+        float spanX = Math.max(0.001f, b[2] - b[0]);
+        float spanY = Math.max(0.001f, b[3] - b[1]);
+        return Math.min(w * 0.92f / spanX, h * 0.92f / spanY);
+    }
+
+    /**
+     * Screen centre for the fitted pad.
+     *
+     * <p>The illustration is not symmetric about the face centre (the triggers extend upward), so
+     * the centre is placed at the middle of the measured bounds rather than at the view's centre.
+     */
+    private void fittedCenter(float scale, float[] out) {
+        float[] b = Controller3DProjection.unitBounds(type, SHELL_SAMPLES);
+        float midX = (b[0] + b[2]) / 2f;
+        float midY = (b[1] + b[3]) / 2f;
+        out[0] = centerX() - midX * scale;
+        out[1] = centerY() - midY * scale;
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         float scale = scale();
-        float cx = centerX();
-        float cy = centerY();
+        float[] centre = new float[2];
+        fittedCenter(scale, centre);
+        float cx = centre[0];
+        float cy = centre[1];
 
         List<Projected> regions = Controller3DProjection.project(type, scale, cx, cy);
 

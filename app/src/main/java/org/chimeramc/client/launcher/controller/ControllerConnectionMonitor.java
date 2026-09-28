@@ -84,8 +84,34 @@ public final class ControllerConnectionMonitor {
         this.inputManager = (InputManager) appContext.getSystemService(Context.INPUT_SERVICE);
     }
 
+    /**
+     * Attaches the callback that shows the pill.
+     *
+     * <p>Attaching also re-announces pads that were already plugged in. Without it a controller
+     * connected before the app launched — or while no screen was listening — was never announced
+     * at all, because the platform only delivers an add callback at the moment of the add.
+     */
     public void setListener(Listener listener) {
         this.listener = listener;
+        if (listener != null) {
+            mainHandler.post(this::announceExisting);
+        }
+    }
+
+    /**
+     * Detaches a listener, but only if it is still the current one.
+     *
+     * <p>Navigation here is activity-based: switching tabs starts the next Activity and stops the
+     * previous one, and the platform runs the new {@code onStart} <em>before</em> the old
+     * {@code onStop}. A plain "clear" from the outgoing screen therefore wiped the listener the
+     * incoming screen had just attached, leaving nobody to draw the pill — the "no controller
+     * notification in the launcher" report. Comparing identity means a stopping Activity can only
+     * remove its own listener.
+     */
+    public void clearListener(Listener listener) {
+        if (this.listener == listener) {
+            this.listener = null;
+        }
     }
 
     /** Registers the listener once; repeated calls are ignored. */
@@ -119,34 +145,13 @@ public final class ControllerConnectionMonitor {
         if (isDebounced(deviceId)) return;
         InputDevice device = InputDevice.getDevice(deviceId);
         if (device == null || !isGamepad(device)) return;
-
-        ControllerType type = ControllerType.from(device);
-        ControllerType effective = type != null ? type : ControllerType.XBOX;
-        String name = displayNameOf(device, effective);
-
-        // Load the pad's profile here rather than waiting for a screen to do it, so its
-        // dead zones and remaps are active the moment the pad is.
-        String profileName = null;
-        try {
-            ControllerProfileManager manager = new ControllerProfileManager(appContext);
-            ControllerProfile profile = manager.getActiveProfile(effective);
-            if (profile != null) {
-                profileName = profile.getName();
-                ControllerInputProcessor.setActiveProfile(effective, profile);
-            }
-        } catch (Exception ignored) {
-            // A profile failure must not stop the notification from being shown.
-        }
-
-        final ControllerType reported = effective;
-        final String reportedProfile = profileName;
-        mainHandler.post(() -> {
-            if (listener != null) listener.onControllerConnected(name, reported, reportedProfile);
-        });
+        announce(device);
     }
 
     private void handleRemoved(int deviceId) {
         if (isDebounced(deviceId)) return;
+        // Forget it, so unplugging and plugging the same pad announces the reconnect.
+        announcedIds.remove(deviceId);
         // The device is already gone, so its name cannot be read now; the last known id is all
         // we have. A generic label is used when nothing was cached for it.
         String name = lastKnownNames.remove(deviceId);
@@ -159,6 +164,72 @@ public final class ControllerConnectionMonitor {
 
     /** Names seen at connect time, so a disconnect can still name the pad that left. */
     private final java.util.Map<Integer, String> lastKnownNames = new java.util.HashMap<>();
+
+    /** Device ids already announced, so a listener attach does not repeat the pill. */
+    private final java.util.Set<Integer> announcedIds = new java.util.HashSet<>();
+
+    /**
+     * Announces every gamepad that is already attached.
+     *
+     * <p>Runs when a listener attaches rather than at registration, so the pill appears on the
+     * first screen that can draw it. The debounce is deliberately bypassed here: this is a
+     * first-sight announcement, not a device event, and routing it through {@code isDebounced}
+     * would let a reconnect race swallow it.
+     */
+    private void announceExisting() {
+        if (listener == null || inputManager == null) return;
+        int[] ids;
+        try {
+            ids = inputManager.getInputDeviceIds();
+        } catch (Exception e) {
+            return;
+        }
+        if (ids == null) return;
+        for (int id : ids) {
+            // Only first sight. Re-announcing on every listener attach would show the pill each
+            // time the user switched tabs, which is the spam the debounce exists to prevent.
+            if (announcedIds.contains(id)) continue;
+            InputDevice device = InputDevice.getDevice(id);
+            if (device == null || !isGamepad(device)) continue;
+            announce(device);
+        }
+    }
+
+    /** Classifies a pad, loads its profile and delivers the connected callback. */
+    private void announce(InputDevice device) {
+        announcedIds.add(device.getId());
+        ControllerType type = ControllerType.from(device);
+        ControllerType effective = type != null ? type : ControllerType.XBOX;
+        String name = displayNameOf(device, effective);
+
+        String profileName = loadProfile(effective);
+
+        final ControllerType reported = effective;
+        final String reportedProfile = profileName;
+        mainHandler.post(() -> {
+            if (listener != null) listener.onControllerConnected(name, reported, reportedProfile);
+        });
+    }
+
+    /**
+     * Applies the saved profile for this pad type and returns its name, or null.
+     *
+     * <p>Loading it here rather than waiting for a screen means the pad's dead zones and remaps
+     * are active the moment it is seen, wherever the user is.
+     */
+    private String loadProfile(ControllerType effective) {
+        try {
+            ControllerProfileManager manager = new ControllerProfileManager(appContext);
+            ControllerProfile profile = manager.getActiveProfile(effective);
+            if (profile != null) {
+                ControllerInputProcessor.setActiveProfile(effective, profile);
+                return profile.getName();
+            }
+        } catch (Exception ignored) {
+            // A profile failure must not stop the notification from being shown.
+        }
+        return null;
+    }
 
     private boolean isDebounced(int deviceId) {
         long now = System.currentTimeMillis();

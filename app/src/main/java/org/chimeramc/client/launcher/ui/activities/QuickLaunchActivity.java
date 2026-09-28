@@ -286,14 +286,20 @@ public class QuickLaunchActivity extends BaseActivity {
     private void addServerToFile(String name, String ip, int port) {
         VersionManager vm = VersionManager.get(this);
         GameVersion version = vm.getSelectedVersion();
-        if (version == null) {
-            Toast.makeText(this, R.string.skins_no_version, Toast.LENGTH_LONG).show();
+        // Servers live in the shared game data root too, so adding one does not actually require a
+        // selected instance. The guard used to reject the action with an unrelated "no version"
+        // skin string, which is why "add server" failed outright before choosing an instance.
+        String profileId = version != null
+                ? version.getStorageProfileId()
+                : LauncherStorage.INSTALLED_MINECRAFT_PROFILE_ID;
+        boolean isolated = version != null && version.versionIsolation;
+        FeatureSettings.StorageType storageType = LauncherStorage.normalizeContentStorageType(
+                LauncherStorage.readSavedContentStorageType(this), isolated);
+        File gameDataDir = LauncherStorage.getContentGameDataDir(this, profileId, storageType);
+        if (gameDataDir == null) {
+            Toast.makeText(this, R.string.server_add_failed, Toast.LENGTH_LONG).show();
             return;
         }
-        FeatureSettings.StorageType storageType = LauncherStorage.normalizeContentStorageType(
-                LauncherStorage.readSavedContentStorageType(this), version.versionIsolation);
-        File gameDataDir = LauncherStorage.getContentGameDataDir(
-                this, version.getStorageProfileId(), storageType);
         File serverFile = new File(new File(gameDataDir, "minecraftpe"), "external_servers.txt");
 
         final ServerItem server = new ServerItem(name, ip, port);
