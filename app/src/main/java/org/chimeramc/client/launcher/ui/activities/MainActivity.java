@@ -1585,7 +1585,6 @@ import okhttp3.OkHttpClient;
         startActivity(intent);
     }
 
-
     private void launchGame() {
         if (!isVersionManagerReady()) return;
         performActualLaunch();
