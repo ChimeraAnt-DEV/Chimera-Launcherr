@@ -1,0 +1,9 @@
+# Build output
+/voice-relay
+/voice-relay.exe
+/chimeravoicerelay
+/chimeravoicerelay.exe
+
+# Local config with a password must never be committed.
+/relay.json
+/config.local.json
