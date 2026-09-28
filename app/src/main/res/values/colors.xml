@@ -45,7 +45,6 @@
     <color name="text_primary">#1A1730</color>
     <color name="text_secondary">#6B6580</color>
     <color name="qa_icon_color">#000000</color>
-    <color name="ic_launcher_adaptive_back">#F2EFFF</color>
 
     <!-- Brand accents (formerly accent_purple / accent_blue / primary_dark). -->
     <color name="accent_violet">#6D4AFF</color>
