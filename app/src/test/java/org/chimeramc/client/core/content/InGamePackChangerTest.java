@@ -98,6 +98,39 @@ public class InGamePackChangerTest {
     }
 
     @Test
+    public void theVersionIsWrittenAsAnArrayNotAString() throws Exception {
+        // The regression this guards: the game matches a pack-list entry against the manifest's
+        // array version. A string version is not comparable, so the game dropped the pack and an
+        // enabled pack never activated.
+        File root = tempDir();
+        assertTrue(InGamePackChanger.setActive(root, "eeee0000-0000-0000-0000-00000000000e", "2.3.4", true));
+
+        String global = readFile(root, "minecraftpe/global_resource_packs.json");
+        org.junit.Assert.assertTrue(global, global.contains("\"version\": ["));
+        org.junit.Assert.assertTrue(global, global.contains("2"));
+        // No string form of the version survives anywhere in the entry.
+        org.junit.Assert.assertFalse(global, global.contains("\"2.3.4\""));
+    }
+
+    @Test
+    public void aLegacyStringVersionIsNormalisedToAnArrayOnTheNextWrite() throws Exception {
+        File root = tempDir();
+        writeWorld(root, "World", "[{\"pack_id\":\"aaaa0000-0000-0000-0000-00000000000a\",\"version\":\"1.0.0\"}]");
+        writeGlobal(root, "[{\"pack_id\":\"bbbb0000-0000-0000-0000-00000000000b\",\"version\":\"1.0.0\"}]");
+
+        // Toggling a different pack rewrites both files and normalises the unrelated entries.
+        assertTrue(InGamePackChanger.setActive(root, "cccc0000-0000-0000-0000-00000000000c", "1.0.0", true));
+
+        assertFalse(readWorld(root, "World").contains("\"1.0.0\""));
+        assertFalse(readFile(root, "minecraftpe/global_resource_packs.json").contains("\"1.0.0\""));
+        assertTrue(readWorld(root, "World").contains("\"version\": ["));
+    }
+
+    private String readFile(File root, String relative) throws Exception {
+        return new String(Files.readAllBytes(new File(root, relative).toPath()));
+    }
+
+    @Test
     public void corruptGlobalListIsReplacedNotPreserved() throws Exception {
         File root = tempDir();
         writeGlobal(root, "{ this is not an array");

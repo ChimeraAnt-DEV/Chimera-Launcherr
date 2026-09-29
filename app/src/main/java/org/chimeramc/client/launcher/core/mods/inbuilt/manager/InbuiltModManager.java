@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.view.KeyEvent;
 
 import org.chimeramc.client.core.mods.inbuilt.model.ModIds;
+import org.chimeramc.client.core.mods.inbuilt.model.ModLoadoutStore;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -24,6 +25,7 @@ public class InbuiltModManager {
     private static final String KEY_MOD_MENU_CONTROLLER_BIND = "mod_menu_controller_bind";
     private static final String KEY_PAUSE_MENU_ONLY = "pause_menu_only";
     private static final String KEY_FAVORITE_MOD_KEYS = "favorite_mod_keys";
+    private static final String KEY_MOD_LOADOUTS = "mod_loadouts";
     private static final String KEY_INBUILT_MOD_ENABLED_PREFIX = "inbuilt_mod_enabled_";
     private static final String KEY_EXTERNAL_MODULE_ENABLED_PREFIX = "external_module_enabled_";
     private static final String KEY_ZOOM_LEVEL = "zoom_level";
@@ -973,5 +975,46 @@ public class InbuiltModManager {
     public void setVoiceRelayTokenSecret(String secret) {
         prefs.edit().putString(KEY_VOICE_RELAY_TOKEN_SECRET,
                 secret == null ? "" : secret.trim()).apply();
+    }
+
+    /**
+     * The saved loadouts, parsed from the stored JSON.
+     *
+     * <p>A corrupt value reads as "no loadouts" rather than throwing, so a bad pref cannot take
+     * the Mod Menu down.
+     */
+    public java.util.List<ModLoadoutStore.Loadout> getModLoadouts() {
+        try {
+            return ModLoadoutStore.fromJson(prefs.getString(KEY_MOD_LOADOUTS, "[]"));
+        } catch (Exception e) {
+            return new java.util.ArrayList<>();
+        }
+    }
+
+    public void saveModLoadouts(java.util.List<ModLoadoutStore.Loadout> loadouts) {
+        prefs.edit().putString(KEY_MOD_LOADOUTS, ModLoadoutStore.toJson(loadouts)).apply();
+    }
+
+    /** Saves the current on/off state of every id in {@code moduleIds} under {@code name}. */
+    public void saveLoadout(String name, java.util.List<String> moduleIds) {
+        ModLoadoutStore.Loadout loadout =
+                ModLoadoutStore.capture(name, moduleIds, this::isInbuiltModEnabledOrFalse);
+        saveModLoadouts(ModLoadoutStore.upsert(getModLoadouts(), loadout));
+    }
+
+    /** Applies a saved loadout, returning true when one by that name existed. */
+    public boolean applyLoadout(String name) {
+        ModLoadoutStore.Loadout loadout = ModLoadoutStore.find(getModLoadouts(), name);
+        if (loadout == null) return false;
+        ModLoadoutStore.apply(loadout, this::setInbuiltModEnabled);
+        return true;
+    }
+
+    public void deleteLoadout(String name) {
+        saveModLoadouts(ModLoadoutStore.remove(getModLoadouts(), name));
+    }
+
+    private boolean isInbuiltModEnabledOrFalse(String modId) {
+        return resolveInbuiltModEnabled(modId, false);
     }
 }

@@ -667,6 +667,24 @@ these are the conclusions.
   writes to **every candidate game-data root** (`LauncherStorage.getCandidateGameDataDirs`) -- the
   same defence the cape installer uses, because the game picks its storage from isolation and
   internal/external, and a write to only the wrong guess is silently ignored.
+- **The pack-list `version` must be a three-number array (`[1,0,0]`), never a string.** The game
+  matches the entry against the manifest's own array version, so `"version": "1.0.0"` is not
+  comparable and the pack is dropped silently -- it applies to the in-game changer, skin packs and
+  cape packs alike because they all share this list. Every writer (`InGamePackChanger`,
+  `SkinPackActivator`) routes through a `versionArray` helper, and existing string entries are
+  normalised on the next rewrite. `InGamePackChangerTest.theVersionIsWrittenAsAnArrayNotAString`
+  and `CapeInGameInstallerTest.theGlobalEntryVersionIsAnArraySoTheGameMatchesThePack` pin it.
+- **A live in-place reload is not possible without a native hook.** The game caches its pack stack
+  when the world loads, and `PreloaderInput.nativeReloadResourcePacks()` is only a *seam* -- the
+  preloader submodule exports no implementation, so it returns false. The honest behaviour is
+  therefore: write both the global list and the running world's own `world_resource_packs.json`
+  (which the running world does read), then report `pack_changer_reload_on_next_load` rather than
+  claiming the change is live. `/reload all` exists in-game but the launcher has no supported way
+  to drive it, so do not promise an in-place reload.
+- The `InGamePackChanger.Reloader` is installed from `InbuiltOverlayManager.showEnabledOverlays()`,
+  **not** as a side effect of starting voice chat (which is how it was first wired, leaving the
+  pack changer with no reloader whenever the voice module happened to be off).
+
 
 ## Mod Menu focus highlight (the "50% white overlay")
 - **The white wash is the platform's default focus highlight.** A clickable View is implicitly

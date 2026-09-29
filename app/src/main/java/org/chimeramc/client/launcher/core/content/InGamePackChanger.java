@@ -221,17 +221,22 @@ public final class InGamePackChanger {
             for (JsonElement element : existing) {
                 if (!element.isJsonObject()) continue;
                 JsonObject object = element.getAsJsonObject();
-                boolean same = object.has("pack_id")
-                        && object.get("pack_id").getAsString().trim().toLowerCase(Locale.ROOT).equals(key);
-                if (same) continue;
-                kept.add(object);
+                if (!object.has("pack_id")) continue;
+                String packId = object.get("pack_id").getAsString().trim().toLowerCase(Locale.ROOT);
+                if (packId.equals(key)) continue;
+                // Re-emit with the version as an array: a string version (what this writer used to
+                // produce) makes the game fail to match the pack and drop it silently.
+                JsonObject clean = new JsonObject();
+                clean.addProperty("pack_id", packId);
+                clean.add("version", versionArray(versionOf(object)));
+                kept.add(clean);
             }
         }
 
         if (active) {
             JsonObject entry = new JsonObject();
             entry.addProperty("pack_id", key);
-            entry.addProperty("version", version == null || version.isEmpty() ? "1.0.0" : version);
+            entry.add("version", versionArray(version));
             kept.add(entry);
         }
 
@@ -275,6 +280,49 @@ public final class InGamePackChanger {
     private static File globalFile(File gameDataDir) {
         if (gameDataDir == null) return null;
         return new File(new File(gameDataDir, MINECRAFT_PE_DIR), GLOBAL_RESOURCE_PACKS);
+    }
+
+    /**
+     * Coerces a version to the JSON form the game expects: a three-number array ({@code [1,0,0]}).
+     *
+     * <p>The pack files are matched on this value, and a <em>string</em> version is not comparable
+     * to the manifest's array, so the entry is dropped and the pack never activates. Everything
+     * this class writes therefore goes through here, and a legacy string version already on disk is
+     * normalised on the next rewrite.
+     */
+    private static JsonArray versionArray(String version) {
+        int[] parts = {1, 0, 0};
+        if (version != null && !version.trim().isEmpty()) {
+            String[] tokens = version.trim().split("\\.");
+            for (int i = 0; i < 3 && i < tokens.length; i++) {
+                try {
+                    parts[i] = Integer.parseInt(tokens[i].trim());
+                } catch (NumberFormatException ignored) {
+                    parts[i] = 0;
+                }
+            }
+        }
+        JsonArray array = new JsonArray();
+        array.add(parts[0]);
+        array.add(parts[1]);
+        array.add(parts[2]);
+        return array;
+    }
+
+    /** Reads a version entry whether it was written as a string or an array (or is absent). */
+    private static String versionOf(JsonObject entry) {
+        if (!entry.has("version")) return null;
+        JsonElement value = entry.get("version");
+        if (value.isJsonArray()) {
+            JsonArray array = value.getAsJsonArray();
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < array.size(); i++) {
+                if (i > 0) builder.append('.');
+                builder.append(array.get(i).getAsInt());
+            }
+            return builder.toString();
+        }
+        return value.getAsString();
     }
 
     private static JsonArray readGlobalArray(File global) {

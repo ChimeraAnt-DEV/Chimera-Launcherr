@@ -80,6 +80,13 @@ public class InbuiltOverlayManager {
         InbuiltModManager manager = InbuiltModManager.getInstance(activity);
         if (!manager.isModMenuEnabled()) return;
 
+        // The in-game pack changer must be able to nudge the live session whether or not voice
+        // chat happens to be running, so the reloader is installed here, not as a side effect of
+        // starting the voice link. Without it a pack toggle writes the files but the loaded world
+        // keeps its cached stack until the next load.
+        org.chimeramc.client.core.content.InGamePackChanger.setReloader(
+                org.chimeramc.client.preloader.PreloaderInput::reloadResourcePacks);
+
         if (hudOverlay == null) {
             hudOverlay = new HudOverlay(activity);
         }
@@ -817,10 +824,6 @@ public class InbuiltOverlayManager {
             LocalPlayerFeed.install();
             VoiceNametagMod.setTagSource(new VoiceNametagTagFeed());
             module.start(manager);
-            // Let the in-game pack changer nudge the live session; without this the pack write
-            // lands but the running world keeps its cached stack until the next load.
-            org.chimeramc.client.core.content.InGamePackChanger.setReloader(
-                    org.chimeramc.client.preloader.PreloaderInput::reloadResourcePacks);
         } catch (Throwable t) {
             android.util.Log.w("InbuiltOverlayManager", "Could not start voice chat", t);
         }
