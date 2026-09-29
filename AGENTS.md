@@ -760,11 +760,16 @@ these are the conclusions.
   recursively (buttons stay focusable for controller nav). Only the highlight flag is touched,
   never a background.
 - **Clearing the flag is not enough on its own — the held focus must also be released.**
-  `disableFocusHighlight` also calls `clearFocus()`. A highlight can be painted for the view that
-  already holds focus, and a stick nudge can hand focus to the root *after* the helper first ran;
-  clearing the flag does not retroactively remove the highlight from the currently-focused view,
-  so without `clearFocus()` the wash still appears mid-gesture for some builds. All three parts
-  are needed: unfocusable root, cleared flag, released focus.
+  `disableFocusHighlight` also walks every descendant, clears the highlight flag and releases focus
+  from whichever view holds it (`clearFocus()` only if `isFocused()`). A highlight can be painted
+  for the view that already holds focus, and a stick nudge can hand focus to the root *or a card
+  row* *after* the helper first ran; clearing the flag does not retroactively remove the highlight
+  from the currently-focused view, so without releasing focus the wash still appears mid-gesture
+  for some builds. All three parts are needed: unfocusable root, cleared flag, released focus.
+- **Order matters: the suppression must run *after* `setupViews()` / `loadMods()`.** Populating the
+  list can hand focus to its first card, which restores the very highlight the helper had just
+  removed. Both `show()` and `showFallback()` call `disableFocusHighlight(overlayView)` after the
+  populate step. Moving it back before is the regression to watch for if the wash returns.
 
 ## Mod Menu keybinds (keyboard + controller) and the in-game capture
 - The Mod Menu open bind is two independent prefs in `InbuiltModManager`:
