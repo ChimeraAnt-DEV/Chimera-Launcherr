@@ -223,6 +223,10 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         favoriteStates.clear();
         favoriteStates.putAll(nextFavoriteStates);
         diff.dispatchUpdatesTo(this);
+        // A filter change or a refresh renumbers every position, so the controller selection would
+        // point at a different card than the one that was highlighted. Drop it rather than let the
+        // next A press toggle whatever moved under the index.
+        controllerFocus = ModMenuNavigation.NONE;
     }
 
     public boolean isGroupHeader(int position) {
