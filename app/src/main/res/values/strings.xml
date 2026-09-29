@@ -797,6 +797,40 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="mod_menu_compact_desc">Use a smaller menu with a dense module list and compact filters</string>
     <string name="mod_menu_cosmetics">Cosmetics</string>
     <string name="mod_menu_packs">Packs</string>
+
+    <!-- VIP Mod Menu (Screen B). A separate premium screen opened by the in-game bind, distinct
+         from the touch Mod Menu opened by the launcher nav bar. -->
+    <string name="vip_menu_title">VIP Mod Menu</string>
+    <string name="vip_menu_subtitle">Premium in-game control</string>
+    <string name="vip_tab_modules">Modules</string>
+    <string name="vip_tab_controller">Controller</string>
+    <string name="vip_tab_keyboard">Keyboard</string>
+    <string name="vip_mode_controller">Controller detected</string>
+    <string name="vip_mode_keyboard">Keyboard &amp; mouse</string>
+    <string name="vip_close">Close</string>
+    <string name="vip_search_hint">Search modules…</string>
+    <string name="vip_empty_title">Nothing here yet</string>
+    <string name="vip_empty_no_mods">No modules are available for this instance.</string>
+    <string name="vip_empty_no_matches">No module matches that search.</string>
+    <string name="vip_empty_no_controller">No controller detected. Connect a gamepad to configure it.</string>
+    <string name="vip_module_count">%1$d modules</string>
+    <string name="vip_active_count">%1$d active</string>
+    <string name="vip_status_active">ACTIVE</string>
+    <string name="vip_status_off">OFF</string>
+    <string name="vip_status_unavailable">UNAVAILABLE</string>
+    <string name="vip_configure">Configure</string>
+    <string name="vip_live_preview">Live input</string>
+    <string name="vip_keyboard_profile">Keyboard profile</string>
+    <string name="vip_keyboard_hint">Select a control to remap it</string>
+    <string name="vip_controller_profiles">Profiles</string>
+    <string name="vip_controller_active_profile">Active profile</string>
+    <string name="vip_section_remap">Remap</string>
+    <string name="vip_dead_zone">Dead zone</string>
+    <string name="vip_sensitivity">Sensitivity</string>
+    <string name="vip_rumble">Rumble</string>
+    <string name="vip_on">On</string>
+    <string name="vip_off">Off</string>
+
     <string name="pack_changer_title">In-game packs</string>
     <string name="pack_changer_status">%1$d of %2$d resource packs active</string>
     <string name="pack_changer_empty">No resource packs are installed for this instance.</string>

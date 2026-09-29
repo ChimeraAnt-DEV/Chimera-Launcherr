@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    VIP Mod Menu (Screen B).
+
+    A separate, bind-opened screen from the launcher's touch Mod Menu (Screen A). It is drawn in
+    its own window so it cannot inherit an Activity theme, exactly like the touch menu, which is
+    why the palette lives in VipTheme and the shapes are named drawables.
+
+    Layout: a glass top bar (mark, wordmark, live input-mode badge, close), a tab row whose
+    selection indicator slides between tabs, then one content host per section. Controller and
+    Keyboard are inflated into their hosts in code from their own layouts, so this file stays the
+    shell and the two sub-modes stay readable.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/vip_overlay_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#A6000008"
+    android:clickable="true"
+    android:defaultFocusHighlightEnabled="false"
+    android:focusable="false">
+
+    <FrameLayout
+        android:id="@+id/vip_menu_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"
+        android:layout_marginStart="22dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="22dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_vip_panel"
+        android:defaultFocusHighlightEnabled="false"
+        android:elevation="24dp"
+        android:focusable="false">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <!-- Top bar -->
+            <LinearLayout
+                android:id="@+id/vip_topbar"
+                android:layout_width="match_parent"
+                android:layout_height="58dp"
+                android:background="@drawable/bg_vip_topbar"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="10dp">
+
+                <FrameLayout
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:background="@drawable/bg_vip_icon_tile">
+
+                    <ImageView
+                        android:id="@+id/vip_logo"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@string/app_name"
+                        android:src="@drawable/ic_glowberry_logo"
+                        android:tint="#FFFFFF" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/vip_title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:letterSpacing="0.02"
+                        android:text="@string/vip_menu_title"
+                        android:textColor="#F4F1FF"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/vip_subtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/vip_menu_subtitle"
+                        android:textColor="#8B85A3"
+                        android:textSize="10sp"
+                        android:letterSpacing="0.06" />
+                </LinearLayout>
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/vip_mode_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_vip_status_off"
+                    android:drawableStart="@drawable/ic_controller"
+                    android:drawablePadding="6dp"
+                    android:drawableTint="#7C5CFF"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="6dp"
+                    android:text="@string/vip_mode_keyboard"
+                    android:textColor="#B6B0CC"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <ImageButton
+                    android:id="@+id/vip_close"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/bg_vip_icon_button"
+                    android:contentDescription="@string/vip_close"
+                    android:padding="9dp"
+                    android:src="@drawable/ic_close"
+                    android:tint="#E6E1F5" />
+            </LinearLayout>
+
+            <!-- Tab row with a sliding selection indicator -->
+            <FrameLayout
+                android:id="@+id/vip_tab_host"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:background="#140F24">
+
+                <LinearLayout
+                    android:id="@+id/vip_tab_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp">
+
+                    <TextView
+                        android:id="@+id/vip_tab_modules"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:defaultFocusHighlightEnabled="false"
+                        android:drawableStart="@drawable/ic_modules"
+                        android:drawablePadding="8dp"
+                        android:drawableTint="#B6B0CC"
+                        android:gravity="center_vertical"
+                        android:minHeight="34dp"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="16dp"
+                        android:text="@string/vip_tab_modules"
+                        android:textColor="#B6B0CC"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/vip_tab_controller"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:defaultFocusHighlightEnabled="false"
+                        android:drawableStart="@drawable/ic_controller"
+                        android:drawablePadding="8dp"
+                        android:drawableTint="#B6B0CC"
+                        android:gravity="center_vertical"
+                        android:minHeight="34dp"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="16dp"
+                        android:text="@string/vip_tab_controller"
+                        android:textColor="#B6B0CC"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/vip_tab_keyboard"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:defaultFocusHighlightEnabled="false"
+                        android:drawableStart="@drawable/ic_keyboard"
+                        android:drawablePadding="8dp"
+                        android:drawableTint="#B6B0CC"
+                        android:gravity="center_vertical"
+                        android:minHeight="34dp"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="16dp"
+                        android:text="@string/vip_tab_keyboard"
+                        android:textColor="#B6B0CC"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/vip_tab_indicator"
+                    android:layout_width="60dp"
+                    android:layout_height="3dp"
+                    android:layout_gravity="bottom|start"
+                    android:layout_marginBottom="3dp"
+                    android:background="@drawable/bg_vip_tab_indicator" />
+            </FrameLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#2E2A44" />
+
+            <!-- Section hosts -->
+            <FrameLayout
+                android:id="@+id/vip_content"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <LinearLayout
+                    android:id="@+id/vip_modules_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="16dp"
+                        android:paddingTop="12dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="4dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="38dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_vip_search"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingStart="12dp"
+                            android:paddingEnd="6dp">
+
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:contentDescription="@null"
+                                android:src="@drawable/ic_search"
+                                android:tint="#8B85A3" />
+
+                            <EditText
+                                android:id="@+id/vip_search_input"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                android:background="@android:color/transparent"
+                                android:hint="@string/vip_search_hint"
+                                android:imeOptions="actionSearch"
+                                android:inputType="text"
+                                android:singleLine="true"
+                                android:textColor="#F4F1FF"
+                                android:textColorHint="#7B7591"
+                                android:textSize="12sp" />
+
+                            <ImageButton
+                                android:id="@+id/vip_search_clear"
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/cancel"
+                                android:padding="3dp"
+                                android:src="@drawable/ic_close"
+                                android:tint="#8B85A3"
+                                android:visibility="gone" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/vip_module_count"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:textColor="#8B85A3"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.06" />
+
+                        <TextView
+                            android:id="@+id/vip_active_count"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:background="@drawable/bg_vip_status_on"
+                            android:paddingStart="10dp"
+                            android:paddingTop="4dp"
+                            android:paddingEnd="10dp"
+                            android:paddingBottom="4dp"
+                            android:textColor="#3DDC97"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1">
+
+                        <androidx.recyclerview.widget.RecyclerView
+                            android:id="@+id/vip_mods_recycler"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:clipToPadding="false"
+                            android:defaultFocusHighlightEnabled="false"
+                            android:focusable="false"
+                            android:paddingStart="10dp"
+                            android:paddingTop="6dp"
+                            android:paddingEnd="10dp"
+                            android:paddingBottom="14dp" />
+
+                        <include
+                            android:id="@+id/vip_skeleton"
+                            layout="@layout/vip_menu_skeleton"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent" />
+
+                        <include
+                            android:id="@+id/vip_empty"
+                            layout="@layout/vip_menu_empty"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center" />
+                    </FrameLayout>
+                </LinearLayout>
+
+                <FrameLayout
+                    android:id="@+id/vip_controller_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+
+                <FrameLayout
+                    android:id="@+id/vip_keyboard_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+
+                <!-- Module settings, opened from a card's gear. Kept inside the VIP shell so the
+                     premium chrome (top bar, tabs) never disappears while configuring. -->
+                <FrameLayout
+                    android:id="@+id/vip_config_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#0E0C1C"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="vertical">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingStart="12dp"
+                            android:paddingTop="10dp"
+                            android:paddingEnd="12dp"
+                            android:paddingBottom="6dp">
+
+                            <ImageButton
+                                android:id="@+id/vip_config_back"
+                                android:layout_width="34dp"
+                                android:layout_height="34dp"
+                                android:background="@drawable/bg_vip_icon_button"
+                                android:contentDescription="@string/cancel"
+                                android:padding="8dp"
+                                android:src="@drawable/ic_arrow_back"
+                                android:tint="#E6E1F5" />
+
+                            <TextView
+                                android:id="@+id/vip_config_title"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="12dp"
+                                android:textColor="#F4F1FF"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <ScrollView
+                            android:layout_width="match_parent"
+                            android:layout_height="0dp"
+                            android:layout_weight="1"
+                            android:fillViewport="true"
+                            android:scrollbars="none">
+
+                            <LinearLayout
+                                android:id="@+id/vip_config_content"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="14dp" />
+                        </ScrollView>
+                    </LinearLayout>
+                </FrameLayout>
+            </FrameLayout>
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>

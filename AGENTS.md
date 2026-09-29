@@ -751,6 +751,30 @@ these are the conclusions.
   pack changer with no reloader whenever the voice module happened to be off).
 
 
+## VIP Mod Menu (Screen B) vs the touch Mod Menu (Screen A)
+- **Two screens, not two versions of one.** Screen A is the existing touch Mod Menu (`ModMenuOverlay`), opened from the
+  launcher nav bar's Controller tab; it stays exactly as it was. Screen B is the premium VIP Mod Menu
+  (`org.chimeramc.client.core.mods.inbuilt.vip.VipModMenuOverlay`), opened **only** by the in-game bind
+  (`InbuiltOverlayManager.handleKeyEvent` → `ModMenuButton.toggleMenuFromBind`). A bind press must never open Screen A, and the
+  nav bar must keep the Controller tab. Do not merge them or ship one as a "version" of the other.
+- **Screen B is bind-driven, so it selects its own sub-mode from the input family.** `VipInputMode.forGamepad(hasGamepad)` (pure)
+  returns CONTROLLER or KEYBOARD, and `VipTab.defaultFor(mode)` opens the matching surface; the shared module list is
+  one shoulder press away. Touch is deliberately not a VIP mode — the touch surface is Screen A.
+- `VipTab` declaration order is both the tab order and the L1/R1 cycle order (`next()`/`previous()` wrap), exactly like
+  `LauncherTab`. `MODULES` is the grid; `CONTROLLER`/`KEYBOARD` are the two sub-modes of the same screen.
+- **`VipKeyLayout` owns the keyboard geometry** (a 7-row board including the arrow cluster), so `KeyboardIllustrationView`
+  only paints. `VipMenuLogicTest` pins the invariants — every letter row sums to the board width, no two caps on a row
+  overlap, every cap stays inside the board — and it already caught a real arrow-cluster overlap. Rounded/extent-bearing
+  caps must be tested with their real extents, not as circles.
+- **The VIP overlay is the one that wins controller input while open.** `InbuiltOverlayManager.handleMenuControllerKey`
+  and `handleMenuControllerMotion` check the open VIP overlay before Screen A's `ModMenuOverlay`, so a pad drives whichever
+  screen is showing and never both. `ModMenuButton.isMenuShowing()` covers both screens so the HUD-visibility tick does not
+  leave a VIP overlay stranded when the pause menu closes.
+- **`MenuBindRelay` is the single in-game bind-capture sink** (`set`/`clear`/`deliver`/`isCapturing`), shared by Screen A's
+  bind picker and the VIP keyboard tab, replacing the two separate capture paths that had drifted.
+- `VipTheme` holds the 3-4 tier VIP palette and glass/elevation tokens as named constants; `bg_vip_*` drawables and
+  `ic_vip_*` icons are the premium surface. Do not add raw ARGB literals in the VIP layouts — add a token.
+
 ## Mod Menu focus highlight (the "50% white overlay")
 - **The white wash is the platform's default focus highlight.** A clickable View is implicitly
   focusable, so the d-pad/analogue stick moved focus onto the overlay root and the framework
