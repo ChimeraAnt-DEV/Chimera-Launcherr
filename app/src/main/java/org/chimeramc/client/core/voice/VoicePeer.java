@@ -31,6 +31,13 @@ public final class VoicePeer {
     public final float level;
     /** True when the peer has muted their own microphone (their own choice, not the listener's). */
     public final boolean selfMuted;
+    /**
+     * The peer's own view yaw/pitch in degrees, or 0 when unknown.
+     *
+     * <p>0 is the "unknown" sentinel, exactly as on the wire: a peer whose facing we were never
+     * told must not be drawn as looking along a real heading.
+     */
+    public final float yaw, pitch;
     /** Uptime milliseconds when this peer last advertised. */
     public final long lastSeenMs;
 
@@ -49,6 +56,14 @@ public final class VoicePeer {
     public VoicePeer(String id, String name, float x, float y, float z,
                      String channel, String channelName, byte visibility,
                      int capacity, float level, boolean selfMuted, long lastSeenMs) {
+        this(id, name, x, y, z, channel, channelName, visibility,
+                capacity, level, selfMuted, 0f, 0f, lastSeenMs);
+    }
+
+    public VoicePeer(String id, String name, float x, float y, float z,
+                     String channel, String channelName, byte visibility,
+                     int capacity, float level, boolean selfMuted,
+                     float yaw, float pitch, long lastSeenMs) {
         this.id = id;
         this.name = name == null || name.trim().isEmpty() ? "Player" : name.trim();
         this.x = x;
@@ -63,6 +78,8 @@ public final class VoicePeer {
         this.capacity = VoiceProtocol.normalizeCapacity(capacity);
         this.level = VoiceProtocol.clampLevel(level);
         this.selfMuted = selfMuted;
+        this.yaw = yaw;
+        this.pitch = pitch;
         this.lastSeenMs = lastSeenMs;
     }
 
@@ -90,22 +107,28 @@ public final class VoicePeer {
 
     public VoicePeer seenAt(long uptimeMs) {
         return new VoicePeer(id, name, x, y, z, channel, channelName, visibility,
-                capacity, level, selfMuted, uptimeMs);
+                capacity, level, selfMuted, yaw, pitch, uptimeMs);
+    }
+
+    /** Returns a copy carrying a fresh position and rotation, as advertised on the wire. */
+    public VoicePeer withPose(float nx, float ny, float nz, float nYaw, float nPitch) {
+        return new VoicePeer(id, name, nx, ny, nz, channel, channelName, visibility,
+                capacity, level, selfMuted, nYaw, nPitch, lastSeenMs);
     }
 
     public VoicePeer withState(float nx, float ny, float nz, String nChannel) {
         return new VoicePeer(id, name, nx, ny, nz, nChannel, channelName, visibility,
-                capacity, level, selfMuted, lastSeenMs);
+                capacity, level, selfMuted, yaw, pitch, lastSeenMs);
     }
 
     public VoicePeer withChannel(String nChannel, String nChannelName, byte nVisibility) {
         return new VoicePeer(id, name, x, y, z, nChannel, nChannelName, nVisibility,
-                capacity, level, selfMuted, lastSeenMs);
+                capacity, level, selfMuted, yaw, pitch, lastSeenMs);
     }
 
     /** Returns a copy carrying a fresh level/mute pair, as advertised on the wire. */
     public VoicePeer withLevel(float nLevel, boolean nMuted) {
         return new VoicePeer(id, name, x, y, z, channel, channelName, visibility,
-                capacity, nLevel, nMuted, lastSeenMs);
+                capacity, nLevel, nMuted, yaw, pitch, lastSeenMs);
     }
 }

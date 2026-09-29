@@ -35,6 +35,8 @@ import org.chimeramc.client.core.mods.inbuilt.model.ModIds;
  */
 public final class HitboxOverlay {
     private static final int REFRESH_MS = 33;
+    /** How far a peer's look ray is drawn, in blocks. */
+    private static final float LOOK_LINE_BLOCKS = 10f;
 
     private static final int COLOR_ENTITY = 0xFFF2F2F2;
     private static final int COLOR_AIMED = 0xFF3DA9FC;
@@ -239,6 +241,21 @@ public final class HitboxOverlay {
                 boxPaint.setColor(base);
                 canvas.drawRect(p.box.left, p.box.top, p.box.right, p.box.bottom, boxPaint);
                 drawPeerGuides(canvas, p);
+            }
+
+            // Look-direction rays last, so a line is never painted over by a nearer box's fill.
+            // Colour matches the aimed-at blue, because both answer "where is this player looking".
+            if (HitboxMod.isShowLookLine()) {
+                boxPaint.setStrokeWidth(Math.max(1.5f, density));
+                boxPaint.setColor(COLOR_AIMED);
+                for (PeerHitboxSource.PeerHitbox peer : peers) {
+                    if (!peer.hasRotation) continue;
+                    HitboxProjector.Rect ray = HitboxProjector.peerLookRay(
+                            peer.entity.x, peer.entity.y, peer.entity.z,
+                            peer.yaw, peer.pitch, LOOK_LINE_BLOCKS, basis);
+                    if (ray == null) continue;
+                    canvas.drawLine(ray.left, ray.top, ray.right, ray.bottom, boxPaint);
+                }
             }
             return true;
         }

@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import org.chimeramc.client.R;
 import org.chimeramc.client.core.mods.inbuilt.UnifiedMod;
+import org.chimeramc.client.core.mods.inbuilt.model.ModAvailability;
 import org.chimeramc.client.ui.animation.DynamicAnim;
 
 import java.util.ArrayList;
@@ -222,14 +223,25 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         }
 
         boolean isEnabled = toggleStates.getOrDefault(mod.getStableKey(), false);
-        updateStatusView(modHolder, isEnabled);
+        boolean available = ModAvailability.isInteractive(mod.getId());
+        updateStatusView(modHolder, isEnabled, available);
         updateAccentBar(modHolder, mod.getGroupId(), isEnabled);
         updateFavoriteView(modHolder, favoriteStates.getOrDefault(mod.getStableKey(), false));
+        updateUnavailableView(modHolder, mod);
 
         View.OnClickListener toggleClick = v -> {
+            // A module that cannot do its job must not look toggleable. The label says why, and
+            // the click is dropped instead of flipping a switch that changes nothing on screen.
+            if (!available) {
+                if (modHolder.unavailableText != null) {
+                    android.widget.Toast.makeText(modHolder.itemView.getContext(),
+                            R.string.mod_unavailable_reason, android.widget.Toast.LENGTH_SHORT).show();
+                }
+                return;
+            }
             boolean newState = !toggleStates.getOrDefault(mod.getStableKey(), false);
             toggleStates.put(mod.getStableKey(), newState);
-            updateStatusView(modHolder, newState);
+            updateStatusView(modHolder, newState, true);
             updateAccentBar(modHolder, mod.getGroupId(), newState);
             // Per-icon behaviour on flip, not a generic bounce: Armor HUD "equips", the Voice mic
             // pulses. Only modules with distinct iconography animate; the rest fall through.
@@ -254,7 +266,7 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             }
         });
 
-        if (mod.hasConfig()) {
+        if (mod.hasConfig() && available) {
             modHolder.configBtn.setVisibility(View.VISIBLE);
             modHolder.configBtn.setOnClickListener(v -> {
                 if (listener != null) {
@@ -265,7 +277,20 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             modHolder.configBtn.setVisibility(View.GONE);
         }
 
-        updateCardState(modHolder, isEnabled);
+        updateCardState(modHolder, isEnabled, available);
+    }
+
+    /**
+     * Shows or hides the "doesn't work or is bugged" outline.
+     *
+     * <p>A module whose game feed has no provider is not merely off — it cannot be turned on. The
+     * label is the whole point: without it the card looks like every other disabled module and the
+     * player assumes their toggle is broken.
+     */
+    private void updateUnavailableView(ModViewHolder holder, UnifiedMod mod) {
+        if (holder.unavailableText == null) return;
+        boolean unavailable = ModAvailability.isUnavailable(mod.getId());
+        holder.unavailableText.setVisibility(unavailable ? View.VISIBLE : View.GONE);
     }
 
     @Override
@@ -282,7 +307,8 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             favorite ? R.string.mod_menu_unfavorite : R.string.mod_menu_favorite));
     }
 
-    private void updateStatusView(ModViewHolder holder, boolean enabled) {
+    private void updateStatusView(ModViewHolder holder, boolean enabled,
+                                  boolean available) {
         float density = holder.statusText.getResources().getDisplayMetrics().density;
         if (enabled) {
             holder.statusText.setText(R.string.mod_status_enabled);
@@ -298,7 +324,7 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             holder.statusText.setTextColor(0xFFB4BBC3);
             holder.statusText.setBackgroundResource(R.drawable.bg_mod_status_disabled);
         }
-        updateCardState(holder, enabled);
+        updateCardState(holder, enabled, available);
     }
 
     /** Paints the top edge strip so each card carries its section colour. */
@@ -311,15 +337,22 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         holder.accentBar.setBackground(bar);
     }
 
-    private void updateCardState(ModViewHolder holder, boolean enabled) {
-        holder.itemView.setAlpha(1f);
-        holder.icon.setAlpha(enabled ? 1f : 0.8f);
-        holder.name.setTextColor(enabled ? 0xFFF1F4F6 : 0xFFD6DCE2);
+    private void updateCardState(ModViewHolder holder, boolean enabled, boolean available) {
+        // Unavailable wins over the enabled/disabled tint: a greyed card is the whole signal.
+        holder.itemView.setAlpha(available ? 1f : 0.55f);
+        holder.itemView.setEnabled(available);
+        holder.itemView.setClickable(available);
+        holder.statusText.setEnabled(available);
+        holder.icon.setAlpha(!available ? 0.5f : (enabled ? 1f : 0.8f));
+        holder.name.setTextColor(!available ? 0xFF8892A0 : (enabled ? 0xFFF1F4F6 : 0xFFD6DCE2));
         
         if (holder.itemView instanceof androidx.cardview.widget.CardView) {
             androidx.cardview.widget.CardView cv = (androidx.cardview.widget.CardView) holder.itemView;
             
-            if (enabled) {
+            if (!available) {
+                cv.setCardBackgroundColor(0xFF1B1E22);
+                cv.setCardElevation(0f);
+            } else if (enabled) {
                 cv.setCardBackgroundColor(theme.enabledCardColor());
                 cv.setCardElevation(theme.enabledElevation());
             } else {
@@ -394,6 +427,7 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         TextView groupText;
         ImageButton favoriteBtn;
         ImageButton configBtn;
+        TextView unavailableText;
         View accentBar;
 
         ModViewHolder(View itemView) {
@@ -404,6 +438,7 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             groupText = itemView.findViewById(R.id.mod_card_group);
             favoriteBtn = itemView.findViewById(R.id.mod_card_favorite);
             configBtn = itemView.findViewById(R.id.mod_card_config);
+            unavailableText = itemView.findViewById(R.id.mod_card_unavailable);
             accentBar = itemView.findViewById(R.id.mod_card_accent);
         }
     }

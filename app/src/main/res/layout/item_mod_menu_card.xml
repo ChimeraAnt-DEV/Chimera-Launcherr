@@ -117,6 +117,30 @@
 
             </LinearLayout>
 
+            <!--
+                The "doesn't work or is bugged" label. Shown only on a module that needs a game
+                feed this build cannot provide; the whole card is greyed and made unclickable at
+                the same time, so the label and the behaviour always agree. Rounded outline rather
+                than a filled pill so it reads as a warning, not as a status.
+            -->
+            <TextView
+                android:id="@+id/mod_card_unavailable"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_mod_unavailable"
+                android:gravity="center"
+                android:minHeight="26dp"
+                android:paddingStart="10dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="4dp"
+                android:text="@string/mod_unavailable_message"
+                android:textColor="#FF8A80"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
         </LinearLayout>
 
     </LinearLayout>

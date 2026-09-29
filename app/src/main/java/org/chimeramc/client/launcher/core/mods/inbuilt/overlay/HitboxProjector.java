@@ -128,14 +128,7 @@ public final class HitboxProjector {
          * mirrors every projected box horizontally, which a feed supplying real yaw would hit.
          */
         public float[] forward() {
-            double yaw = Math.toRadians(yawDeg);
-            double pitch = Math.toRadians(pitchDeg);
-            double cosPitch = Math.cos(pitch);
-            return new float[]{
-                    (float) (-Math.sin(yaw) * cosPitch),
-                    (float) Math.sin(pitch),
-                    (float) (Math.cos(yaw) * cosPitch)
-            };
+            return forwardFrom(yawDeg, pitchDeg);
         }
     }
 
@@ -264,6 +257,75 @@ public final class HitboxProjector {
      * so a perpendicular is picked from a different axis rather than returning a null basis that
      * would blank the whole frame.
      */
+    /**
+     * Unit forward vector for a yaw/pitch pair, in degrees.
+     *
+     * <p>The one place the yaw convention lives. Yaw increases clockwise seen from above (the
+     * Minecraft convention), so forward's X component is negated relative to the naive spherical
+     * form; getting this sign wrong mirrors every projected box and every peer look line
+     * horizontally. {@link Camera#forward()} and the peer look ray both call this so a box and the
+     * line drawn beside it can never disagree about which way "forward" is.
+     */
+    public static float[] forwardFrom(float yawDeg, float pitchDeg) {
+        double yaw = Math.toRadians(yawDeg);
+        double pitch = Math.toRadians(pitchDeg);
+        double cosPitch = Math.cos(pitch);
+        return new float[]{
+                (float) (-Math.sin(yaw) * cosPitch),
+                (float) Math.sin(pitch),
+                (float) (Math.cos(yaw) * cosPitch)
+        };
+    }
+
+    /**
+     * Projects one world point to screen space, or null when it is behind the near plane.
+     *
+     * <p>Null rather than a clamped value on purpose: a point behind the camera has no screen
+     * position, and drawing a line to an invented one would put a peer's look direction across the
+     * wrong half of the screen.
+     */
+    public static float[] projectPoint(float worldX, float worldY, float worldZ, Basis basis) {
+        if (basis == null) return null;
+        float dx = worldX - basis.camera.x;
+        float dy = worldY - basis.camera.y;
+        float dz = worldZ - basis.camera.z;
+        float depth = dot(dx, dy, dz, basis.forward);
+        if (depth <= NEAR_PLANE) return null;
+        float camX = dot(dx, dy, dz, basis.right);
+        float camY = dot(dx, dy, dz, basis.up);
+        float sx = basis.camera.screenWidth / 2f + (camX / depth) * basis.focal;
+        float sy = basis.camera.screenHeight / 2f - (camY / depth) * basis.focal;
+        return new float[]{sx, sy};
+    }
+
+    /** Eye height above an entity's feet, in blocks; the anchor for a look ray. */
+    public static final float EYE_HEIGHT = 1.62f;
+
+    /**
+     * The screen-space look ray for a peer: from its eye out along its own heading.
+     *
+     * <p>Returns null when the peer advertised no rotation (both angles 0 is the wire's "unknown"
+     * sentinel) or when either end is behind the near plane. A missing line is the honest outcome -
+     * a line at a guessed heading would be worse than none, because the player would trust it.
+     *
+     * @param yawDeg   the peer's yaw, as advertised
+     * @param pitchDeg the peer's pitch, as advertised (positive looking down, Minecraft's sign)
+     */
+    public static Rect peerLookRay(float x, float y, float z, float yawDeg, float pitchDeg,
+                                   float lengthBlocks, Basis basis) {
+        if (basis == null) return null;
+        if (yawDeg == 0f && pitchDeg == 0f) return null;
+        float[] forward = forwardFrom(yawDeg, -pitchDeg);
+        float eyeY = y + EYE_HEIGHT;
+        float[] head = projectPoint(x, eyeY, z, basis);
+        if (head == null) return null;
+        float[] tip = projectPoint(x + forward[0] * lengthBlocks,
+                eyeY + forward[1] * lengthBlocks,
+                z + forward[2] * lengthBlocks, basis);
+        if (tip == null) return null;
+        return new Rect(head[0], head[1], tip[0], tip[1]);
+    }
+
     public static Basis basis(Camera camera) {
         if (camera == null) return null;
         float[] forward = camera.forward();

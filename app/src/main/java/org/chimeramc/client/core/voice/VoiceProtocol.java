@@ -41,15 +41,33 @@ import java.util.Arrays;
  * group would be a needless break. The version on the wire is therefore a property of the
  * transport, not of this class -- {@link #encodeBeacon} stays v3 and the relay builds v4 itself.
  * On decode, v1-v4 are all accepted so one build can hear both a LAN peer and a relay peer.
+ *
+ * <p><b>Version 5</b> adds the sender's own view rotation (yaw and pitch, in degrees) right
+ * after the sequence number. The Hitboxes module needs it: a peer box alone shows where a
+ * player is, but a look-direction line needs which way they are facing, and the only source for
+ * another player's facing is that player telling us. Two floats is the whole change. v1-v4 decode
+ * unchanged with yaw/pitch read as 0 ("unknown"), which draws no look line rather than a line
+ * pointing along a made-up axis.
  */
 public final class VoiceProtocol {
 
     public static final byte[] MAGIC = {'C', 'V'};
 
     /** The current format version, as used by the relay transport. */
-    public static final byte VERSION = 4;
+    public static final byte VERSION = 5;
     /** The version the multicast transport still sends, for LAN compatibility. */
     public static final byte VERSION_MULTICAST = 3;
+
+    /**
+     * The version the relay wire speaks.
+     *
+     * <p>Pinned separately from {@link #VERSION} on purpose. The relay is a separate Go program
+     * whose parser is fixed by cross-language golden vectors, so bumping {@link #VERSION} for a
+     * LAN-only extension must not silently change what the relay is sent. A v5 rotation field on
+     * the relay wire would have to land in the Go parser in the same commit; until then the relay
+     * stays on the v4 shape it was pinned against.
+     */
+    public static final byte VERSION_RELAY = 4;
     /** The oldest format version still accepted, so an older peer is still heard. */
     public static final byte VERSION_LEGACY = 1;
 
@@ -122,6 +140,14 @@ public final class VoiceProtocol {
         public final boolean muted;
         public final float x, y, z;
         public final int sequence;
+        /**
+         * The sender's view yaw/pitch in degrees, or 0 when unknown (v1-v4 packets).
+         *
+         * <p>0 is deliberately the "unknown" sentinel: a v5 sender that genuinely looks straight
+         * along yaw 0 still advertises pitch too, and a peer with no rotation information must draw
+         * no direction line rather than one aimed along an arbitrary axis.
+         */
+        public final float yaw, pitch;
         /** {@link #CODEC_PCM} or {@link #CODEC_OPUS}; PCM for a v3-or-earlier packet. */
         public final byte codec;
         /** The server-assigned client id, or 0 outside the relay. */
@@ -139,7 +165,8 @@ public final class VoiceProtocol {
         private Packet(byte type, String peerId, String name, String deviceId, String channel,
                        byte visibility, String channelName,
                        int capacity, float level, boolean muted,
-                       float x, float y, float z, int sequence, byte codec, long clientId,
+                       float x, float y, float z, int sequence, float yaw, float pitch,
+                       byte codec, long clientId,
                        byte[] payload) {
             this.type = type;
             this.peerId = peerId;
@@ -155,6 +182,8 @@ public final class VoiceProtocol {
             this.y = y;
             this.z = z;
             this.sequence = sequence;
+            this.yaw = yaw;
+            this.pitch = pitch;
             this.codec = codec;
             this.clientId = clientId;
             this.payload = payload;
@@ -172,7 +201,8 @@ public final class VoiceProtocol {
         /** A copy carrying a different payload, so a transport can reframe without re-decoding. */
         public Packet withPayload(byte[] newPayload) {
             return new Packet(type, peerId, name, deviceId, channel, visibility, channelName,
-                    capacity, level, muted, x, y, z, sequence, codec, clientId, newPayload);
+                    capacity, level, muted, x, y, z, sequence, yaw, pitch, codec, clientId,
+                    newPayload);
         }
     }
 
@@ -239,6 +269,22 @@ public final class VoiceProtocol {
                 CAPACITY_NONE, 0f, false, x, y, z, 0, null);
     }
 
+    /**
+     * A version-5 LAN beacon that also carries the sender's view rotation.
+     *
+     * <p>Sent only when a peer must be able to draw another player's look direction; the plain
+     * {@link #encodeBeacon} still speaks v3 so any existing LAN peer keeps working. A receiver that
+     * does not understand v5 would drop it, so this is opt-in at the call site rather than a
+     * blanket change to the multicast version.
+     */
+    public static byte[] encodeBeaconV5(String peerId, String name, String channel,
+                                        byte visibility, String channelName,
+                                        float x, float y, float z, int sequence,
+                                        float yaw, float pitch) {
+        return encode(VERSION, 0L, TYPE_BEACON, peerId, name, "", channel, visibility, channelName,
+                CAPACITY_NONE, 0f, false, x, y, z, sequence, yaw, pitch, CODEC_PCM, null);
+    }
+
     private static byte[] encode(byte type, String peerId, String name, String channel,
                                  byte visibility, String channelName, int capacity,
                                  float level, boolean muted,
@@ -275,6 +321,22 @@ public final class VoiceProtocol {
                                 String deviceId, String channel, byte visibility, String channelName,
                                 int capacity, float level, boolean muted,
                                 float x, float y, float z, int sequence, byte codec, byte[] audio) {
+        return encode(version, clientId, type, peerId, name, deviceId, channel, visibility,
+                channelName, capacity, level, muted, x, y, z, sequence, 0f, 0f, codec, audio);
+    }
+
+    /**
+     * The full encoder, including the v5 view rotation.
+     *
+     * <p>{@code version} selects the wire shape: v3 omits the client id, device id and codec byte;
+     * v4 writes all three; v5 appends yaw/pitch after the sequence number. A caller that has no
+     * rotation information passes 0/0 and the receiver reads "unknown".
+     */
+    public static byte[] encode(byte version, long clientId, byte type, String peerId, String name,
+                                String deviceId, String channel, byte visibility, String channelName,
+                                int capacity, float level, boolean muted,
+                                float x, float y, float z, int sequence, float yaw, float pitch,
+                                byte codec, byte[] audio) {
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             DataOutputStream out = new DataOutputStream(buffer);
@@ -299,6 +361,10 @@ public final class VoiceProtocol {
             out.writeFloat(y);
             out.writeFloat(z);
             out.writeInt(sequence);
+            if (version >= 5) {
+                out.writeFloat(yaw);
+                out.writeFloat(pitch);
+            }
             if (version >= 4) {
                 out.writeByte(normalizeCodec(codec));
             }
@@ -335,8 +401,8 @@ public final class VoiceProtocol {
                                            int capacity, float level, boolean muted,
                                            float x, float y, float z, int sequence, byte codec,
                                            byte[] audio) {
-        return encode(VERSION, clientId, type, peerId, name, "", channel, visibility, channelName,
-                capacity, level, muted, x, y, z, sequence, codec, audio);
+        return encode(VERSION_RELAY, clientId, type, peerId, name, "", channel, visibility,
+                channelName, capacity, level, muted, x, y, z, sequence, codec, audio);
     }
 
     /** As above, but stamps the sender's device id so the relay can bind it to a token/ban. */
@@ -346,7 +412,7 @@ public final class VoiceProtocol {
                                            boolean muted,
                                            float x, float y, float z, int sequence, byte codec,
                                            byte[] audio) {
-        return encode(VERSION, clientId, type, peerId, name, deviceId, channel, visibility,
+        return encode(VERSION_RELAY, clientId, type, peerId, name, deviceId, channel, visibility,
                 channelName, capacity, level, muted, x, y, z, sequence, codec, audio);
     }
 
@@ -358,7 +424,8 @@ public final class VoiceProtocol {
      * when only a password is in use.
      */
     public static byte[] encodeHello(String name, String deviceId, String channel, byte[] credential) {
-        return encode(VERSION, 0L, TYPE_HELLO, "", name, deviceId, channel, VISIBILITY_PUBLIC, "",
+        return encode(VERSION_RELAY, 0L, TYPE_HELLO, "", name, deviceId, channel, VISIBILITY_PUBLIC,
+                "",
                 CAPACITY_NONE, 0f, false, 0f, 0f, 0f, 0, CODEC_OPUS, credential);
     }
 
@@ -369,7 +436,7 @@ public final class VoiceProtocol {
 
     /** A v4 PONG, sent as a keepalive and in reply to a server PING. */
     public static byte[] encodePong(long clientId) {
-        return encode(VERSION, clientId, TYPE_PONG, "", "", "", VoiceChannel.WORLD,
+        return encode(VERSION_RELAY, clientId, TYPE_PONG, "", "", "", VoiceChannel.WORLD,
                 VISIBILITY_PUBLIC, "", CAPACITY_NONE, 0f, false, 0f, 0f, 0f, 0, CODEC_PCM, null);
     }
 
@@ -416,6 +483,14 @@ public final class VoiceProtocol {
             float y = in.readFloat();
             float z = in.readFloat();
             int sequence = in.readInt();
+            // v5 rotation sits between the sequence and the codec byte; an older packet simply
+            // has no rotation, which reads as the "unknown" sentinel.
+            float yaw = 0f;
+            float pitch = 0f;
+            if (version >= 5) {
+                yaw = in.readFloat();
+                pitch = in.readFloat();
+            }
             byte codec = CODEC_PCM;
             if (version >= 4) {
                 codec = normalizeCodec(in.readByte());
@@ -425,7 +500,7 @@ public final class VoiceProtocol {
             byte[] payload = new byte[length];
             in.readFully(payload);
             return new Packet(type, peerId, name, deviceId, channel, visibility, channelName,
-                    capacity, level, muted, x, y, z, sequence, codec, clientId, payload);
+                    capacity, level, muted, x, y, z, sequence, yaw, pitch, codec, clientId, payload);
         } catch (IOException | RuntimeException e) {
             return null;
         }

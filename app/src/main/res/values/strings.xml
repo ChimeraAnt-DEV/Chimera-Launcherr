@@ -898,6 +898,8 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="mod_menu_active_desc">All inbuilt mods are now accessible through the in-game Mod Menu. Disable Mod Menu to add individual overlay buttons.</string>
     <string name="mod_status_enabled">Enabled</string>
     <string name="mod_status_disabled">Disabled</string>
+    <string name="mod_unavailable_message">This Module doesn\'t work or is bugged</string>
+    <string name="mod_unavailable_reason">Needs a game data feed this build cannot provide yet. It is disabled until then.</string>
     <string name="mod_notification_enabled">%s enabled</string>
     <string name="mod_overlay_fps_unknown">FPS: --</string>
     <string name="mod_overlay_fps_value">FPS: %1$d</string>
