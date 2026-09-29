@@ -251,7 +251,9 @@ public class ModMenuOverlay {
             // the whole screen, which reads as "the menu put a 50% white overlay up" whenever the
             // player so much as nudges the stick. The highlight is suppressed here rather than
             // only in XML so it cannot come back through a theme or a re-inflated layout.
-            disableFocusHighlight(overlayView);
+            // Applied *after* setupViews/loadMods below: the module list is populated there and
+            // can take focus for its first card, which would restore the very highlight this
+            // suppresses.
 
             int uiOptions = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                     | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
@@ -271,6 +273,7 @@ public class ModMenuOverlay {
 
             setupViews();
             loadMods();
+            disableFocusHighlight(overlayView);
 
             wmParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -314,9 +317,9 @@ public class ModMenuOverlay {
         if (rootView == null) return;
 
         overlayView = LayoutInflater.from(activity).inflate(R.layout.overlay_mod_menu, null);
-        disableFocusHighlight(overlayView);
         setupViews();
         loadMods();
+        disableFocusHighlight(overlayView);
 
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -353,13 +356,15 @@ public class ModMenuOverlay {
     private static void disableFocusHighlight(View view) {
         if (view == null) return;
         view.setFocusable(false);
+        view.setFocusableInTouchMode(false);
         view.setDefaultFocusHighlightEnabled(false);
         // Clearing an already-held focus matters as much as clearing the flag. The highlight can
         // be painted for the view that holds focus right now, and a stick nudge can hand focus to
-        // the root while the menu is already open — after this helper first ran. Dropping the flag
-        // does not retroactively remove the highlight from the currently-focused view, so focus is
-        // released here; a ViewGroup handles its children below.
-        view.clearFocus();
+        // the root — or, after a rebind, to a card — while the menu is already open. Dropping the
+        // flag does not retroactively remove the highlight from the currently-focused view, so
+        // focus is released here. The walk also clears the flag on every descendant (buttons stay
+        // focusable for controller navigation, but must not paint the highlight), and releases
+        // focus held by any descendant rather than the root alone.
         clearFocusHighlightRecursive(view);
     }
 
@@ -412,6 +417,7 @@ public class ModMenuOverlay {
     private static void clearFocusHighlightRecursive(View view) {
         if (view == null) return;
         view.setDefaultFocusHighlightEnabled(false);
+        if (view.isFocused()) view.clearFocus();
         if (view instanceof ViewGroup) {
             ViewGroup group = (ViewGroup) view;
             for (int i = 0; i < group.getChildCount(); i++) {
