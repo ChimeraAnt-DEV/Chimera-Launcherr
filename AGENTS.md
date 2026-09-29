@@ -373,6 +373,18 @@ only, like the other overlays.
   expose a combo field in the shipped builds (no `combo` symbol exists in the preloader). The
   local counter is the honest deliverable; `hit_timing_scope_note` states the distinction in the
   dialog so the readout cannot be mistaken for the server value.
+## Item/arrow hitboxes - not shipped (documented limitation)
+- Phase 3 asked whether a nearby-entity walk (items, arrows, thrown items within ~16 blocks) is
+  feasible with the existing anchor offsets. It is **not**, for the same reason the mob boxes are
+  not: those entity kinds live in the game's entity list, which this build cannot read (see the
+  native-feed section - game classes export no symbols, and no static vtable address yields a live
+  `Actor*`). The overlay draws them only when a `HitboxMod.EntitySource` supplies a frame, and no
+  provider is installed.
+- **The options are disabled rather than removed** (`hitbox_show_items` / `hitbox_show_projectiles`
+  / `hitbox_show_thrown_items` are in `ModIds.outputRequiresGameData`), so the switch is
+  discoverable but cannot be turned on to no effect. This is the documented limitation the request
+  asked for; do not "finish" it by drawing a guessed box.
+
 ## In-game Mod Menu navigation & overlay visibility
 - The Mod Menu nav is a **top bar** inside `overlay_mod_menu.xml`, not a side rail (landscape-only app; a rail only gets the short edge). Entries live in a `HorizontalScrollView` so compact mode's narrow window still fits every destination and the close button.
 - **An unresolved native HUD hook must not hide a mod's UI.** `OverlayVisibility.showGameOverlays` treats `hudScreenOpen == false` as authoritative only once the hook has fired (`gameWorldSeen`); before that it falls back to `sessionActive`. Without the fallback, an overlay appeared only while the Mod Menu was open and vanished the instant it closed. The fallback signals are part of `tick()`'s state hash — a session starting must re-evaluate visibility even when every native flag is unchanged.
