@@ -772,6 +772,9 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="mod_menu_group_pvp">PvP</string>
     <string name="mod_menu_pvp_empty">No PvP modules enabled. PvP modules also appear under Inbuilt.</string>
     <string name="mod_menu_search_hint">Search mods…</string>
+    <string name="mod_stats_fps_placeholder">— FPS</string>
+    <string name="mod_stats_ping_placeholder">— ms</string>
+    <string name="mod_stats_battery_placeholder">— %</string>
     <string name="mod_menu_no_mods">No mods added</string>
     <string name="mod_menu_no_favorites">No favorite mods yet</string>
     <string name="mod_menu_no_matches">No matching mods</string>
@@ -800,6 +803,8 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="pack_changer_disabled">In-game pack changer is off. Enable it in Instance Settings to change packs here.</string>
     <string name="pack_changer_no_instance">No instance is selected.</string>
     <string name="pack_changer_write_failed">Could not update the pack list.</string>
+    <string name="pack_changer_reloaded">Pack applied. Minecraft reloaded its packs.</string>
+    <string name="pack_changer_reload_on_next_load">Pack list saved. It applies the next time the world is loaded.</string>
     <string name="pack_changer_enable">Enable</string>
     <string name="pack_changer_disable">Disable</string>
     <string name="pack_changer_on">on</string>
@@ -893,6 +898,8 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="mod_menu_active_desc">All inbuilt mods are now accessible through the in-game Mod Menu. Disable Mod Menu to add individual overlay buttons.</string>
     <string name="mod_status_enabled">Enabled</string>
     <string name="mod_status_disabled">Disabled</string>
+    <string name="mod_unavailable_message">This Module doesn\'t work or is bugged</string>
+    <string name="mod_unavailable_reason">Needs a game data feed this build cannot provide yet. It is disabled until then.</string>
     <string name="mod_notification_enabled">%s enabled</string>
     <string name="mod_overlay_fps_unknown">FPS: --</string>
     <string name="mod_overlay_fps_value">FPS: %1$d</string>
@@ -1052,6 +1059,20 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="controller_editor_left_sensitivity">Left sensitivity</string>
     <string name="controller_editor_right_sensitivity">Right sensitivity</string>
     <string name="controller_editor_vibration">Vibration</string>
+    <string name="controller_editor_rumble_strength">Rumble strength</string>
+    <string name="controller_editor_rumble_percent">%1$d%%</string>
+    <string name="controller_editor_rumble_test">Test rumble</string>
+    <string name="controller_editor_rumble_off">Rumble is off or set to 0%</string>
+    <string name="controller_layers_title">Button-map layers</string>
+    <string name="controller_layers_summary">Hold a modifier button to switch the whole button map. Layers start as a copy of the base map, so only edit the buttons that differ.</string>
+    <string name="controller_layer_row">%1$s — modifier: %2$s</string>
+    <string name="controller_layer_add">Add layer</string>
+    <string name="controller_layer_set">Set button</string>
+    <string name="controller_layer_clear">Clear</string>
+    <string name="controller_layer_delete">Delete</string>
+    <string name="controller_layer_no_modifier">None</string>
+    <string name="controller_layer_default_name">Layer %1$d</string>
+    <string name="controller_layer_press_modifier">Press a controller button to use as the modifier</string>
     <string name="controller_editor_remap_title">Button remaps</string>
     <string name="controller_editor_remap_hint">Remaps apply to the active profile during gameplay.</string>
 
@@ -1258,6 +1279,18 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="mod_menu_keyboard_bind">Keyboard / mouse bind</string>
     <string name="mod_menu_controller_bind">Controller bind</string>
     <string name="mod_menu_bind_none">Not bound</string>
+    <string name="mod_menu_loadouts">Loadouts</string>
+    <string name="mod_menu_loadouts_desc">Save the current module set, then swap a whole preset in one tap.</string>
+    <string name="mod_menu_loadout_save">Save current as loadout</string>
+    <string name="mod_menu_loadout_saved">Loadout \"%1$s\" saved</string>
+    <string name="mod_menu_loadout_applied">Loadout \"%1$s\" applied</string>
+    <string name="mod_menu_loadout_deleted">Loadout \"%1$s\" deleted</string>
+    <string name="mod_menu_loadout_name_hint">Loadout name</string>
+    <string name="mod_menu_loadout_preset_pvp">PvP</string>
+    <string name="mod_menu_loadout_preset_survival">Survival</string>
+    <string name="mod_menu_loadout_preset_building">Building</string>
+    <string name="mod_menu_loadout_delete_confirm">Delete the loadout \"%1$s\"?</string>
+    <string name="mod_menu_loadout_none">No loadouts yet. Save the current set to create one.</string>
     <string name="mod_menu_bind_set">Change</string>
     <string name="mod_menu_bind_clear">Clear</string>
     <string name="mod_menu_bind_press_key">Press a key or mouse button\u2026</string>
@@ -1517,7 +1550,7 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="mod_config_hit_timing_show_combo_desc">Displays how many hits are in the current streak</string>
     <string name="mod_config_hit_timing_show_bar">Show Timing Bar</string>
     <string name="mod_config_hit_timing_show_bar_desc">Progress line along the indicator so you can see the rhythm, not just the state</string>
-    <string name="hit_timing_scope_note">This reads your own attack input and tells you when the next click will count. It never clicks for you, and it cannot make a hit land — the server still decides that.</string>
+    <string name="hit_timing_scope_note">This reads your own attack input and tells you when the next click will count. It never clicks for you, and it cannot make a hit land — the server still decides that. The combo count is your own landed-in-window attacks, not the game\'s server-side combo counter, which this build cannot read.</string>
 
     <!-- Hitboxes -->
     <string name="inbuilt_mod_hitbox">Hitboxes</string>
@@ -1538,7 +1571,9 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="mod_config_hitbox_show_crit_line_desc">Red line across the head — hit there for a critical; turns blue while you are aimed at it</string>
     <string name="mod_config_hitbox_show_combo_box">Show Best-Combo Box</string>
     <string name="mod_config_hitbox_show_combo_box_desc">Red box marking the best place to hit for combos; turns blue while you are aimed at it</string>
-    <string name="hitbox_scope_note">Boxes come from a game-data feed. Until that feed is available nothing is drawn — an invented box would be worse than none, because you would aim at it.</string>
+    <string name="mod_config_hitbox_show_target_box">Show Target Box</string>
+    <string name="mod_config_hitbox_show_target_box_desc">Blue chest-height box marking what to aim at on another player</string>
+    <string name="hitbox_scope_note">Other players running this launcher are drawn from the voice link: their position and view travel with the audio, so their box and aim line need no game hook. Mobs, items, projectiles and the crit/combo guides need the game\'s own entity list, which this build cannot read — those options are disabled rather than drawing a made-up box.</string>
 
     <!-- Proximity Voice Chat -->
     <string name="inbuilt_mod_voice_chat">Proximity Voice Chat</string>

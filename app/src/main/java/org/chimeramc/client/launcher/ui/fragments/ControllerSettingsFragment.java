@@ -31,6 +31,8 @@ import org.chimeramc.client.launcher.controller.ControllerProfile;
 import org.chimeramc.client.launcher.controller.ControllerProfileCodec;
 import org.chimeramc.client.launcher.controller.ControllerProfileManager;
 import org.chimeramc.client.launcher.controller.ControllerType;
+import org.chimeramc.client.launcher.controller.RemapLayer;
+import org.chimeramc.client.launcher.controller.RumbleCurve;
 import org.chimeramc.client.launcher.controller.StickCalibration;
 import org.chimeramc.client.launcher.controller.StickCalibrationSession;
 import org.chimeramc.client.launcher.controller.StickCurve;
@@ -274,9 +276,109 @@ public class ControllerSettingsFragment extends Fragment {
     }
 
     public void handleHardwareKey(int keyCode, boolean down) {
+        // A layer-modifier capture takes the next press before the illustration sees it, so the
+        // captured button is the one the player meant rather than also lighting the map.
+        if (pendingLayerModifier != null && down) {
+            RemapLayer layer = pendingLayerModifier;
+            pendingLayerModifier = null;
+            layer.setModifierKeyCode(keyCode);
+            if (layerModifierRefresh != null) layerModifierRefresh.run();
+            return;
+        }
         if (illustration != null) {
             illustration.handleKeyEvent(keyCode, down);
         }
+    }
+
+    /** The layer currently waiting for its modifier button, or null when no capture is running. */
+    private RemapLayer pendingLayerModifier;
+    /** Repaints the layer rows after a capture or edit, so the label is never stale. */
+    private Runnable layerModifierRefresh;
+    /** The layer rows are rebuilt in place when a layer is added or removed. */
+    private LinearLayout layerContainer;
+
+    private void startLayerModifierCapture(RemapLayer layer) {
+        pendingLayerModifier = layer;
+        android.widget.Toast.makeText(requireContext(),
+                R.string.controller_layer_press_modifier, android.widget.Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Rebuilds the layer rows in place.
+     *
+     * Done by clearing and re-adding rather than diffing, because the list is short and a rebuild
+     * cannot leave a stale label after a capture. The rows read from the working profile, so an
+     * unsaved edit is what the player sees.
+     */
+    private void rebuildLayerRows(ControllerProfile working, LinearLayout container) {
+        if (container == null) return;
+        container.removeAllViews();
+
+        for (int i = 0; i < working.getRemapLayers().size(); i++) {
+            final int index = i;
+            RemapLayer layer = working.getRemapLayers().get(i);
+            LinearLayout row = new LinearLayout(requireContext());
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+            TextView name = new TextView(requireContext());
+            name.setText(getString(R.string.controller_layer_row, layer.getName(),
+                    modifierLabel(layer.getModifierKeyCode())));
+            name.setTextSize(12f);
+            name.setTextColor(requireContext().getColor(R.color.on_surface));
+            LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            row.addView(name, nameParams);
+
+            android.widget.Button set = new android.widget.Button(requireContext());
+            set.setText(R.string.controller_layer_set);
+            set.setTextSize(11f);
+            set.setOnClickListener(v -> startLayerModifierCapture(layer));
+            row.addView(set);
+
+            android.widget.Button clear = new android.widget.Button(requireContext());
+            clear.setText(R.string.controller_layer_clear);
+            clear.setTextSize(11f);
+            clear.setOnClickListener(v -> {
+                layer.setModifierKeyCode(RemapLayer.NO_MODIFIER);
+                rebuildLayerRows(working, container);
+            });
+            row.addView(clear);
+
+            android.widget.Button remove = new android.widget.Button(requireContext());
+            remove.setText(R.string.controller_layer_delete);
+            remove.setTextSize(11f);
+            remove.setOnClickListener(v -> {
+                working.removeRemapLayer(index);
+                rebuildLayerRows(working, container);
+            });
+            row.addView(remove);
+
+            container.addView(row);
+        }
+
+        android.widget.Button add = new android.widget.Button(requireContext());
+        add.setText(R.string.controller_layer_add);
+        add.setOnClickListener(v -> {
+            // A new layer starts as a copy of the base map, so the player only edits the buttons
+            // that differ while the modifier is held.
+            RemapLayer layer = new RemapLayer(
+                    getString(R.string.controller_layer_default_name,
+                            working.getRemapLayers().size() + 1));
+            layer.getRemaps().putAll(working.getButtonRemaps());
+            working.addRemapLayer(layer);
+            rebuildLayerRows(working, container);
+        });
+        container.addView(add);
+    }
+
+    /** A human-readable name for a modifier key code, or "None". */
+    private String modifierLabel(int keyCode) {
+        if (keyCode == RemapLayer.NO_MODIFIER) {
+            return getString(R.string.controller_layer_no_modifier);
+        }
+        String name = android.view.KeyEvent.keyCodeToString(keyCode);
+        return name.startsWith("KEYCODE_") ? name.substring(8).replace('_', ' ') : name;
     }
 
     public void handleHardwareMotion(MotionEvent event) {
@@ -701,11 +803,57 @@ public class ControllerSettingsFragment extends Fragment {
         content.addView(label(getString(R.string.controller_editor_vibration)));
         content.addView(vibration);
 
+        // Rumble magnitude, with a test button so the slider can be felt rather than guessed.
+        content.addView(subLabel(getString(R.string.controller_editor_rumble_strength)));
+        final android.widget.SeekBar rumbleBar = seekBar(working.getRumbleStrength() / 100f);
+        final android.widget.TextView rumbleValue = subLabel(
+                getString(R.string.controller_editor_rumble_percent, working.getRumbleStrength()));
+        content.addView(rumbleBar);
+        content.addView(rumbleValue);
+        final android.widget.Button rumbleTest = new android.widget.Button(requireContext());
+        rumbleTest.setText(R.string.controller_editor_rumble_test);
+        content.addView(rumbleTest);
+        rumbleBar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar sb, int progress, boolean fromUser) {
+                rumbleValue.setText(getString(R.string.controller_editor_rumble_percent, progress));
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar sb) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar sb) {
+            }
+        });
+        rumbleTest.setOnClickListener(v -> {
+            int percent = vibration.isChecked() ? rumbleBar.getProgress() : 0;
+            if (RumbleCurve.isOff(percent)) {
+                android.widget.Toast.makeText(requireContext(),
+                        R.string.controller_editor_rumble_off, android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+            org.chimeramc.client.launcher.controller.ControllerRumble.play(
+                    requireContext(), currentType, RumbleCurve.amplitude(percent));
+        });
+
         android.widget.Switch antiDrift = new android.widget.Switch(requireContext());
         antiDrift.setChecked(working.isAntiDriftEnabled());
         content.addView(label(getString(R.string.controller_antidrift_title)));
         content.addView(subLabel(getString(R.string.controller_antidrift_summary)));
         content.addView(antiDrift);
+
+        // Button-map layers. Each row names the layer and its modifier, and lets the player press
+        // the pad button to capture the modifier. The remaps themselves are copied from the base
+        // map on creation so a layer starts as a tweak of the current setup, not a blank slate.
+        content.addView(label(getString(R.string.controller_layers_title)));
+        content.addView(subLabel(getString(R.string.controller_layers_summary)));
+        layerContainer = new LinearLayout(requireContext());
+        layerContainer.setOrientation(LinearLayout.VERTICAL);
+        content.addView(layerContainer);
+        layerModifierRefresh = () -> rebuildLayerRows(working, layerContainer);
+        rebuildLayerRows(working, layerContainer);
 
         content.addView(label(getString(R.string.controller_editor_stick_curve_label)));
         CurvePreviewView preview = new CurvePreviewView(requireContext());
@@ -824,6 +972,7 @@ public class ControllerSettingsFragment extends Fragment {
                     working.setLeftStickSensitivity(0.25f + leftSens.getProgress() / 100f * 2.75f);
                     working.setRightStickSensitivity(0.25f + rightSens.getProgress() / 100f * 2.75f);
                     working.setVibrationEnabled(vibration.isChecked());
+                    working.setRumbleStrength(rumbleBar.getProgress());
                     working.setAntiDriftEnabled(antiDrift.isChecked());
                     int active = profileManager.getActiveSlot(currentType);
                     List<ControllerProfile> profiles = profileManager.getProfiles(currentType);

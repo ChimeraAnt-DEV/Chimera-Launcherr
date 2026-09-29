@@ -80,6 +80,13 @@ public class InbuiltOverlayManager {
         InbuiltModManager manager = InbuiltModManager.getInstance(activity);
         if (!manager.isModMenuEnabled()) return;
 
+        // The in-game pack changer must be able to nudge the live session whether or not voice
+        // chat happens to be running, so the reloader is installed here, not as a side effect of
+        // starting the voice link. Without it a pack toggle writes the files but the loaded world
+        // keeps its cached stack until the next load.
+        org.chimeramc.client.core.content.InGamePackChanger.setReloader(
+                org.chimeramc.client.preloader.PreloaderInput::reloadResourcePacks);
+
         if (hudOverlay == null) {
             hudOverlay = new HudOverlay(activity);
         }
@@ -880,6 +887,11 @@ public class InbuiltOverlayManager {
     public boolean handleKeyEvent(int keyCode, int action, int rawKeyCode) {
         InbuiltModManager manager = InbuiltModManager.getInstance(activity);
 
+        // The open Mod Menu takes controller navigation before anything else. Its root is
+        // unfocusable by design (so the platform stops painting a focus wash), so the menu cannot
+        // be driven by the framework's focus system and is driven here instead.
+        if (handleMenuControllerKey(rawKeyCode, action)) return true;
+
         // Mod Menu open bind. Honoured for both the keyboard and controller codes, and only on
         // the press so a held button does not flap the panel open and shut.
         if (action == android.view.KeyEvent.ACTION_DOWN && modMenuButton != null) {
@@ -921,6 +933,28 @@ public class InbuiltOverlayManager {
         }
 
         return false;
+    }
+
+    /**
+     * Hands one controller key to the open Mod Menu, if there is one.
+     *
+     * <p>Public because the game activity calls it at the very top of {@code dispatchKeyEvent},
+     * before the preloader can swallow the press: a pad button the menu wants to use for navigation
+     * would otherwise be consumed by the game first.
+     */
+    public boolean handleMenuControllerKey(int rawKeyCode, int action) {
+        if (modMenuButton == null) return false;
+        ModMenuOverlay menu = modMenuButton.getMenuOverlay();
+        if (menu == null || !menu.isShowing()) return false;
+        return menu.handleControllerKey(rawKeyCode,
+                action == android.view.KeyEvent.ACTION_DOWN);
+    }
+
+    /** Hands analogue stick movement to the open Mod Menu, so the stick can move the selection. */
+    public boolean handleMenuControllerMotion(android.view.MotionEvent event) {
+        if (modMenuButton == null) return false;
+        ModMenuOverlay menu = modMenuButton.getMenuOverlay();
+        return menu != null && menu.isShowing() && menu.handleControllerMotion(event);
     }
 
     public boolean handleScrollEvent(float scrollDelta) {

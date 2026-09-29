@@ -17,6 +17,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.Toast;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.PopupMenu;
@@ -34,6 +35,7 @@ import org.chimeramc.client.core.mods.inbuilt.InbuiltModuleProvider;
 import org.chimeramc.client.core.mods.inbuilt.UnifiedMod;
 import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
 import org.chimeramc.client.core.mods.inbuilt.model.ModIds;
+import org.chimeramc.client.core.mods.inbuilt.model.ModLoadoutStore;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -71,6 +73,17 @@ public class ModMenuOverlay {
     private TextView filterAll, filterFavorites, filterEnabled, filterInbuilt, filterExternal, filterPvp;
     private TextView moduleCountText, emptyStateText;
     private TextView compactFilterSelector, compactModuleCount;
+
+    // The live stats strip in the top bar. Refreshed on a one-second tick while the menu is open,
+    // and never when it is closed, so it costs nothing during gameplay.
+    private TextView statsFps, statsPing, statsBattery;
+    private final Runnable statsTick = new Runnable() {
+        @Override
+        public void run() {
+            refreshStatsStrip();
+            if (isShowing) handler.postDelayed(this, 1000L);
+        }
+    };
     private View settingsContainer;
     private View modulesContainer;
     private FrameLayout cosmeticsContainer;
@@ -103,6 +116,8 @@ public class ModMenuOverlay {
     private TextView controllerBindText;
     /** The connected pad's 2D illustration shown beside the controller bind row. */
     private org.chimeramc.client.launcher.ui.views.Controller3DView controllerBindIllustration;
+    /** Chips for the saved module loadouts on the Settings tab. */
+    private android.widget.LinearLayout loadoutChipRow;
 
     /** Delivers a hardware key to an open bind picker. Returns true when one consumed it. */
     public interface BindCapture {
@@ -236,7 +251,9 @@ public class ModMenuOverlay {
             // the whole screen, which reads as "the menu put a 50% white overlay up" whenever the
             // player so much as nudges the stick. The highlight is suppressed here rather than
             // only in XML so it cannot come back through a theme or a re-inflated layout.
-            disableFocusHighlight(overlayView);
+            // Applied *after* setupViews/loadMods below: the module list is populated there and
+            // can take focus for its first card, which would restore the very highlight this
+            // suppresses.
 
             int uiOptions = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                     | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
@@ -256,6 +273,7 @@ public class ModMenuOverlay {
 
             setupViews();
             loadMods();
+            disableFocusHighlight(overlayView);
 
             wmParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -275,6 +293,12 @@ public class ModMenuOverlay {
             windowManager.addView(overlayView, wmParams);
             isShowing = true;
 
+            // Start the stats strip tick. Only while the menu is open, so the FPS/battery read
+            // costs nothing during ordinary play.
+            handler.removeCallbacks(statsTick);
+            refreshStatsStrip();
+            handler.postDelayed(statsTick, 1000L);
+
             overlayView.setAlpha(0f);
             overlayView.animate().alpha(1f).setDuration(220).start();
 
@@ -293,9 +317,9 @@ public class ModMenuOverlay {
         if (rootView == null) return;
 
         overlayView = LayoutInflater.from(activity).inflate(R.layout.overlay_mod_menu, null);
-        disableFocusHighlight(overlayView);
         setupViews();
         loadMods();
+        disableFocusHighlight(overlayView);
 
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -332,19 +356,68 @@ public class ModMenuOverlay {
     private static void disableFocusHighlight(View view) {
         if (view == null) return;
         view.setFocusable(false);
+        view.setFocusableInTouchMode(false);
         view.setDefaultFocusHighlightEnabled(false);
         // Clearing an already-held focus matters as much as clearing the flag. The highlight can
         // be painted for the view that holds focus right now, and a stick nudge can hand focus to
-        // the root while the menu is already open — after this helper first ran. Dropping the flag
-        // does not retroactively remove the highlight from the currently-focused view, so focus is
-        // released here; a ViewGroup handles its children below.
-        view.clearFocus();
+        // the root — or, after a rebind, to a card — while the menu is already open. Dropping the
+        // flag does not retroactively remove the highlight from the currently-focused view, so
+        // focus is released here. The walk also clears the flag on every descendant (buttons stay
+        // focusable for controller navigation, but must not paint the highlight), and releases
+        // focus held by any descendant rather than the root alone.
         clearFocusHighlightRecursive(view);
+    }
+
+    /**
+     * Refreshes the FPS / ping / battery strip in the top bar.
+     *
+     * <p>FPS comes from the same inbuilt {@code FpsMod} the FPS overlay uses, so the two can never
+     * disagree. Battery comes from the sticky {@code ACTION_BATTERY_CHANGED} broadcast, and ping
+     * has no source in this build — it renders the em dash rather than a fabricated figure, which
+     * is why {@link ModStatsFormatter} owns the "no reading" rule.
+     */
+    private void refreshStatsStrip() {
+        if (statsFps != null) {
+            int fps = 0;
+            try {
+                if (org.levimc.launcher.core.mods.inbuilt.nativemod.FpsMod.nativeIsInitialized()) {
+                    fps = org.levimc.launcher.core.mods.inbuilt.nativemod.FpsMod.nativeGetFps();
+                }
+            } catch (Throwable ignored) {
+                // A native read must never take the menu down; the em dash is the honest fallback.
+            }
+            statsFps.setText(ModStatsFormatter.fps(fps));
+        }
+        if (statsPing != null) {
+            statsPing.setText(ModStatsFormatter.ping(0));
+        }
+        if (statsBattery != null) {
+            statsBattery.setText(readBattery());
+        }
+    }
+
+    private String readBattery() {
+        try {
+            android.content.Intent battery = activity.registerReceiver(null,
+                    new android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED));
+            if (battery == null) return ModStatsFormatter.battery(-1, false);
+            int level = battery.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1);
+            int scale = battery.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1);
+            if (level < 0 || scale <= 0) return ModStatsFormatter.battery(-1, false);
+            int percent = Math.round(level * 100f / scale);
+            int status = battery.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1);
+            boolean charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING
+                    || status == android.os.BatteryManager.BATTERY_STATUS_FULL;
+            return ModStatsFormatter.battery(percent, charging);
+        } catch (Throwable t) {
+            return ModStatsFormatter.battery(-1, false);
+        }
     }
 
     private static void clearFocusHighlightRecursive(View view) {
         if (view == null) return;
         view.setDefaultFocusHighlightEnabled(false);
+        if (view.isFocused()) view.clearFocus();
         if (view instanceof ViewGroup) {
             ViewGroup group = (ViewGroup) view;
             for (int i = 0; i < group.getChildCount(); i++) {
@@ -379,6 +452,9 @@ public class ModMenuOverlay {
         filterExternal = overlayView.findViewById(R.id.filter_external);
         filterPvp = overlayView.findViewById(R.id.filter_pvp);
         moduleCountText = overlayView.findViewById(R.id.module_count_text);
+        statsFps = overlayView.findViewById(R.id.mod_stats_fps);
+        statsPing = overlayView.findViewById(R.id.mod_stats_ping);
+        statsBattery = overlayView.findViewById(R.id.mod_stats_battery);
         settingsContainer = overlayView.findViewById(R.id.settings_container);
         modulesContainer = overlayView.findViewById(R.id.modules_container);
         cosmeticsContainer = overlayView.findViewById(R.id.cosmetics_container);
@@ -567,6 +643,7 @@ public class ModMenuOverlay {
         applyMenuOpacity();
 
         setupKeybindSettings(modManager);
+        setupLoadoutSettings(modManager);
 
         adapter = new ModMenuAdapter(new ModMenuTheme(activity));
         adapter.setCompactMode(compactMode);
@@ -693,6 +770,109 @@ public class ModMenuOverlay {
         if (controllerRow != null) {
             controllerRow.setOnClickListener(v -> openControllerBindPicker(modManager));
         }
+    }
+
+    /**
+     * Wires the Settings tab's loadout row: a chip per saved set (tap to apply, long-press to
+     * delete) and a "save current" action. A loadout only touches the ids it stored, so applying
+     * an older preset cannot switch off a module added since.
+     */
+    private void setupLoadoutSettings(InbuiltModManager modManager) {
+        loadoutChipRow = overlayView.findViewById(R.id.loadout_chip_row);
+        View saveRow = overlayView.findViewById(R.id.setting_save_loadout);
+        if (saveRow != null) {
+            saveRow.setOnClickListener(v -> promptSaveLoadout(modManager));
+        }
+        rebuildLoadoutChips(modManager);
+    }
+
+    private void rebuildLoadoutChips(InbuiltModManager modManager) {
+        if (loadoutChipRow == null) return;
+        loadoutChipRow.removeAllViews();
+        java.util.List<ModLoadoutStore.Loadout> loadouts = modManager.getModLoadouts();
+
+        if (loadouts.isEmpty()) {
+            TextView hint = new TextView(activity);
+            hint.setText(R.string.mod_menu_loadout_none);
+            hint.setTextColor(0xFF888888);
+            hint.setTextSize(11f);
+            loadoutChipRow.addView(hint);
+            return;
+        }
+
+        int margin = (int) (8 * activity.getResources().getDisplayMetrics().density);
+        for (ModLoadoutStore.Loadout loadout : loadouts) {
+            TextView chip = new TextView(activity);
+            chip.setText(loadout.name);
+            chip.setTextColor(0xFFF1F4F6);
+            chip.setTextSize(12f);
+            chip.setPadding(margin * 2, margin, margin * 2, margin);
+            chip.setBackgroundResource(R.drawable.bg_search_field);
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.rightMargin = margin;
+            chip.setLayoutParams(lp);
+            chip.setOnClickListener(v -> {
+                if (modManager.applyLoadout(loadout.name)) {
+                    loadMods();
+                    String name = loadout.name;
+                    Toast.makeText(activity,
+                            activity.getString(R.string.mod_menu_loadout_applied, name),
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+            chip.setOnLongClickListener(v -> {
+                confirmDeleteLoadout(modManager, loadout.name);
+                return true;
+            });
+            loadoutChipRow.addView(chip);
+        }
+    }
+
+    private void promptSaveLoadout(InbuiltModManager modManager) {
+        final EditText input = new EditText(activity);
+        input.setHint(R.string.mod_menu_loadout_name_hint);
+        // Seed with a sensible preset name so saving takes one tap in the common case.
+        boolean empty = modManager.getModLoadouts().isEmpty();
+        input.setText(empty ? activity.getString(R.string.mod_menu_loadout_preset_pvp) : "");
+
+        new android.app.AlertDialog.Builder(activity)
+                .setTitle(R.string.mod_menu_loadout_save)
+                .setView(input)
+                .setPositiveButton(R.string.save, (d, w) -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) return;
+                    modManager.saveLoadout(name, currentModuleIds());
+                    rebuildLoadoutChips(modManager);
+                    Toast.makeText(activity,
+                            activity.getString(R.string.mod_menu_loadout_saved, name),
+                            Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void confirmDeleteLoadout(InbuiltModManager modManager, String name) {
+        new android.app.AlertDialog.Builder(activity)
+                .setMessage(activity.getString(R.string.mod_menu_loadout_delete_confirm, name))
+                .setPositiveButton(R.string.delete, (d, w) -> {
+                    modManager.deleteLoadout(name);
+                    rebuildLoadoutChips(modManager);
+                    Toast.makeText(activity,
+                            activity.getString(R.string.mod_menu_loadout_deleted, name),
+                            Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private java.util.List<String> currentModuleIds() {
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        for (UnifiedMod mod : allMods) {
+            if (mod.getSource() == UnifiedMod.Source.INBUILT) ids.add(mod.getId());
+        }
+        return ids;
     }
 
     private void refreshKeyboardBindLabel(InbuiltModManager modManager) {
@@ -1595,6 +1775,8 @@ public class ModMenuOverlay {
     public void hide() {
         if (!isShowing || overlayView == null) return;
 
+        handler.removeCallbacks(statsTick);
+
         InbuiltOverlayManager overlayManager = InbuiltOverlayManager.getInstance();
         if (overlayManager != null) {
             overlayManager.setHudEditorMode(false);
@@ -1627,6 +1809,68 @@ public class ModMenuOverlay {
         }
         overlayView.animate().alpha(0f).setDuration(180).start();
     }
+
+    /**
+     * Routes one controller key press into the open menu: a d-pad/left-stick direction moves the
+     * selection, a face/shoulder button toggles the selected module.
+     *
+     * <p>Called from the game activity before the preloader sees the key, because the overlay root
+     * is unfocusable on purpose (see {@link #disableFocusHighlight}) — so the framework cannot move
+     * focus for us and the direction has to be applied to the list directly.
+     *
+     * @return true when the press was used by the menu and must be swallowed
+     */
+    public boolean handleControllerKey(int keyCode, boolean down) {
+        if (!isShowing || !down || adapter == null) return false;
+        switch (keyCode) {
+            case android.view.KeyEvent.KEYCODE_DPAD_UP:
+                return adapter.handleControllerNavigation(ModMenuNavigation.Direction.UP);
+            case android.view.KeyEvent.KEYCODE_DPAD_DOWN:
+                return adapter.handleControllerNavigation(ModMenuNavigation.Direction.DOWN);
+            case android.view.KeyEvent.KEYCODE_DPAD_LEFT:
+                return adapter.handleControllerNavigation(ModMenuNavigation.Direction.LEFT);
+            case android.view.KeyEvent.KEYCODE_DPAD_RIGHT:
+                return adapter.handleControllerNavigation(ModMenuNavigation.Direction.RIGHT);
+            case android.view.KeyEvent.KEYCODE_BUTTON_A:
+            case android.view.KeyEvent.KEYCODE_ENTER:
+                return adapter.handleControllerSelect();
+            case android.view.KeyEvent.KEYCODE_BUTTON_START:
+                hide();
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Routes analogue stick movement into the open menu, so the selection can be moved with the
+     * stick and not only the d-pad.
+     *
+     * <p>A repeat delay is applied because a held stick would otherwise race through the list.
+     *
+     * @return true when the movement was used by the menu and must be swallowed
+     */
+    public boolean handleControllerMotion(android.view.MotionEvent event) {
+        if (!isShowing || adapter == null) return false;
+        float axisX = event.getAxisValue(android.view.MotionEvent.AXIS_X);
+        float axisY = event.getAxisValue(android.view.MotionEvent.AXIS_Y);
+        if (Math.abs(axisX) < NAV_AXIS_THRESHOLD && Math.abs(axisY) < NAV_AXIS_THRESHOLD) return false;
+
+        long now = android.os.SystemClock.uptimeMillis();
+        if (now < nextAxisNavMs) return true;
+        nextAxisNavMs = now + NAV_AXIS_REPEAT_MS;
+
+        if (Math.abs(axisX) > Math.abs(axisY)) {
+            return adapter.handleControllerNavigation(axisX > 0
+                    ? ModMenuNavigation.Direction.RIGHT : ModMenuNavigation.Direction.LEFT);
+        }
+        return adapter.handleControllerNavigation(axisY > 0
+                ? ModMenuNavigation.Direction.DOWN : ModMenuNavigation.Direction.UP);
+    }
+
+    private static final float NAV_AXIS_THRESHOLD = 0.6f;
+    private static final long NAV_AXIS_REPEAT_MS = 180L;
+    private volatile long nextAxisNavMs = 0L;
 
     public boolean isShowing() {
         return isShowing;

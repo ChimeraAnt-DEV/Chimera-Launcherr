@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.view.KeyEvent;
 
 import org.chimeramc.client.core.mods.inbuilt.model.ModIds;
+import org.chimeramc.client.core.mods.inbuilt.model.ModLoadoutStore;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -24,6 +25,7 @@ public class InbuiltModManager {
     private static final String KEY_MOD_MENU_CONTROLLER_BIND = "mod_menu_controller_bind";
     private static final String KEY_PAUSE_MENU_ONLY = "pause_menu_only";
     private static final String KEY_FAVORITE_MOD_KEYS = "favorite_mod_keys";
+    private static final String KEY_MOD_LOADOUTS = "mod_loadouts";
     private static final String KEY_INBUILT_MOD_ENABLED_PREFIX = "inbuilt_mod_enabled_";
     private static final String KEY_EXTERNAL_MODULE_ENABLED_PREFIX = "external_module_enabled_";
     private static final String KEY_ZOOM_LEVEL = "zoom_level";
@@ -71,6 +73,10 @@ public class InbuiltModManager {
     private static final String KEY_HITBOX_SHOW_LOOK_LINE = "hitbox_show_look_line";
     private static final String KEY_HITBOX_SHOW_CRIT_LINE = "hitbox_show_crit_line";
     private static final String KEY_HITBOX_SHOW_COMBO_BOX = "hitbox_show_combo_box";
+    /** Draws the chest-height target sub-box inside each peer box. */
+    private static final String KEY_HITBOX_SHOW_TARGET_BOX = "hitbox_show_target_box";
+    /** ARGB colour of the peer boxes; -1 means "use the default white". */
+    private static final String KEY_HITBOX_PEER_COLOR = "hitbox_peer_color";
     private static final String KEY_VOICE_RANGE = "voice_range_blocks";
     private static final String KEY_VOICE_VOLUME = "voice_volume_percent";
     private static final String KEY_VOICE_CHANNEL = "voice_channel";
@@ -689,6 +695,35 @@ public class InbuiltModManager {
         prefs.edit().putBoolean(KEY_HITBOX_SHOW_COMBO_BOX, show).apply();
     }
 
+    /** Whether the chest-height target sub-box is drawn. Default on. */
+    public boolean isHitboxShowTargetBox() {
+        return prefs.getBoolean(KEY_HITBOX_SHOW_TARGET_BOX, true);
+    }
+
+    /** Whether the chest-height target sub-box is drawn; alias used by the peer-feed overlay. */
+    public boolean getHitboxShowTargetBox() {
+        return isHitboxShowTargetBox();
+    }
+
+    public void setHitboxShowTargetBox(boolean show) {
+        prefs.edit().putBoolean(KEY_HITBOX_SHOW_TARGET_BOX, show).apply();
+    }
+
+    /**
+     * The peer box colour, or {@link Color#WHITE} when unset.
+     *
+     * <p>Default white rather than a themed accent: the box has to read against any world backdrop,
+     * and the player's accent can be a low-contrast violet. Stored as an int so a picked colour
+     * survives a restart without a separate colour-index scheme.
+     */
+    public int getHitboxPeerColor() {
+        return prefs.getInt(KEY_HITBOX_PEER_COLOR, android.graphics.Color.WHITE);
+    }
+
+    public void setHitboxPeerColor(int color) {
+        prefs.edit().putInt(KEY_HITBOX_PEER_COLOR, color).apply();
+    }
+
     // --- Proximity voice ----------------------------------------------------------------
 
     public float getVoiceRangeBlocks() {
@@ -940,5 +975,46 @@ public class InbuiltModManager {
     public void setVoiceRelayTokenSecret(String secret) {
         prefs.edit().putString(KEY_VOICE_RELAY_TOKEN_SECRET,
                 secret == null ? "" : secret.trim()).apply();
+    }
+
+    /**
+     * The saved loadouts, parsed from the stored JSON.
+     *
+     * <p>A corrupt value reads as "no loadouts" rather than throwing, so a bad pref cannot take
+     * the Mod Menu down.
+     */
+    public java.util.List<ModLoadoutStore.Loadout> getModLoadouts() {
+        try {
+            return ModLoadoutStore.fromJson(prefs.getString(KEY_MOD_LOADOUTS, "[]"));
+        } catch (Exception e) {
+            return new java.util.ArrayList<>();
+        }
+    }
+
+    public void saveModLoadouts(java.util.List<ModLoadoutStore.Loadout> loadouts) {
+        prefs.edit().putString(KEY_MOD_LOADOUTS, ModLoadoutStore.toJson(loadouts)).apply();
+    }
+
+    /** Saves the current on/off state of every id in {@code moduleIds} under {@code name}. */
+    public void saveLoadout(String name, java.util.List<String> moduleIds) {
+        ModLoadoutStore.Loadout loadout =
+                ModLoadoutStore.capture(name, moduleIds, this::isInbuiltModEnabledOrFalse);
+        saveModLoadouts(ModLoadoutStore.upsert(getModLoadouts(), loadout));
+    }
+
+    /** Applies a saved loadout, returning true when one by that name existed. */
+    public boolean applyLoadout(String name) {
+        ModLoadoutStore.Loadout loadout = ModLoadoutStore.find(getModLoadouts(), name);
+        if (loadout == null) return false;
+        ModLoadoutStore.apply(loadout, this::setInbuiltModEnabled);
+        return true;
+    }
+
+    public void deleteLoadout(String name) {
+        saveModLoadouts(ModLoadoutStore.remove(getModLoadouts(), name));
+    }
+
+    private boolean isInbuiltModEnabledOrFalse(String modId) {
+        return resolveInbuiltModEnabled(modId, false);
     }
 }

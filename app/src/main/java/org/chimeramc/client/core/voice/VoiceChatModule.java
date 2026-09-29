@@ -196,6 +196,48 @@ public final class VoiceChatModule {
         return sanitizePosition(readFromSource());
     }
 
+    /**
+     * The local view rotation as a {@code {yaw, pitch}} pair, or null when unavailable.
+     *
+     * <p>Read from the same feed as the position, because they come from the same snapshot: a
+     * position from this frame paired with a rotation from a previous one would advertise a heading
+     * the player is no longer facing. Absent rotation is reported as unknown, never as 0 degrees.
+     */
+    private float[] readLocalRotation() {
+        PositionSource source = positionSource;
+        if (source == null || !(source instanceof RotationSource)) return null;
+        try {
+            float[] rotation = ((RotationSource) source).readRotation();
+            return sanitizeRotation(rotation);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * Accepts a raw feed rotation only when it is two finite numbers; otherwise null.
+     *
+     * <p>Pure, so the fail-closed rule is testable exactly like {@link #sanitizePosition}.
+     */
+    static float[] sanitizeRotation(float[] raw) {
+        if (raw == null || raw.length < 2) return null;
+        if (Float.isNaN(raw[0]) || Float.isInfinite(raw[0])) return null;
+        if (Float.isNaN(raw[1]) || Float.isInfinite(raw[1])) return null;
+        return new float[]{raw[0], raw[1]};
+    }
+
+    /**
+     * An optional extension of {@link PositionSource} for feeds that can also report the player's
+     * view rotation. Kept separate so an existing position-only provider still compiles and simply
+     * advertises no rotation, which the receiver reads as unknown.
+     */
+    public interface RotationSource {
+        /**
+         * @return {yaw, pitch} in degrees, or null when unavailable.
+         */
+        float[] readRotation();
+    }
+
     private float[] readFromSource() {
         PositionSource source = positionSource;
         if (source == null) return null;
@@ -472,9 +514,17 @@ public final class VoiceChatModule {
                     currentChannelCapacity(), localLevel(), localSelfMuted(),
                     x, y, z, seq, codecByte, payload);
         }
-        return VoiceProtocol.encodeLegacy(type, peerId, displayName, currentChannel(),
-                currentChannelVisibility(), currentChannelName(), currentChannelCapacity(),
-                localLevel(), localSelfMuted(), x, y, z, seq, payload);
+        // The LAN path speaks v5 so a peer can draw another player's look direction. v5 is a
+        // superset of the v3 shape a plain beacon uses, and the multicast transport only ever
+        // hears this build's own group, so this is the right place to carry the rotation.
+        float[] rotation = readLocalRotation();
+        return VoiceProtocol.encode(VoiceProtocol.VERSION, 0L, type, peerId, displayName, "",
+                currentChannel(), currentChannelVisibility(), currentChannelName(),
+                currentChannelCapacity(), localLevel(), localSelfMuted(),
+                x, y, z, seq,
+                rotation != null ? rotation[0] : 0f,
+                rotation != null ? rotation[1] : 0f,
+                VoiceProtocol.CODEC_PCM, payload);
     }
 
     private void onCapturedFrame(byte[] pcm, int length) {
@@ -516,7 +566,7 @@ public final class VoiceChatModule {
         String channel = VoiceChannel.normalize(packet.channel);
         VoicePeer peer = new VoicePeer(packet.peerId, packet.name,
                 packet.x, packet.y, packet.z, channel, packet.channelName, packet.visibility,
-                packet.capacity, packet.level, packet.muted, now);
+                packet.capacity, packet.level, packet.muted, packet.yaw, packet.pitch, now);
         if (packet.type == VoiceProtocol.TYPE_BEACON) {
             registry.put(peer);
             return;

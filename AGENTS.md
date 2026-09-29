@@ -328,6 +328,23 @@ invented box is worse than no box — the player would aim at it.
 - Far-to-near sort so a nearer box paints over one behind it. A box behind the camera produces
   no screen rect and is skipped.
 
+### Peer boxes are drawn even with no native feed (the reachable half)
+- **The module is not greyed out and must not be.** `HitboxMod.EntitySource` has no provider, so
+  the native frame is always null — but `HitboxOverlay.drawPeerBoxes` still draws other players
+  from the proximity-voice feed (`PeerHitboxSource` → `VoiceChatModule.audiblePeers()`), which
+  needs no game hook at all. `ModIds.requiresGameData` therefore **excludes** `HITBOX`; only the
+  options that genuinely need the entity list are disabled, via
+  `ModIds.outputRequiresGameData(modId, configKey)` (mobs/items/projectiles/thrown items/crit
+  line/combo box) which `InbuiltModuleProvider.configNode` turns into `"disabled": true` and
+  `ModAvailability.isOptionInteractive` exposes. `ModAvailabilityTest` pins both halves. Greying
+  the whole module (an earlier state) made the working peer boxes unreachable — do not restore it.
+- **The aim line for a peer is the peer's own advertised yaw/pitch** (protocol v5), never a
+  locally guessed heading; `PeerHitboxSource.from` treats 0/0 as the "unknown" sentinel and
+  `hasRotation == false` draws a box with no line.
+- **The chest-height target box is `hitbox_show_target_box`** (default on), drawn inside a peer
+  box by `drawPeerGuides`; it is in the config schema, the configs list and the setter switch, so
+  it is user-toggleable. It is a peer-route output, so it is *not* in the native-outputs set.
+
 ## Select Hit module (HitTimingSolver + HitTimingMod + HitTimingOverlay)
 A small green/red pill centred at the top of the screen: green while a hit will land, red while
 the post-hit window is still open, with the combo count beside it and a slim progress bar. Sized
@@ -349,12 +366,60 @@ only, like the other overlays.
   attack either way, and the timing must be the real input timing.
 - Honest scope: it reads your own attack input and never clicks for you; the server still decides
   whether a hit lands. `hit_timing_scope_note` says so in the dialog.
+- **Phase 2 (the game's own combo counter) is a documented limitation, not shipped.** The pill's
+  `decision.combo` is the player's own landed-in-window attacks, counted by `HitTimingSolver`;
+  it is not a read of the game's server-side combo counter. Reading that needs a per-frame
+  `libminecraftpe.so` feed, and the mask-scan anchors used for the local-player position do not
+  expose a combo field in the shipped builds (no `combo` symbol exists in the preloader). The
+  local counter is the honest deliverable; `hit_timing_scope_note` states the distinction in the
+  dialog so the readout cannot be mistaken for the server value.
+## Item/arrow hitboxes - not shipped (documented limitation)
+- Phase 3 asked whether a nearby-entity walk (items, arrows, thrown items within ~16 blocks) is
+  feasible with the existing anchor offsets. It is **not**, for the same reason the mob boxes are
+  not: those entity kinds live in the game's entity list, which this build cannot read (see the
+  native-feed section - game classes export no symbols, and no static vtable address yields a live
+  `Actor*`). The overlay draws them only when a `HitboxMod.EntitySource` supplies a frame, and no
+  provider is installed.
+- **The options are disabled rather than removed** (`hitbox_show_items` / `hitbox_show_projectiles`
+  / `hitbox_show_thrown_items` are in `ModIds.outputRequiresGameData`), so the switch is
+  discoverable but cannot be turned on to no effect. This is the documented limitation the request
+  asked for; do not "finish" it by drawing a guessed box.
 
 ## In-game Mod Menu navigation & overlay visibility
 - The Mod Menu nav is a **top bar** inside `overlay_mod_menu.xml`, not a side rail (landscape-only app; a rail only gets the short edge). Entries live in a `HorizontalScrollView` so compact mode's narrow window still fits every destination and the close button.
 - **An unresolved native HUD hook must not hide a mod's UI.** `OverlayVisibility.showGameOverlays` treats `hudScreenOpen == false` as authoritative only once the hook has fired (`gameWorldSeen`); before that it falls back to `sessionActive`. Without the fallback, an overlay appeared only while the Mod Menu was open and vanished the instant it closed. The fallback signals are part of `tick()`'s state hash — a session starting must re-evaluate visibility even when every native flag is unchanged.
 - **`gameWorldSeen` is never set false.** The HUD hook only *ever* reports true once installed; a false is indistinguishable from "not installed", so treating it as "left the world" would re-hide overlays after the first menu.
 - Compact mode **narrows** the window (`applyCompactModeLayout`); it must never hide the navigation. The old sidebar/compact-icon swap was the bug.
+
+## Controller remap layers & rumble (RemapLayer + RumbleCurve + ControllerRumble)
+- **A layer is an alternate button map selected by a held modifier.** `RemapLayer` holds a
+  modifier key code and its own `Map<Integer,Integer>`; `ControllerProfile.getRemapLayers()`
+  carries them and `ControllerProfileCodec` persists them. `ControllerResponse` precomputes one
+  flat `int[]` per layer so the hot path (`remapKey(keyCode, modifier)`) still allocates nothing.
+- **A button the layer does not list falls through to the base map**, not to identity — otherwise
+  holding a modifier would silently un-remap every button the layer does not mention.
+- **The modifier is tracked by *raw* key code**, before any remap: a base remap that changes the
+  modifier button's meaning must not stop it selecting. `ControllerInputProcessor.handleLayerModifier`
+  returns true for the modifier press so `MinecraftActivity.dispatchKeyEvent` can swallow it — the
+  modifier is a switch, not an action. `resetLayerState()` runs in `setActiveProfile`.
+- **Layers only apply to a gamepad.** `ControllerResponse.isGamepadKeyCode` is an explicit set, not
+  a range test: the lettered faces sit at 96..110 while `KEYCODE_BUTTON_1..16` sit at 188..203, so
+  no min/max works. The d-pad codes are included. A keyboard key sharing a code must not swap a
+  player's whole map while they type.
+- **`ControllerRumble` reaches the pad through API 31+ `InputDevice.getVibrator()`, behind a nested
+  holder** — `getVibrator` does not exist on minSdk 28 and referencing it from a reachable method
+  would class-init crash. Below 31 it returns false and the caller falls back; `RumbleCurve` owns
+  the strength→amplitude math (a 1% strength must stay above `MIN_AMPLITUDE`, not round to a value
+  a vibrator cannot render). Pinned by `RemapLayerTest` / `RumbleCurveTest` (no mocks).
+
+## Mod Menu live stats strip (ModStatsFormatter)
+- **FPS / ping / battery in the top bar, refreshed on a one-second tick only while the menu is
+  open** (`ModMenuOverlay.statsTick`, registered in `showInternal`, removed in `hide`). FPS reads
+  the same inbuilt `FpsMod` the FPS overlay uses so the two cannot disagree; battery reads the
+  sticky `ACTION_BATTERY_CHANGED` broadcast.
+- **An unknown reading renders an em dash, never `0`.** A "0 FPS" or "0 ms" reads as a real
+  measurement. `ModStatsFormatter` owns that rule and is pure, so `ModStatsFormatterTest` pins it.
+  Ping has no source in this build and correctly shows the em dash.
 
 ## Controller input latency (StickDriftGate + ControllerInputProcessor)
 - The anti-drift gate must release on **elapsed time** (`SUSTAIN_MS`), not only on event count. Many pads deliver a motion event only when an axis *changes*, so a stick held at a steady deflection across the threshold produces one crossing and no second event; an event-count-only rule held that deflection back indefinitely, which the player feels as input delay.
@@ -667,6 +732,24 @@ these are the conclusions.
   writes to **every candidate game-data root** (`LauncherStorage.getCandidateGameDataDirs`) -- the
   same defence the cape installer uses, because the game picks its storage from isolation and
   internal/external, and a write to only the wrong guess is silently ignored.
+- **The pack-list `version` must be a three-number array (`[1,0,0]`), never a string.** The game
+  matches the entry against the manifest's own array version, so `"version": "1.0.0"` is not
+  comparable and the pack is dropped silently -- it applies to the in-game changer, skin packs and
+  cape packs alike because they all share this list. Every writer (`InGamePackChanger`,
+  `SkinPackActivator`) routes through a `versionArray` helper, and existing string entries are
+  normalised on the next rewrite. `InGamePackChangerTest.theVersionIsWrittenAsAnArrayNotAString`
+  and `CapeInGameInstallerTest.theGlobalEntryVersionIsAnArraySoTheGameMatchesThePack` pin it.
+- **A live in-place reload is not possible without a native hook.** The game caches its pack stack
+  when the world loads, and `PreloaderInput.nativeReloadResourcePacks()` is only a *seam* -- the
+  preloader submodule exports no implementation, so it returns false. The honest behaviour is
+  therefore: write both the global list and the running world's own `world_resource_packs.json`
+  (which the running world does read), then report `pack_changer_reload_on_next_load` rather than
+  claiming the change is live. `/reload all` exists in-game but the launcher has no supported way
+  to drive it, so do not promise an in-place reload.
+- The `InGamePackChanger.Reloader` is installed from `InbuiltOverlayManager.showEnabledOverlays()`,
+  **not** as a side effect of starting voice chat (which is how it was first wired, leaving the
+  pack changer with no reloader whenever the voice module happened to be off).
+
 
 ## Mod Menu focus highlight (the "50% white overlay")
 - **The white wash is the platform's default focus highlight.** A clickable View is implicitly
@@ -677,11 +760,16 @@ these are the conclusions.
   recursively (buttons stay focusable for controller nav). Only the highlight flag is touched,
   never a background.
 - **Clearing the flag is not enough on its own — the held focus must also be released.**
-  `disableFocusHighlight` also calls `clearFocus()`. A highlight can be painted for the view that
-  already holds focus, and a stick nudge can hand focus to the root *after* the helper first ran;
-  clearing the flag does not retroactively remove the highlight from the currently-focused view,
-  so without `clearFocus()` the wash still appears mid-gesture for some builds. All three parts
-  are needed: unfocusable root, cleared flag, released focus.
+  `disableFocusHighlight` also walks every descendant, clears the highlight flag and releases focus
+  from whichever view holds it (`clearFocus()` only if `isFocused()`). A highlight can be painted
+  for the view that already holds focus, and a stick nudge can hand focus to the root *or a card
+  row* *after* the helper first ran; clearing the flag does not retroactively remove the highlight
+  from the currently-focused view, so without releasing focus the wash still appears mid-gesture
+  for some builds. All three parts are needed: unfocusable root, cleared flag, released focus.
+- **Order matters: the suppression must run *after* `setupViews()` / `loadMods()`.** Populating the
+  list can hand focus to its first card, which restores the very highlight the helper had just
+  removed. Both `show()` and `showFallback()` call `disableFocusHighlight(overlayView)` after the
+  populate step. Moving it back before is the regression to watch for if the wash returns.
 
 ## Mod Menu keybinds (keyboard + controller) and the in-game capture
 - The Mod Menu open bind is two independent prefs in `InbuiltModManager`:
@@ -838,3 +926,24 @@ these are the conclusions.
   too, and the dedicated key code still delivers the Enter press. The preloader also wraps every
   registered input callback in a try/catch so a throwing mod reads as "not consumed" instead of
   unwinding through the game's dispatch and killing the session.
+
+
+## Mod Menu controller navigation (ModMenuNavigation + ModMenuAdapter)
+- **The unfocusable overlay root means the framework never moves focus for you.** The white-wash
+  fix sets `focusable=false` on the overlay root, so a d-pad or stick press does not move focus
+  onto a card. Controller navigation is therefore computed in Java and applied to the list, not
+  left to `focusSearch`.
+- **`ModMenuNavigation` lays the grid out explicitly.** A group header spans the whole row (the
+  adapter's `SpanSizeLookup`), so a header owns a row of its own; plain `index +/- columns`
+  arithmetic stepped onto headers and appeared to skip a row. The class is pure and Android-free,
+  and `ModMenuNavigationTest` pins every edge (a run of header rows, moving off the end, an
+  all-unavailable menu, the single-column compact list).
+- **`ModMenuAdapter` owns the selection** (`handleControllerNavigation`/`handleControllerSelect`)
+  and draws an accent ring on the selected card via `setForeground`, because the platform's own
+  highlight is exactly the wash that was removed. Selection is skipped for unavailable modules,
+  matching the touch path.
+- **The game activity offers raw keys and stick motion to the open menu before the preloader.**
+  `MinecraftActivity.dispatchKeyEvent` -> `InbuiltOverlayManager.handleMenuControllerKey` and
+  `dispatchGenericMotionEvent` -> `handleMenuControllerMotion`. Without the early offer a pad button
+  the menu wants for navigation would be swallowed by the game first. Stick navigation has a
+  repeat delay so a held stick does not race through the list.

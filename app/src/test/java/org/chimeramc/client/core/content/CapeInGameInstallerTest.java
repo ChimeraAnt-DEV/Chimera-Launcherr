@@ -109,6 +109,24 @@ public class CapeInGameInstallerTest {
     }
 
     @Test
+    public void theGlobalEntryVersionIsAnArraySoTheGameMatchesThePack() throws Exception {
+        // The game matches a pack-list entry against the manifest's array version; a string
+        // version is not comparable, so the pack is dropped and the cape never shows. This pins
+        // the array form for the path the cape installer shares with the skin apply.
+        File staging = temp.newFolder("staging_array");
+        File root = temp.newFolder("root_array");
+
+        assertTrue(CapeInGameInstaller.install(staging, Collections.singletonList(root), cape()).success);
+
+        File global = new File(new File(root, "minecraftpe"), "global_resource_packs.json");
+        assertTrue("global pack list must exist", global.isFile());
+        String json = new String(java.nio.file.Files.readAllBytes(global.toPath()));
+        assertTrue("version must be an array: " + json, json.contains("\"version\": ["));
+        assertFalse("version must not be a string: " + json,
+                json.contains("\"version\": \""));
+    }
+
+    @Test
     public void nullRootsAreSkippedRatherThanCrashing() throws Exception {
         File staging = temp.newFolder("staging4");
         File realRoot = temp.newFolder("root_f");

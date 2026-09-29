@@ -89,6 +89,9 @@ public final class ControllerInputProcessor {
         leftDriftGate.reset();
         rightDriftGate.reset();
         resetCpsState();
+        // A held layer modifier belongs to the pad that was active; carrying it across a profile
+        // switch would silently keep an old layer in force on a new map.
+        resetLayerState();
         if (profile == null) {
             active = null;
             activeProfile = null;
@@ -561,7 +564,53 @@ public final class ControllerInputProcessor {
         if (response == null || keyCode <= 0) {
             return keyCode;
         }
-        return response.remapKey(keyCode);
+        return response.remapKey(keyCode, heldModifierKey());
+    }
+
+    /**
+     * Presses/releases of a button that switches the whole remap map, tracked by raw key code.
+     *
+     * <p>Tracks by the <em>raw</em> code, before any remap, so the modifier the player physically
+     * holds is what selects the layer — a base remap that changes the modifier button's meaning
+     * must not also stop it selecting. Only one modifier is remembered; holding a second replaces
+     * the first, which matches "hold one button to switch the map".
+     *
+     * @return true when this press was a layer modifier and should be kept from the game, so the
+     *         modifier acts as a plain switch rather than also firing its own action.
+     */
+    public static boolean handleLayerModifier(int rawKeyCode, boolean down) {
+        if (rawKeyCode <= 0) return false;
+        ControllerResponse response = active;
+        if (response == null || !response.isLayerModifier(rawKeyCode)) return false;
+        if (down) {
+            heldModifier = rawKeyCode;
+        } else if (heldModifier == rawKeyCode) {
+            heldModifier = 0;
+        }
+        return true;
+    }
+
+    /**
+     * The modifier that should select a layer right now, or 0 when the base map is in force.
+     *
+     * <p>Layers only apply to a controller, never to a physical keyboard: a modifier is identified
+     * by a gamepad key code, and a keyboard key that happens to share a code must not silently
+     * swap a player's whole map while they type.
+     */
+    private static int heldModifierKey() {
+        if (heldModifier == 0) return 0;
+        if (!ControllerResponse.isGamepadKeyCode(heldModifier)) return 0;
+        return heldModifier;
+    }
+
+    /** Clears the held modifier, e.g. when the profile changes or the pad disconnects. */
+    public static void resetLayerState() {
+        heldModifier = 0;
+    }
+
+    /** Active modifiers held on the pad, for the illustration; 0 when none. */
+    public static int activeLayerModifier() {
+        return heldModifierKey();
     }
 
     /**
@@ -572,6 +621,14 @@ public final class ControllerInputProcessor {
      * limits. Plain field, UI-thread only, like the drift gates.
      */
     private static final CpsLimiter cpsLimiter = new CpsLimiter();
+
+    /**
+     * The raw key code of the layer modifier the player is holding, or 0.
+     *
+     * UI-thread only, like the drift gates and the CPS limiter — it carries live hold state that
+     * must not be persisted, so it lives here rather than on the profile.
+     */
+    private static int heldModifier = 0;
 
     /** Buttons currently held down with a repeat configured, for {@link #tickCpsRepeats}. */
     private static final java.util.Set<Integer> repeatingButtons = new java.util.HashSet<>();

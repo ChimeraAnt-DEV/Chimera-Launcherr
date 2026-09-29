@@ -151,6 +151,16 @@ public final class VoiceNametagOverlay {
         cameraSource = source;
     }
 
+    /**
+     * The installed camera feed, shared with the Hitboxes module.
+     *
+     * <p>Exposed so the peer-feed hitbox view uses the same camera the nametag icons do. Two
+     * cameras would drift apart and the boxes would not line up with the world.
+     */
+    public static CameraSource cameraSource() {
+        return cameraSource;
+    }
+
     private final class NametagView extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint spritePaint = new Paint();

@@ -52,6 +52,15 @@ public final class ControllerResponse {
     private final float leftSensitivity;
     private final float rightSensitivity;
     private final int[] remapTable;
+    /**
+     * Held-modifier key for each alternate whole-map layer, and that layer's own flat table.
+     *
+     * Parallel arrays rather than a map so {@link #remapKey(int, int)} is a short linear scan over
+     * a handful of ints — the layers are few and this runs inside {@code dispatchKeyEvent}, so it
+     * must not allocate or hash. Empty when the profile has no layers, which is the common case.
+     */
+    private final int[] layerModifiers;
+    private final int[][] layerRemapTables;
     private final float[] leftStickCurve;
     private final float[] rightStickCurve;
     private final TriggerCurve leftTrigger;
@@ -69,6 +78,15 @@ public final class ControllerResponse {
         this.leftSensitivity = profile == null ? ControllerProfile.DEFAULT_SENSITIVITY : profile.getLeftStickSensitivity();
         this.rightSensitivity = profile == null ? ControllerProfile.DEFAULT_SENSITIVITY : profile.getRightStickSensitivity();
         this.remapTable = buildRemapTable(profile);
+        java.util.List<RemapLayer> layers = profile == null ? null : profile.getRemapLayers();
+        int layerCount = layers == null ? 0 : layers.size();
+        this.layerModifiers = new int[layerCount];
+        this.layerRemapTables = new int[layerCount][];
+        for (int i = 0; i < layerCount; i++) {
+            RemapLayer layer = layers.get(i);
+            this.layerModifiers[i] = layer.getModifierKeyCode();
+            this.layerRemapTables[i] = buildLayerRemapTable(layer);
+        }
         this.antiDriftEnabled = profile != null && profile.isAntiDriftEnabled();
         // Widen the dead zone to this pad's measured resting noise. Only when the toggle is on:
         // with it off the profile's own dead zone is exactly what the user chose.
@@ -141,16 +159,99 @@ public final class ControllerResponse {
         return table;
     }
 
+    private static int[] buildLayerRemapTable(RemapLayer layer) {
+        int[] table = new int[REMAP_TABLE_SIZE];
+        for (int code = 0; code < REMAP_TABLE_SIZE; code++) {
+            table[code] = code;
+        }
+        if (layer != null) {
+            for (java.util.Map.Entry<Integer, Integer> entry : layer.getRemaps().entrySet()) {
+                Integer from = entry.getKey();
+                Integer to = entry.getValue();
+                if (from == null || to == null) continue;
+                if (from < 0 || from >= REMAP_TABLE_SIZE) continue;
+                table[from] = to;
+            }
+        }
+        return table;
+    }
+
     private static float clamp(float zone) {
         if (Float.isNaN(zone)) return ControllerProfile.DEFAULT_DEAD_ZONE;
         return Math.max(0f, Math.min(0.99f, zone));
     }
 
+    /**
+     * Whether a key code is a gamepad button rather than a keyboard key.
+     *
+     * <p>The joystick buttons are <em>not</em> one contiguous range: the lettered faces sit at
+     * 96..110 while {@code KEYCODE_BUTTON_1..16} sit at 188..203, so a min/max test is impossible
+     * and a modifier is only meaningful on a pad — a keyboard key that happens to share a numeric
+     * code must not select a layer.
+     */
+    public static boolean isGamepadKeyCode(int keyCode) {
+        return GAMEPAD_KEY_CODES.contains(keyCode);
+    }
+
+    private static final java.util.Set<Integer> GAMEPAD_KEY_CODES = buildGamepadKeyCodes();
+
+    private static java.util.Set<Integer> buildGamepadKeyCodes() {
+        java.util.HashSet<Integer> codes = new java.util.HashSet<>();
+        // Lettered faces, shoulders, triggers, sticks and the menu pair (96..110).
+        for (int code = android.view.KeyEvent.KEYCODE_BUTTON_A;
+                code <= android.view.KeyEvent.KEYCODE_BUTTON_MODE; code++) {
+            codes.add(code);
+        }
+        // Numbered face buttons (188..203).
+        for (int code = android.view.KeyEvent.KEYCODE_BUTTON_1;
+                code <= android.view.KeyEvent.KEYCODE_BUTTON_16; code++) {
+            codes.add(code);
+        }
+        // The d-pad arrives as these key codes when a pad reports it as buttons.
+        codes.add(android.view.KeyEvent.KEYCODE_DPAD_UP);
+        codes.add(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+        codes.add(android.view.KeyEvent.KEYCODE_DPAD_LEFT);
+        codes.add(android.view.KeyEvent.KEYCODE_DPAD_RIGHT);
+        codes.add(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
+        return java.util.Collections.unmodifiableSet(codes);
+    }
+
+    /** Whether a button is a modifier for one of this profile's layers. */
+    public boolean isLayerModifier(int keyCode) {
+        if (keyCode <= 0) return false;
+        for (int modifier : layerModifiers) {
+            if (modifier == keyCode) return true;
+        }
+        return false;
+    }
+
     public int remapKey(int keyCode) {
-        if (keyCode > 0 && keyCode < REMAP_TABLE_SIZE) {
+        return remapKey(keyCode, 0);
+    }
+
+    /**
+     * Remaps a key through the layer whose modifier is held, else through the base map.
+     *
+     * @param heldModifierKeyCode the key code of the modifier button currently held, or 0 for
+     *        none. The base map's own remaps still apply to the layer's input, so a layer only
+     *        needs to list the buttons whose meaning changes while the modifier is down.
+     */
+    public int remapKey(int keyCode, int heldModifierKeyCode) {
+        if (keyCode <= 0) return keyCode;
+        if (heldModifierKeyCode > 0) {
+            for (int i = 0; i < layerModifiers.length; i++) {
+                if (layerModifiers[i] != heldModifierKeyCode) continue;
+                int[] table = layerRemapTables[i];
+                if (keyCode < REMAP_TABLE_SIZE) {
+                    int mapped = table[keyCode];
+                    return mapped == keyCode ? remapTable[keyCode] : mapped;
+                }
+                return keyCode;
+            }
+        }
+        if (keyCode < REMAP_TABLE_SIZE) {
             return remapTable[keyCode];
         }
-        if (keyCode <= 0) return keyCode;
         // Rare code outside the table: fall back to the map so remaps still apply.
         return keyCode;
     }

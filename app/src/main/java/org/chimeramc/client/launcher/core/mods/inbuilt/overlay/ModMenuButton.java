@@ -274,6 +274,17 @@ public class ModMenuButton {
         return isShowing;
     }
 
+    /**
+     * The open menu, or null.
+     *
+     * <p>Exists so the game activity can hand controller input to the menu before the preloader may
+     * swallow it — the overlay root is unfocusable, so the framework never routes a key or a stick
+     * movement to it on its own.
+     */
+    public ModMenuOverlay getMenuOverlay() {
+        return menuOverlay;
+    }
+
     public boolean isMenuShowing() {
         return menuOverlay != null && menuOverlay.isShowing();
     }

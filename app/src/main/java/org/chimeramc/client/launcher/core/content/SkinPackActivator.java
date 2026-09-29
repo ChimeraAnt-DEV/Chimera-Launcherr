@@ -237,8 +237,7 @@ public final class SkinPackActivator {
                                 ? object.get("pack_id").getAsString().toLowerCase(Locale.ROOT)
                                 : null;
                         if (packId != null && packId.equals(uuidToRemove)) continue;
-                        SkinEntry entry = new SkinEntry(packId,
-                                object.has("version") ? object.get("version").getAsString() : null);
+                        SkinEntry entry = new SkinEntry(packId, versionOf(object));
                         result.add(entry);
                     }
                 }
@@ -256,7 +255,7 @@ public final class SkinPackActivator {
             if (entry.uuid == null) continue;
             JsonObject object = new JsonObject();
             object.addProperty("pack_id", entry.uuid);
-            object.addProperty("version", entry.version == null ? "1.0.0" : entry.version);
+            object.add("version", versionArray(entry.version));
             array.add(object);
         }
         ensureDirectory(globalFile.getParentFile());
@@ -344,6 +343,49 @@ public final class SkinPackActivator {
     private static void ensureDirectory(File dir) throws IOException {
         if (dir == null || dir.isDirectory()) return;
         if (!dir.mkdirs() && !dir.isDirectory()) throw new IOException("Failed to create " + dir);
+    }
+
+    /**
+     * Coerces a version to the JSON form the game expects: a three-number array ({@code [1,0,0]}).
+     *
+     * <p>A pack-list entry is matched against the manifest's own array version, and a string
+     * version is not comparable, so the game silently drops the pack. Writing {@code "version"}
+     * as a string was exactly why an applied skin pack (and a cape pack) could look enabled in the
+     * launcher while the game ignored it.
+     */
+    private static JsonArray versionArray(String version) {
+        int[] parts = {1, 0, 0};
+        if (version != null && !version.trim().isEmpty()) {
+            String[] tokens = version.trim().split("\\.");
+            for (int i = 0; i < 3 && i < tokens.length; i++) {
+                try {
+                    parts[i] = Integer.parseInt(tokens[i].trim());
+                } catch (NumberFormatException ignored) {
+                    parts[i] = 0;
+                }
+            }
+        }
+        JsonArray array = new JsonArray();
+        array.add(parts[0]);
+        array.add(parts[1]);
+        array.add(parts[2]);
+        return array;
+    }
+
+    /** Reads a version whether it was written as a string, an array, or is absent. */
+    private static String versionOf(JsonObject entry) {
+        if (entry == null || !entry.has("version")) return null;
+        JsonElement value = entry.get("version");
+        if (value.isJsonArray()) {
+            JsonArray array = value.getAsJsonArray();
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < array.size(); i++) {
+                if (i > 0) builder.append('.');
+                builder.append(array.get(i).getAsInt());
+            }
+            return builder.toString();
+        }
+        return value.getAsString();
     }
 
     private static final class SkinEntry {

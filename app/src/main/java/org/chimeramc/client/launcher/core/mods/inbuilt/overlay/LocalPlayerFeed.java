@@ -40,8 +40,28 @@ public final class LocalPlayerFeed {
 
     /** Installs both seams. Safe to call repeatedly; the last install wins. */
     public static void install() {
-        VoiceChatModule.setPositionSource(LocalPlayerFeed::readPosition);
+        VoiceChatModule.setPositionSource(new LocalPlayerFeed.Feed());
         VoiceNametagOverlay.setCameraSource(LocalPlayerFeed::readCamera);
+    }
+
+    /**
+     * The feed handed to the voice module: position plus view rotation.
+     *
+     * <p>It implements the rotation extension so beacons advertise which way the player is looking,
+     * which is what lets another launcher user draw a look-direction line for this player. The two
+     * values are read from the same native snapshot in the same call, so a position can never be
+     * paired with a rotation from a different frame.
+     */
+    static final class Feed implements VoiceChatModule.PositionSource, VoiceChatModule.RotationSource {
+        @Override
+        public float[] read() {
+            return readPosition();
+        }
+
+        @Override
+        public float[] readRotation() {
+            return PreloaderInput.readLocalPlayerRotation();
+        }
     }
 
     /** The local player's position, or null when the native read is unavailable. */

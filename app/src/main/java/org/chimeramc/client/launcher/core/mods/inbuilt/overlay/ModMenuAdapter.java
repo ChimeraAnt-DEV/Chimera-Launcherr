@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import org.chimeramc.client.R;
 import org.chimeramc.client.core.mods.inbuilt.UnifiedMod;
+import org.chimeramc.client.core.mods.inbuilt.model.ModAvailability;
 import org.chimeramc.client.ui.animation.DynamicAnim;
 
 import java.util.ArrayList;
@@ -39,6 +40,9 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     private OnModActionListener listener;
     private boolean compactMode;
     private ModMenuTheme theme;
+    /** The index a controller has moved the selection to, or NONE. -1 because position 0 is valid. */
+    private int controllerFocus = ModMenuNavigation.NONE;
+    private RecyclerView recycler;
 
     public ModMenuAdapter(ModMenuTheme theme) {
         this.theme = theme != null ? theme : new ModMenuTheme(null);
@@ -53,6 +57,93 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
     public void setOnModActionListener(OnModActionListener listener) {
         this.listener = listener;
+    }
+
+    @Override
+    public void onAttachedToRecyclerView(@NonNull RecyclerView recyclerView) {
+        super.onAttachedToRecyclerView(recyclerView);
+        this.recycler = recyclerView;
+    }
+
+    @Override
+    public void onDetachedFromRecyclerView(@NonNull RecyclerView recyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView);
+        this.recycler = null;
+    }
+
+    /** Columns per row, so vertical moves step by row exactly as the grid lays out. */
+    private int columnCount() {
+        if (recycler != null && recycler.getLayoutManager() instanceof androidx.recyclerview.widget.GridLayoutManager) {
+            return ((androidx.recyclerview.widget.GridLayoutManager) recycler.getLayoutManager()).getSpanCount();
+        }
+        return compactMode ? 1 : 4;
+    }
+
+    /** One flag per item: group headers cannot be selected, module cards can. */
+    private boolean[] selectableFlags() {
+        boolean[] flags = new boolean[items.size()];
+        for (int i = 0; i < items.size(); i++) {
+            MenuItem item = items.get(i);
+            flags[i] = !item.isGroup() && item.mod != null && ModAvailability.isInteractive(item.mod.getId());
+        }
+        return flags;
+    }
+
+    /** One flag per item: a group header spans its own row, so the layout has to say so. */
+    private boolean[] fullRowFlags() {
+        boolean[] flags = new boolean[items.size()];
+        for (int i = 0; i < items.size(); i++) {
+            flags[i] = items.get(i).isGroup();
+        }
+        return flags;
+    }
+
+    /**
+     * Moves the controller selection by one directional press.
+     *
+     * <p>Returns true when the press was consumed, so the caller can swallow it and the stick does
+     * not also reach the game. The move is computed by {@link ModMenuNavigation}, which is pure and
+     * tested; this method only applies the result to the list.
+     */
+    public boolean handleControllerNavigation(ModMenuNavigation.Direction direction) {
+        if (items.isEmpty()) return false;
+        int target = ModMenuNavigation.move(controllerFocus, columnCount(), fullRowFlags(),
+                selectableFlags(), direction);
+        if (target == ModMenuNavigation.NONE || target == controllerFocus) {
+            // Nothing to move to: still consumed, so a press at the edge does not make the stick
+            // act on the game behind the menu.
+            return controllerFocus != ModMenuNavigation.NONE;
+        }
+        int previous = controllerFocus;
+        controllerFocus = target;
+        if (previous >= 0) notifyItemChanged(previous);
+        notifyItemChanged(target);
+        if (recycler != null) recycler.smoothScrollToPosition(target);
+        return true;
+    }
+
+    /**
+     * Activates the focused card: a module toggles (or, when unavailable, says why), a card with a
+     * gear opens its settings.
+     *
+     * <p>The same rules the touch path uses, so a controller cannot switch on a module the touch
+     * path refuses.
+     */
+    public boolean handleControllerSelect() {
+        if (controllerFocus < 0 || controllerFocus >= items.size()) return false;
+        MenuItem item = items.get(controllerFocus);
+        if (item.isGroup() || item.mod == null) return false;
+        if (!ModAvailability.isInteractive(item.mod.getId())) return true;
+        if (listener != null) listener.onToggle(item.mod, !toggleStates.getOrDefault(item.mod.getStableKey(), false));
+        return true;
+    }
+
+    /** Clears the controller selection, e.g. when the menu closes. */
+    public void clearControllerFocus() {
+        if (controllerFocus == ModMenuNavigation.NONE) return;
+        int previous = controllerFocus;
+        controllerFocus = ModMenuNavigation.NONE;
+        if (previous >= 0 && previous < items.size()) notifyItemChanged(previous);
     }
 
     public void setCompactMode(boolean compactMode) {
@@ -132,6 +223,10 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         favoriteStates.clear();
         favoriteStates.putAll(nextFavoriteStates);
         diff.dispatchUpdatesTo(this);
+        // A filter change or a refresh renumbers every position, so the controller selection would
+        // point at a different card than the one that was highlighted. Drop it rather than let the
+        // next A press toggle whatever moved under the index.
+        controllerFocus = ModMenuNavigation.NONE;
     }
 
     public boolean isGroupHeader(int position) {
@@ -222,14 +317,25 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         }
 
         boolean isEnabled = toggleStates.getOrDefault(mod.getStableKey(), false);
-        updateStatusView(modHolder, isEnabled);
+        boolean available = ModAvailability.isInteractive(mod.getId());
+        updateStatusView(modHolder, isEnabled, available);
         updateAccentBar(modHolder, mod.getGroupId(), isEnabled);
         updateFavoriteView(modHolder, favoriteStates.getOrDefault(mod.getStableKey(), false));
+        updateUnavailableView(modHolder, mod);
 
         View.OnClickListener toggleClick = v -> {
+            // A module that cannot do its job must not look toggleable. The label says why, and
+            // the click is dropped instead of flipping a switch that changes nothing on screen.
+            if (!available) {
+                if (modHolder.unavailableText != null) {
+                    android.widget.Toast.makeText(modHolder.itemView.getContext(),
+                            R.string.mod_unavailable_reason, android.widget.Toast.LENGTH_SHORT).show();
+                }
+                return;
+            }
             boolean newState = !toggleStates.getOrDefault(mod.getStableKey(), false);
             toggleStates.put(mod.getStableKey(), newState);
-            updateStatusView(modHolder, newState);
+            updateStatusView(modHolder, newState, true);
             updateAccentBar(modHolder, mod.getGroupId(), newState);
             // Per-icon behaviour on flip, not a generic bounce: Armor HUD "equips", the Voice mic
             // pulses. Only modules with distinct iconography animate; the rest fall through.
@@ -254,7 +360,7 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             }
         });
 
-        if (mod.hasConfig()) {
+        if (mod.hasConfig() && available) {
             modHolder.configBtn.setVisibility(View.VISIBLE);
             modHolder.configBtn.setOnClickListener(v -> {
                 if (listener != null) {
@@ -265,7 +371,46 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             modHolder.configBtn.setVisibility(View.GONE);
         }
 
-        updateCardState(modHolder, isEnabled);
+        updateCardState(modHolder, isEnabled, available);
+        applyControllerFocus(modHolder, position);
+    }
+
+    /**
+     * Dresses the card a controller has selected with an accent ring.
+     *
+     * <p>This is why the overlay root is unfocusable: the platform's own focus highlight is the
+     * white wash that made the menu look broken, so the selection is drawn here instead, in the
+     * theme accent, on exactly one card.
+     */
+    private void applyControllerFocus(ModViewHolder holder, int position) {
+        boolean focused = position == controllerFocus;
+        float density = holder.itemView.getResources().getDisplayMetrics().density;
+        if (focused) {
+            android.graphics.drawable.GradientDrawable ring = new android.graphics.drawable.GradientDrawable();
+            ring.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            ring.setCornerRadius(14f * density);
+            ring.setColor(0x00000000);
+            ring.setStroke(Math.max(2, (int) (2f * density)), theme.accent());
+            holder.itemView.setForeground(ring);
+            holder.itemView.setAlpha(1f);
+            holder.itemView.setTranslationZ(6f * density);
+        } else {
+            holder.itemView.setForeground(null);
+            holder.itemView.setTranslationZ(0f);
+        }
+    }
+
+    /**
+     * Shows or hides the "doesn't work or is bugged" outline.
+     *
+     * <p>A module whose game feed has no provider is not merely off — it cannot be turned on. The
+     * label is the whole point: without it the card looks like every other disabled module and the
+     * player assumes their toggle is broken.
+     */
+    private void updateUnavailableView(ModViewHolder holder, UnifiedMod mod) {
+        if (holder.unavailableText == null) return;
+        boolean unavailable = ModAvailability.isUnavailable(mod.getId());
+        holder.unavailableText.setVisibility(unavailable ? View.VISIBLE : View.GONE);
     }
 
     @Override
@@ -282,7 +427,8 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             favorite ? R.string.mod_menu_unfavorite : R.string.mod_menu_favorite));
     }
 
-    private void updateStatusView(ModViewHolder holder, boolean enabled) {
+    private void updateStatusView(ModViewHolder holder, boolean enabled,
+                                  boolean available) {
         float density = holder.statusText.getResources().getDisplayMetrics().density;
         if (enabled) {
             holder.statusText.setText(R.string.mod_status_enabled);
@@ -298,7 +444,7 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             holder.statusText.setTextColor(0xFFB4BBC3);
             holder.statusText.setBackgroundResource(R.drawable.bg_mod_status_disabled);
         }
-        updateCardState(holder, enabled);
+        updateCardState(holder, enabled, available);
     }
 
     /** Paints the top edge strip so each card carries its section colour. */
@@ -311,15 +457,22 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         holder.accentBar.setBackground(bar);
     }
 
-    private void updateCardState(ModViewHolder holder, boolean enabled) {
-        holder.itemView.setAlpha(1f);
-        holder.icon.setAlpha(enabled ? 1f : 0.8f);
-        holder.name.setTextColor(enabled ? 0xFFF1F4F6 : 0xFFD6DCE2);
+    private void updateCardState(ModViewHolder holder, boolean enabled, boolean available) {
+        // Unavailable wins over the enabled/disabled tint: a greyed card is the whole signal.
+        holder.itemView.setAlpha(available ? 1f : 0.55f);
+        holder.itemView.setEnabled(available);
+        holder.itemView.setClickable(available);
+        holder.statusText.setEnabled(available);
+        holder.icon.setAlpha(!available ? 0.5f : (enabled ? 1f : 0.8f));
+        holder.name.setTextColor(!available ? 0xFF8892A0 : (enabled ? 0xFFF1F4F6 : 0xFFD6DCE2));
         
         if (holder.itemView instanceof androidx.cardview.widget.CardView) {
             androidx.cardview.widget.CardView cv = (androidx.cardview.widget.CardView) holder.itemView;
             
-            if (enabled) {
+            if (!available) {
+                cv.setCardBackgroundColor(0xFF1B1E22);
+                cv.setCardElevation(0f);
+            } else if (enabled) {
                 cv.setCardBackgroundColor(theme.enabledCardColor());
                 cv.setCardElevation(theme.enabledElevation());
             } else {
@@ -394,6 +547,7 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         TextView groupText;
         ImageButton favoriteBtn;
         ImageButton configBtn;
+        TextView unavailableText;
         View accentBar;
 
         ModViewHolder(View itemView) {
@@ -404,6 +558,7 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             groupText = itemView.findViewById(R.id.mod_card_group);
             favoriteBtn = itemView.findViewById(R.id.mod_card_favorite);
             configBtn = itemView.findViewById(R.id.mod_card_config);
+            unavailableText = itemView.findViewById(R.id.mod_card_unavailable);
             accentBar = itemView.findViewById(R.id.mod_card_accent);
         }
     }

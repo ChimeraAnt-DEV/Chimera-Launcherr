@@ -73,6 +73,7 @@ public final class InbuiltModuleProvider {
     private static final String CFG_HITBOX_SHOW_LOOK_LINE = "hitbox_show_look_line";
     private static final String CFG_HITBOX_SHOW_CRIT_LINE = "hitbox_show_crit_line";
     private static final String CFG_HITBOX_SHOW_COMBO_BOX = "hitbox_show_combo_box";
+    private static final String CFG_HITBOX_SHOW_TARGET_BOX = "hitbox_show_target_box";
     private static final String CFG_VOICE_RANGE = "voice_range_blocks";
     private static final String CFG_VOICE_VOLUME = "voice_volume_percent";
     private static final String CFG_VOICE_CHANNEL = "voice_channel";
@@ -322,6 +323,7 @@ public final class InbuiltModuleProvider {
                 nodes.put(configNode(context, mod, CFG_HITBOX_SHOW_PROJECTILES, "entities"));
                 nodes.put(configNode(context, mod, CFG_HITBOX_SHOW_THROWN_ITEMS, "entities"));
                 nodes.put(configNode(context, mod, CFG_HITBOX_SHOW_LOOK_LINE, "guides"));
+                nodes.put(configNode(context, mod, CFG_HITBOX_SHOW_TARGET_BOX, "guides"));
                 nodes.put(configNode(context, mod, CFG_HITBOX_SHOW_CRIT_LINE, "guides"));
                 nodes.put(configNode(context, mod, CFG_HITBOX_SHOW_COMBO_BOX, "guides"));
                 nodes.put(configNode(context, mod, CFG_OVERLAY_SHOW_EVERYWHERE, "guides"));
@@ -404,6 +406,12 @@ public final class InbuiltModuleProvider {
             node.put("enabled_when", new JSONArray().put(new JSONObject()
                     .put("key", config.dependsOn).put("op", "truthy")));
         }
+        // An output the native entity feed would have to supply is disabled rather than hidden:
+        // the switch stays visible so the option is discoverable, but it cannot be turned on to
+        // no effect. The same rule the module-level badge uses, one level down.
+        if (ModIds.outputRequiresGameData(mod.getId(), key)) {
+            node.put("disabled", true);
+        }
         return node;
     }
 
@@ -435,6 +443,7 @@ public final class InbuiltModuleProvider {
             case CFG_HITBOX_SHOW_LOOK_LINE: return R.string.mod_config_hitbox_show_look_line_desc;
             case CFG_HITBOX_SHOW_CRIT_LINE: return R.string.mod_config_hitbox_show_crit_line_desc;
             case CFG_HITBOX_SHOW_COMBO_BOX: return R.string.mod_config_hitbox_show_combo_box_desc;
+            case CFG_HITBOX_SHOW_TARGET_BOX: return R.string.mod_config_hitbox_show_target_box_desc;
             case CFG_VOICE_RANGE: return R.string.mod_config_voice_range_desc;
             case CFG_VOICE_VOLUME: return R.string.mod_config_voice_volume_desc;
             case CFG_VOICE_CHANNEL: return R.string.mod_config_voice_channel_desc;
@@ -777,6 +786,11 @@ public final class InbuiltModuleProvider {
                     UnifiedMod.ConfigType.TOGGLE,
                     "true", "", "",
                     String.valueOf(manager.isHitboxShowComboBox())));
+            configs.add(config(CFG_HITBOX_SHOW_TARGET_BOX,
+                    context.getString(R.string.mod_config_hitbox_show_target_box),
+                    UnifiedMod.ConfigType.TOGGLE,
+                    "true", "", "",
+                    String.valueOf(manager.isHitboxShowTargetBox())));
         } else if (ModIds.VOICE_CHAT.equals(modId)) {
             // Trimmed to mic-only scope: the mic master switch plus the in-world icon's look and
             // behaviour. Channel, visibility, capacity and per-member mute are owned by the Voice
@@ -980,6 +994,9 @@ public final class InbuiltModuleProvider {
                 break;
             case CFG_HITBOX_SHOW_COMBO_BOX:
                 manager.setHitboxShowComboBox(parseBoolean(value));
+                break;
+            case CFG_HITBOX_SHOW_TARGET_BOX:
+                manager.setHitboxShowTargetBox(parseBoolean(value));
                 break;
             case CFG_VOICE_MIC:
                 manager.setVoiceMicEnabled(parseBoolean(value));

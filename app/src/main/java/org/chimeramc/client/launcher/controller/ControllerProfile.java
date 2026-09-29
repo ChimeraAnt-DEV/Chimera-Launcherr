@@ -61,6 +61,24 @@ public class ControllerProfile {
     private final Map<Integer, Integer> clickLimits = new HashMap<>();
     private final Map<Integer, Integer> repeatRates = new HashMap<>();
 
+    /**
+     * Strength of the pad's rumble, as a percentage.
+     *
+     * Stored on the profile rather than globally so a player who keeps one pad for racing and one
+     * for Minecraft can set them differently. {@link #vibrationEnabled} is the on/off switch and
+     * this is the magnitude; 0 reads as off even when the switch is on.
+     */
+    private int rumbleStrength = RumbleCurve.DEFAULT_STRENGTH;
+
+    /**
+     * Alternate whole-button maps, each in force only while its modifier key is held.
+     *
+     * The profile's own {@code buttonRemaps} is layer 0 and is always active; these are the extra
+     * layers on top. An empty list (a profile saved before layers existed) reads back as "no
+     * layers", which is the identity behaviour.
+     */
+    private final java.util.List<RemapLayer> remapLayers = new java.util.ArrayList<>();
+
     public ControllerProfile() {
         this("Profile");
     }
@@ -273,6 +291,42 @@ public class ControllerProfile {
         return new HashMap<>(repeatRates);
     }
 
+    /** Rumble magnitude as a percentage; 0 means off even when vibration is enabled. */
+    public int getRumbleStrength() {
+        return rumbleStrength;
+    }
+
+    public void setRumbleStrength(int percent) {
+        rumbleStrength = RumbleCurve.clampStrength(percent);
+    }
+
+    /** The extra whole-map layers, in hold order. The returned list is the live one. */
+    public java.util.List<RemapLayer> getRemapLayers() {
+        return remapLayers;
+    }
+
+    public void addRemapLayer(RemapLayer layer) {
+        if (layer != null) remapLayers.add(layer);
+    }
+
+    public void removeRemapLayer(int index) {
+        if (index >= 0 && index < remapLayers.size()) remapLayers.remove(index);
+    }
+
+    /**
+     * The layer whose modifier is currently held, or null for the base map.
+     *
+     * First match in list order wins, so the layer declared first takes priority when two layers
+     * share a modifier.
+     */
+    public RemapLayer activeLayer(int heldKeyCode) {
+        if (heldKeyCode <= 0) return null;
+        for (RemapLayer layer : remapLayers) {
+            if (layer.getModifierKeyCode() == heldKeyCode) return layer;
+        }
+        return null;
+    }
+
     public ControllerProfile copy() {
         ControllerProfile copy = new ControllerProfile(name);
         copy.leftDeadZone = leftDeadZone;
@@ -304,6 +358,11 @@ public class ControllerProfile {
         copy.clickLimits.putAll(clickLimits);
         copy.repeatRates.clear();
         copy.repeatRates.putAll(repeatRates);
+        copy.rumbleStrength = rumbleStrength;
+        copy.remapLayers.clear();
+        for (RemapLayer layer : remapLayers) {
+            copy.remapLayers.add(layer.copy());
+        }
         return copy;
 
     }
