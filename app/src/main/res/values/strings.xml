@@ -1571,6 +1571,8 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="mod_config_hitbox_show_crit_line_desc">Red line across the head — hit there for a critical; turns blue while you are aimed at it</string>
     <string name="mod_config_hitbox_show_combo_box">Show Best-Combo Box</string>
     <string name="mod_config_hitbox_show_combo_box_desc">Red box marking the best place to hit for combos; turns blue while you are aimed at it</string>
+    <string name="mod_config_hitbox_show_target_box">Show Target Box</string>
+    <string name="mod_config_hitbox_show_target_box_desc">Blue chest-height box marking what to aim at on another player</string>
     <string name="hitbox_scope_note">Other players running this launcher are drawn from the voice link: their position and view travel with the audio, so their box and aim line need no game hook. Mobs, items, projectiles and the crit/combo guides need the game\'s own entity list, which this build cannot read — those options are disabled rather than drawing a made-up box.</string>
 
     <!-- Proximity Voice Chat -->
