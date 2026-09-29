@@ -71,6 +71,10 @@ public class InbuiltModManager {
     private static final String KEY_HITBOX_SHOW_LOOK_LINE = "hitbox_show_look_line";
     private static final String KEY_HITBOX_SHOW_CRIT_LINE = "hitbox_show_crit_line";
     private static final String KEY_HITBOX_SHOW_COMBO_BOX = "hitbox_show_combo_box";
+    /** Draws the chest-height target sub-box inside each peer box. */
+    private static final String KEY_HITBOX_SHOW_TARGET_BOX = "hitbox_show_target_box";
+    /** ARGB colour of the peer boxes; -1 means "use the default white". */
+    private static final String KEY_HITBOX_PEER_COLOR = "hitbox_peer_color";
     private static final String KEY_VOICE_RANGE = "voice_range_blocks";
     private static final String KEY_VOICE_VOLUME = "voice_volume_percent";
     private static final String KEY_VOICE_CHANNEL = "voice_channel";
@@ -687,6 +691,35 @@ public class InbuiltModManager {
 
     public void setHitboxShowComboBox(boolean show) {
         prefs.edit().putBoolean(KEY_HITBOX_SHOW_COMBO_BOX, show).apply();
+    }
+
+    /** Whether the chest-height target sub-box is drawn. Default on. */
+    public boolean isHitboxShowTargetBox() {
+        return prefs.getBoolean(KEY_HITBOX_SHOW_TARGET_BOX, true);
+    }
+
+    /** Whether the chest-height target sub-box is drawn; alias used by the peer-feed overlay. */
+    public boolean getHitboxShowTargetBox() {
+        return isHitboxShowTargetBox();
+    }
+
+    public void setHitboxShowTargetBox(boolean show) {
+        prefs.edit().putBoolean(KEY_HITBOX_SHOW_TARGET_BOX, show).apply();
+    }
+
+    /**
+     * The peer box colour, or {@link Color#WHITE} when unset.
+     *
+     * <p>Default white rather than a themed accent: the box has to read against any world backdrop,
+     * and the player's accent can be a low-contrast violet. Stored as an int so a picked colour
+     * survives a restart without a separate colour-index scheme.
+     */
+    public int getHitboxPeerColor() {
+        return prefs.getInt(KEY_HITBOX_PEER_COLOR, android.graphics.Color.WHITE);
+    }
+
+    public void setHitboxPeerColor(int color) {
+        prefs.edit().putInt(KEY_HITBOX_PEER_COLOR, color).apply();
     }
 
     // --- Proximity voice ----------------------------------------------------------------

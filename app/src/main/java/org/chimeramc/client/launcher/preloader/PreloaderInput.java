@@ -34,6 +34,14 @@ public class PreloaderInput {
     public static native boolean nativeIsLocalPlayerAvailable();
     public static native float[] nativeReadLocalPlayerPosition();
     public static native float[] nativeReadLocalPlayerRotation();
+    /**
+     * Asks the running game to re-read the active resource-pack list.
+     *
+     * <p>Optional by design: a build that has not resolved the per-version hook for this returns
+     * false and the caller falls back to "applies on the next world load". Declared here so the
+     * seam exists and the Java side needs no change when the hook lands.
+     */
+    public static native boolean nativeReloadResourcePacks();
     public static native void nativeConfigureSignatureRules(String rulesPath, String minecraftVersion);
 
     public static void configureSignatureRules(File rulesFile, String minecraftVersion) {
@@ -109,6 +117,21 @@ public class PreloaderInput {
             return value != null && value.length >= 2 ? value : null;
         } catch (UnsatisfiedLinkError e) {
             return null;
+        }
+    }
+
+    /**
+     * Asks the game to re-read its active resource packs.
+     *
+     * @return true when the running game refreshed; false when no live hook is installed, so the
+     *         caller reports the change will apply on the next world load instead of implying it
+     *         took effect now.
+     */
+    public static boolean reloadResourcePacks() {
+        try {
+            return nativeReloadResourcePacks();
+        } catch (UnsatisfiedLinkError e) {
+            return false;
         }
     }
 

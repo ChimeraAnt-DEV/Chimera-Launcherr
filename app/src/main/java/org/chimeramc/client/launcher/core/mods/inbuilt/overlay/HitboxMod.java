@@ -27,6 +27,8 @@ public final class HitboxMod {
     private static volatile boolean showLookLine = true;
     private static volatile boolean showCritLine = true;
     private static volatile boolean showComboBox = true;
+    private static volatile boolean showTargetBox = true;
+    private static volatile int peerColor = 0xFFFFFFFF;
 
     private HitboxMod() {}
 
@@ -51,7 +53,9 @@ public final class HitboxMod {
                     manager.isHitboxShowItems(), manager.isHitboxShowProjectiles(),
                     manager.isHitboxShowThrownItems(),
                     manager.isHitboxShowLookLine(), manager.isHitboxShowCritLine(),
-                    manager.isHitboxShowComboBox());
+                    manager.isHitboxShowComboBox(),
+                    manager.getHitboxShowTargetBox(),
+                    manager.getHitboxPeerColor());
         }
     }
 
@@ -61,13 +65,23 @@ public final class HitboxMod {
                 manager.isHitboxShowItems(), manager.isHitboxShowProjectiles(),
                 manager.isHitboxShowThrownItems(),
                 manager.isHitboxShowLookLine(), manager.isHitboxShowCritLine(),
-                manager.isHitboxShowComboBox());
+                manager.isHitboxShowComboBox(),
+                manager.getHitboxShowTargetBox(), manager.getHitboxPeerColor());
     }
 
     /** Separate from the manager overload so the filters are testable without a Context. */
     public static void applyConfig(boolean players, boolean mobs, boolean items,
                                    boolean projectiles, boolean thrownItems,
                                    boolean lookLine, boolean critLine, boolean comboBox) {
+        applyConfig(players, mobs, items, projectiles, thrownItems, lookLine, critLine, comboBox,
+                showTargetBox, peerColor);
+    }
+
+    /** Full form, including the peer-feed toggle and colour. */
+    public static void applyConfig(boolean players, boolean mobs, boolean items,
+                                   boolean projectiles, boolean thrownItems,
+                                   boolean lookLine, boolean critLine, boolean comboBox,
+                                   boolean targetBox, int color) {
         showPlayers = players;
         showMobs = mobs;
         showItems = items;
@@ -76,6 +90,8 @@ public final class HitboxMod {
         showLookLine = lookLine;
         showCritLine = critLine;
         showComboBox = comboBox;
+        showTargetBox = targetBox;
+        peerColor = color;
     }
 
     public static boolean isActive() {
@@ -92,6 +108,29 @@ public final class HitboxMod {
 
     public static boolean isShowComboBox() {
         return active && showComboBox;
+    }
+
+    /** Whether the chest-height target sub-box should be drawn. */
+    public static boolean isShowTargetBox() {
+        return active && showTargetBox;
+    }
+
+    /** The configured peer box colour, defaulting to white. */
+    public static int peerColor() {
+        return peerColor;
+    }
+
+    /**
+     * True when the module is on and a peer feed is available.
+     *
+     * <p>Different from {@link #isAwaitingGameData()}, which is about the native entity feed: the
+     * peer feed needs no native hook, so it is present whenever the voice module is running. The
+     * overlay uses this to decide between the native "waiting for game data" notice and the
+     * peer-only view, so a player who has voice on sees boxes rather than a message saying the
+     * module is not wired up.
+     */
+    public static boolean hasPeerFeed() {
+        return active && PeerHitboxSource.readPeers() != null;
     }
 
     public static boolean isKindEnabled(HitboxProjector.Kind kind) {

@@ -16,6 +16,9 @@ import android.widget.FrameLayout;
 import android.os.Handler;
 import android.os.Looper;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
 import org.chimeramc.client.core.mods.inbuilt.model.ModIds;
 
@@ -43,6 +46,8 @@ public final class HitboxOverlay {
     private static final int COLOR_ITEM = 0xFFFFD86B;
     private static final int COLOR_THROWN = 0xFFFF9F45;
     private static final int COLOR_PROJECTILE = 0xFFC08BFF;
+    /** The chest-height target strip inside a peer box: a distinct, cooler colour than the box. */
+    private static final int COLOR_TARGET = 0x9978C8FF;
 
     private final Activity activity;
     private final WindowManager windowManager;
@@ -160,8 +165,11 @@ public final class HitboxOverlay {
         protected void onDraw(Canvas canvas) {
             HitboxProjector.Frame frame = HitboxMod.readFrame();
             if (frame == null) {
-                // The module is on but there is no entity feed, so there is genuinely nothing to
-                // draw. Saying so is the difference between "not wired up yet" and "broken".
+                // No native entity feed -- but the peer feed (voice positions) needs no native
+                // hook, so draw what the network actually reported before falling back to the
+                // "waiting for game data" notice. Showing the notice while peer boxes are
+                // available would claim the module is unwired when it is working.
+                if (drawPeerBoxes(canvas)) return;
                 if (HitboxMod.isAwaitingGameData()) drawAwaitingData(canvas);
                 return;
             }
@@ -197,6 +205,65 @@ public final class HitboxOverlay {
                         canvas.drawRect(combo.left, combo.top, combo.right, combo.bottom, fillPaint);
                     }
                 }
+            }
+        }
+
+        /**
+         * Draws the peer feed's boxes, and reports whether anything was drawn.
+         *
+         * <p>Returns false when the feed is absent or empty, so the caller can fall through to the
+         * native "waiting for game data" notice. Returns true the moment one box is drawn, because
+         * once we are drawing real geometry the notice would be a lie.
+         */
+        private boolean drawPeerBoxes(Canvas canvas) {
+            HitboxProjector.Camera camera = camera();
+            if (camera == null) return false;
+            HitboxProjector.Basis basis = HitboxProjector.basis(camera);
+            if (basis == null) return false;
+
+            List<PeerHitboxSource.PeerHitbox> peers = PeerHitboxSource.build(PeerHitboxSource::readPeers);
+            if (peers.isEmpty()) return false;
+
+            int base = HitboxMod.peerColor();
+            List<HitboxProjector.Projected> projected = new ArrayList<>(peers.size());
+            for (PeerHitboxSource.PeerHitbox peer : peers) {
+                HitboxProjector.Projected p =
+                        HitboxProjector.projectEntity(peer.entity, basis);
+                if (p != null) projected.add(p);
+            }
+            // Far to near, matching the native frame's ordering so a nearer box paints on top.
+            projected.sort((a, b) -> Float.compare(b.distance, a.distance));
+
+            for (HitboxProjector.Projected p : projected) {
+                boxPaint.setStrokeWidth(Math.max(1.5f, density));
+                boxPaint.setColor(base);
+                canvas.drawRect(p.box.left, p.box.top, p.box.right, p.box.bottom, boxPaint);
+                drawPeerGuides(canvas, p);
+            }
+            return true;
+        }
+
+        /** The target sub-box inside a peer box: the chest-height strip a hit lands in. */
+        private void drawPeerGuides(Canvas canvas, HitboxProjector.Projected p) {
+            if (!HitboxMod.isShowTargetBox()) return;
+            float width = p.box.width() * 0.5f;
+            float cx = (p.box.left + p.box.right) / 2f;
+            float top = p.box.top + p.box.height() * 0.16f;
+            float bottom = p.box.top + p.box.height() * 0.55f;
+            boxPaint.setColor(COLOR_TARGET);
+            boxPaint.setStrokeWidth(Math.max(1f, density * 0.9f));
+            canvas.drawRect(cx - width / 2f, top, cx + width / 2f, bottom, boxPaint);
+        }
+
+        /** The camera for the peer view, or null when the local player feed is unavailable. */
+        private HitboxProjector.Camera camera() {
+            VoiceNametagOverlay.CameraSource source = VoiceNametagOverlay.cameraSource();
+            if (source == null) return null;
+            try {
+                // The camera is scaled to the draw target, so the basis and the entity boxes agree.
+                return source.camera(getWidth(), getHeight());
+            } catch (Throwable t) {
+                return null;
             }
         }
 

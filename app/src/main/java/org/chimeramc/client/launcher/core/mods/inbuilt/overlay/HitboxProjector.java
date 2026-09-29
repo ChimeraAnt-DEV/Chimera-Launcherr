@@ -198,6 +198,29 @@ public final class HitboxProjector {
         }
     }
 
+    /**
+     * The camera's orthonormal basis and focal length, computed once per frame.
+     *
+     * <p>Exposed so the entity projection and the aim-line projection share one basis. Computing
+     * it twice would let a heading change between the two, and the aim line would disagree with
+     * the box it points at, which is exactly the mismatch the module exists to avoid.
+     */
+    public static final class Basis {
+        public final Camera camera;
+        public final float[] forward;
+        public final float[] right;
+        public final float[] up;
+        public final float focal;
+
+        Basis(Camera camera, float[] forward, float[] right, float[] up, float focal) {
+            this.camera = camera;
+            this.forward = forward;
+            this.right = right;
+            this.up = up;
+            this.focal = focal;
+        }
+    }
+
     private HitboxProjector() {}
 
     /**
@@ -214,17 +237,11 @@ public final class HitboxProjector {
             return new Frame(null, new ArrayList<>());
         }
         Camera camera = scene.camera;
-        float[] forward = camera.forward();
-        float[] right = normalize(cross(forward, new float[]{0f, 1f, 0f}));
-        if (right == null) {
-            // Looking straight up or down: the world up vector is parallel to forward, so pick
-            // any perpendicular. Without this the basis is degenerate and nothing projects.
-            right = normalize(cross(forward, new float[]{1f, 0f, 0f}));
-        }
-        float[] up = normalize(cross(right, forward));
-
-        float focal = (camera.screenHeight / 2f)
-                / (float) Math.tan(Math.toRadians(camera.fovDeg) / 2f);
+        Basis basis = basis(camera);
+        float[] forward = basis.forward;
+        float[] right = basis.right;
+        float[] up = basis.up;
+        float focal = basis.focal;
 
         List<Projected> projected = new ArrayList<>();
         for (Entity entity : scene.entities) {
@@ -238,6 +255,35 @@ public final class HitboxProjector {
         float cy = camera.screenHeight / 2f;
         Rect lookLine = new Rect(cx, cy, cx, cy + camera.screenHeight * 0.18f);
         return new Frame(lookLine, projected);
+    }
+
+    /**
+     * The camera's forward/right/up basis and focal length.
+     *
+     * <p>Degenerate when looking straight up or down (the world up vector is parallel to forward),
+     * so a perpendicular is picked from a different axis rather than returning a null basis that
+     * would blank the whole frame.
+     */
+    public static Basis basis(Camera camera) {
+        if (camera == null) return null;
+        float[] forward = camera.forward();
+        float[] right = normalize(cross(forward, new float[]{0f, 1f, 0f}));
+        if (right == null) {
+            right = normalize(cross(forward, new float[]{1f, 0f, 0f}));
+        }
+        float[] up = normalize(cross(right, forward));
+        float focal = (camera.screenHeight / 2f)
+                / (float) Math.tan(Math.toRadians(camera.fovDeg) / 2f);
+        return new Basis(camera, forward, right, up, focal);
+    }
+
+    /**
+     * Projects a single world-space box directly, for callers that do not build a whole scene
+     * (the network-feed hitbox overlay, which has one peer's box to draw at a time).
+     */
+    public static Projected projectEntity(Entity entity, Basis basis) {
+        if (entity == null || basis == null) return null;
+        return projectEntity(entity, basis.camera, basis.forward, basis.right, basis.up, basis.focal);
     }
 
     private static Projected projectEntity(Entity entity, Camera camera, float[] forward,

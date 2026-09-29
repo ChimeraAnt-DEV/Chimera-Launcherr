@@ -87,9 +87,14 @@ final class PackChangerPanel {
             return;
         }
 
-        List<InGamePackChanger.PackEntry> packs = InGamePackChanger.listPacks(gameDataDir);
+        List<File> dirs = resolveGameDataDirs();
+        List<InGamePackChanger.PackEntry> packs = InGamePackChanger.listPacks(dirs);
+        int activeCount = 0;
+        for (InGamePackChanger.PackEntry pack : packs) {
+            if (pack.active) activeCount++;
+        }
         statusLine.setText(activity.getString(R.string.pack_changer_status,
-                InGamePackChanger.activeCount(gameDataDir), packs.size()));
+                activeCount, packs.size()));
 
         if (packs.isEmpty()) {
             TextView empty = new TextView(activity);
@@ -147,7 +152,8 @@ final class PackChangerPanel {
         toggle.setOnClickListener(v -> {
             // Apply to every candidate root the way the cape/installer does: the game picks its
             // storage from isolation + internal/external, and a write to only the wrong guess is
-            // silently ignored.
+            // silently ignored. setActive writes both the global list and each world's own list,
+            // because the running world reads the latter.
             boolean ok = false;
             for (File gameDataDir : resolveGameDataDirs()) {
                 ok |= InGamePackChanger.setActive(
@@ -157,7 +163,13 @@ final class PackChangerPanel {
                 statusLine.setText(R.string.pack_changer_write_failed);
                 return;
             }
+            // Ask the running session to re-read its packs. When no live hook is installed the
+            // write still applies on the next world load, and we say so rather than pretending
+            // the change is live.
+            boolean live = InGamePackChanger.requestReload();
             rebuild();
+            statusLine.setText(live ? R.string.pack_changer_reloaded
+                    : R.string.pack_changer_reload_on_next_load);
         });
         row.addView(toggle);
 

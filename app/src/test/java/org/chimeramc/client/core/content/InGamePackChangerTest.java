@@ -121,4 +121,129 @@ public class InGamePackChangerTest {
         assertTrue(new File(new File(root, "resource_packs"), "broken").mkdirs());
         assertTrue(InGamePackChanger.listPacks(root).isEmpty());
     }
+
+    private void writeWorld(File gameDataDir, String worldName, String json) throws Exception {
+        File world = new File(new File(gameDataDir, "minecraftWorlds"), worldName);
+        assertTrue(world.mkdirs());
+        try (FileWriter writer = new FileWriter(new File(world, "world_resource_packs.json"))) {
+            writer.write(json);
+        }
+    }
+
+    private String readWorld(File gameDataDir, String worldName) throws Exception {
+        File file = new File(new File(new File(gameDataDir, "minecraftWorlds"), worldName),
+                "world_resource_packs.json");
+        return new String(Files.readAllBytes(file.toPath()));
+    }
+
+    @Test
+    public void enablingWritesTheRunningWorldsOwnListToo() throws Exception {
+        // The regression this class now guards: the running world reads its own
+        // world_resource_packs.json, not the global list, so toggling in-game did nothing until
+        // the player left and re-entered. Both files must be written.
+        File root = tempDir();
+        writeWorld(root, "Survival", "[]");
+
+        assertTrue(InGamePackChanger.setActive(root, "aaaa0000-0000-0000-0000-000000000001", "1.0.0", true));
+
+        assertTrue(readWorld(root, "Survival").contains("aaaa0000-0000-0000-0000-000000000001"));
+        Set<String> active = InGamePackChanger.activeUuids(root);
+        assertTrue(active.contains("aaaa0000-0000-0000-0000-000000000001"));
+    }
+
+    @Test
+    public void aPackActiveOnlyInAWorldCountsAsActive() throws Exception {
+        File root = tempDir();
+        // Nothing in the global list; the world lists it. The panel must not show "off".
+        writeWorld(root, "Creative", "[{\"pack_id\":\"bbbb0000-0000-0000-0000-000000000002\"}]");
+
+        Set<String> active = InGamePackChanger.activeUuids(root);
+        assertTrue(active.contains("bbbb0000-0000-0000-0000-000000000002"));
+    }
+
+    @Test
+    public void disablingRemovesItFromEveryWorldsList() throws Exception {
+        File root = tempDir();
+        writeWorld(root, "One", "[{\"pack_id\":\"cccc0000-0000-0000-0000-000000000003\"}]");
+        writeWorld(root, "Two", "[{\"pack_id\":\"cccc0000-0000-0000-0000-000000000003\"},"
+                + "{\"pack_id\":\"dddd0000-0000-0000-0000-000000000004\"}]");
+
+        assertTrue(InGamePackChanger.setActive(root, "cccc0000-0000-0000-0000-000000000003", "1.0.0", false));
+
+        assertFalse(readWorld(root, "One").contains("cccc0000"));
+        assertFalse(readWorld(root, "Two").contains("cccc0000"));
+        // The unrelated entry survives.
+        assertTrue(readWorld(root, "Two").contains("dddd0000-0000-0000-0000-000000000004"));
+    }
+
+    @Test
+    public void aWorldWithoutAListIsNotCreatedJustToRemoveAPack() throws Exception {
+        File root = tempDir();
+        writeWorld(root, "Fresh", "[]");
+        File untouched = new File(new File(new File(root, "minecraftWorlds"), "Fresh"),
+                "world_resource_packs.json");
+
+        InGamePackChanger.setActive(root, "eeee0000-0000-0000-0000-000000000005", "1.0.0", false);
+
+        // Removing a pack that was never there leaves the file as-is; an empty file the game
+        // would then parse is a needless side effect.
+        assertEquals("[]", new String(Files.readAllBytes(untouched.toPath())).trim());
+    }
+
+    @Test
+    public void listPacksMergesAcrossCandidateRoots() throws Exception {
+        File first = tempDir();
+        File second = tempDir();
+        File alpha = writePack(first, "aaaa0000-0000-0000-0000-00000000000a", "Alpha");
+        writePack(second, "bbbb0000-0000-0000-0000-00000000000b", "Beta");
+        writeGlobal(second, "[{\"pack_id\":\"bbbb0000-0000-0000-0000-00000000000b\"}]");
+
+        List<InGamePackChanger.PackEntry> packs =
+                InGamePackChanger.listPacks(java.util.Arrays.asList(first, second));
+
+        assertEquals(2, packs.size());
+        assertEquals("Alpha", packs.get(0).name);
+        assertFalse(packs.get(0).active);
+        assertEquals("Beta", packs.get(1).name);
+        assertTrue(packs.get(1).active);
+        // The listing did not move the pack between roots.
+        assertTrue(alpha.isDirectory());
+    }
+
+    @Test
+    public void requestReloadReportsFalseWhenNoReloaderIsInstalled() {
+        InGamePackChanger.setReloader(null);
+        assertFalse(InGamePackChanger.requestReload());
+    }
+
+    @Test
+    public void requestReloadForwardsToTheInstalledReloader() {
+        InGamePackChanger.setReloader(() -> true);
+        try {
+            assertTrue(InGamePackChanger.requestReload());
+        } finally {
+            InGamePackChanger.setReloader(null);
+        }
+    }
+
+    @Test
+    public void aThrowingReloaderIsTreatedAsNoLiveReload() {
+        InGamePackChanger.setReloader(() -> {
+            throw new IllegalStateException("game gone");
+        });
+        try {
+            assertFalse(InGamePackChanger.requestReload());
+        } finally {
+            InGamePackChanger.setReloader(null);
+        }
+    }
+
+    @Test
+    public void worldPackFilesFindsEveryWorldDirectory() throws Exception {
+        File root = tempDir();
+        writeWorld(root, "One", "[]");
+        writeWorld(root, "Two", "[]");
+        assertEquals(2, InGamePackChanger.worldPackFiles(root).size());
+        assertTrue(InGamePackChanger.worldPackFiles(null).isEmpty());
+    }
 }

@@ -817,6 +817,10 @@ public class InbuiltOverlayManager {
             LocalPlayerFeed.install();
             VoiceNametagMod.setTagSource(new VoiceNametagTagFeed());
             module.start(manager);
+            // Let the in-game pack changer nudge the live session; without this the pack write
+            // lands but the running world keeps its cached stack until the next load.
+            org.chimeramc.client.core.content.InGamePackChanger.setReloader(
+                    org.chimeramc.client.preloader.PreloaderInput::reloadResourcePacks);
         } catch (Throwable t) {
             android.util.Log.w("InbuiltOverlayManager", "Could not start voice chat", t);
         }

@@ -23,11 +23,21 @@ import java.util.Set;
 /**
  * Enables or disables the resource packs of an instance without leaving the game.
  *
- * <p>Bedrock decides which packs are active by reading
- * {@code minecraftpe/global_resource_packs.json}: an array of {@code {pack_id, version}} entries.
- * The packs themselves live under {@code resource_packs/<uuid>/}. This class reads the installed
- * packs from the folder and rewrites the global list, which is the file the running game reloads
- * when the world's pack selection is refreshed.
+ * <p>Bedrock tracks active packs in <b>two</b> places, and which one matters depends on when it is
+ * read:
+ * <ul>
+ *   <li>{@code minecraftpe/global_resource_packs.json} — the list applied to a world when it is
+ *       <em>loaded</em>. An array of {@code {pack_id, version}} entries.</li>
+ *   <li>{@code minecraftWorlds/<world>/world_resource_packs.json} — the list the <em>running</em>
+ *       world actually reads, both at load and when it refreshes its pack selection in-game.</li>
+ * </ul>
+ *
+ * <p>Writing only the global file is why toggling a pack in-game appeared to do nothing: the
+ * loaded world never re-reads the global list, so enable/disable had no visible effect until the
+ * player left and re-entered. {@link #setActive} therefore writes <em>both</em> — the global list
+ * for the next load, and every world's own file so the current session sees the change.
+ *
+ * <p>The pack folders live under {@code resource_packs/<uuid>/}.
  *
  * <p>Deliberately File-based rather than Context-based so the list/merge logic is unit-testable
  * on the JVM, the same split the rest of the content package uses.
@@ -42,8 +52,32 @@ public final class InGamePackChanger {
     private static final String RESOURCE_PACKS_DIR = "resource_packs";
     private static final String MINECRAFT_PE_DIR = "minecraftpe";
     private static final String GLOBAL_RESOURCE_PACKS = "global_resource_packs.json";
+    private static final String MINECRAFT_WORLDS_DIR = "minecraftWorlds";
+    private static final String WORLD_RESOURCE_PACKS = "world_resource_packs.json";
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+    /**
+     * A hook the running session can install so a pack change is pushed to the game immediately.
+     *
+     * <p>Writing the files is necessary but not sufficient: a loaded world caches its pack stack,
+     * so without a nudge the change is only visible on the next load. A session installs a
+     * {@link Reloader} that asks the game to refresh its applied packs; when none is installed the
+     * write still happens and the caller is told a restart is needed.
+     */
+    public interface Reloader {
+        /**
+         * @return true when the game accepted the refresh, false when it cannot be done live (the
+         *         change will apply on the next world load).
+         */
+        boolean reloadPacks();
+    }
+
+    private static volatile Reloader reloader;
+
+    public static void setReloader(Reloader value) {
+        reloader = value;
+    }
 
     private InGamePackChanger() {
     }
@@ -91,34 +125,98 @@ public final class InGamePackChanger {
         return result;
     }
 
-    /** Uuids currently listed in {@code global_resource_packs.json}. */
-    public static Set<String> activeUuids(File gameDataDir) {
-        Set<String> result = new LinkedHashSet<>();
-        JsonArray array = readGlobalArray(globalFile(gameDataDir));
-        if (array == null) return result;
-        for (JsonElement element : array) {
-            if (!element.isJsonObject()) continue;
-            JsonObject object = element.getAsJsonObject();
-            if (object.has("pack_id")) {
-                result.add(object.get("pack_id").getAsString().trim().toLowerCase(Locale.ROOT));
+    /**
+     * The union of the packs found under several candidate roots, de-duplicated by uuid.
+     *
+     * <p>The game picks its storage from isolation and internal/external, so a pack may sit in any
+     * one of the candidates. Listing only the first root showed an empty or stale list whenever
+     * that root was not the one actually in use.
+     */
+    public static List<PackEntry> listPacks(List<File> gameDataDirs) {
+        java.util.LinkedHashMap<String, PackEntry> byUuid = new java.util.LinkedHashMap<>();
+        if (gameDataDirs == null) return new ArrayList<>();
+        for (File dir : gameDataDirs) {
+            for (PackEntry entry : listPacks(dir)) {
+                // A pack active in any root counts as active.
+                PackEntry existing = byUuid.get(entry.uuid);
+                if (existing == null || (!existing.active && entry.active)) {
+                    byUuid.put(entry.uuid, entry);
+                }
             }
         }
+        List<PackEntry> result = new ArrayList<>(byUuid.values());
+        result.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
         return result;
     }
 
     /**
-     * Turns a pack on or off in the instance's global list.
+     * Uuids currently active for this instance.
      *
-     * @return {@code true} when the list was written; {@code false} for a bad argument or an IO
-     *         failure, so the caller can leave the switch where it was instead of lying.
+     * <p>The union of the global list and every world's own list: a pack can be active in the
+     * running world without being in the global list (that is exactly the state the in-game toggle
+     * produces), so reading only the global file would show "off" for a pack the player just
+     * turned on.
+     */
+    public static Set<String> activeUuids(File gameDataDir) {
+        Set<String> result = new LinkedHashSet<>();
+        collectUuids(globalFile(gameDataDir), result);
+        for (File worldPacks : worldPackFiles(gameDataDir)) {
+            collectUuids(worldPacks, result);
+        }
+        return result;
+    }
+
+    private static void collectUuids(File file, Set<String> into) {
+        JsonArray array = readGlobalArray(file);
+        if (array == null) return;
+        for (JsonElement element : array) {
+            if (!element.isJsonObject()) continue;
+            JsonObject object = element.getAsJsonObject();
+            if (object.has("pack_id")) {
+                into.add(object.get("pack_id").getAsString().trim().toLowerCase(Locale.ROOT));
+            }
+        }
+    }
+
+    /**
+     * Turns a pack on or off for the loaded world and the next load alike.
+     *
+     * <p>Writes the global list (applies at next world load) and every world's own
+     * {@code world_resource_packs.json} (what the running world reads). Writing only the global
+     * file was the bug: an in-game toggle then did nothing until the player re-entered the world.
+     *
+     * @return {@code true} when the global list was written; {@code false} for a bad argument or an
+     *         IO failure, so the caller can leave the switch where it was instead of lying.
      */
     public static boolean setActive(File gameDataDir, String uuid, String version, boolean active) {
         if (gameDataDir == null || uuid == null || uuid.trim().isEmpty()) return false;
         String key = uuid.trim().toLowerCase(Locale.ROOT);
+
+        // The world files are the ones that matter live; write them first so a failure on the
+        // global list cannot leave the running world out of sync with what the player just chose.
+        for (File worldPacks : worldPackFiles(gameDataDir)) {
+            mergeInto(worldPacks, key, version, active);
+        }
+
         File global = globalFile(gameDataDir);
+        return mergeInto(global, key, version, active);
+    }
+
+    /**
+     * Rewrites one pack list file, adding/removing the uuid and preserving unrelated entries.
+     *
+     * @return true when the file was written (or does not need to exist for a removal).
+     */
+    private static boolean mergeInto(File file, String key, String version, boolean active) {
+        if (file == null) return false;
+        if (!active && !file.isFile()) {
+            // Nothing to remove from a world that never had a lists file; leave it absent rather
+            // than creating an empty one the game would then have to parse.
+            return true;
+        }
 
         List<JsonObject> kept = new ArrayList<>();
-        JsonArray existing = readGlobalArray(global);
+        JsonArray existing = readGlobalArray(file);
         if (existing != null) {
             for (JsonElement element : existing) {
                 if (!element.isJsonObject()) continue;
@@ -138,11 +236,40 @@ public final class InGamePackChanger {
         }
 
         try {
-            writeGlobal(global, kept);
+            writeGlobal(file, kept);
             return true;
         } catch (IOException e) {
             return false;
         }
+    }
+
+    /**
+     * Asks the running session to pick up a pack change immediately.
+     *
+     * @return true when a live reload happened; false when no session is running or it could not
+     *         refresh, in which case the change applies on the next world load.
+     */
+    public static boolean requestReload() {
+        Reloader current = reloader;
+        if (current == null) return false;
+        try {
+            return current.reloadPacks();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** Every world's own resource-list file under {@code minecraftWorlds/}. */
+    public static List<File> worldPackFiles(File gameDataDir) {
+        List<File> files = new ArrayList<>();
+        if (gameDataDir == null) return files;
+        File worlds = new File(gameDataDir, MINECRAFT_WORLDS_DIR);
+        File[] children = worlds.listFiles(File::isDirectory);
+        if (children == null) return files;
+        for (File world : children) {
+            files.add(new File(world, WORLD_RESOURCE_PACKS));
+        }
+        return files;
     }
 
     private static File globalFile(File gameDataDir) {
