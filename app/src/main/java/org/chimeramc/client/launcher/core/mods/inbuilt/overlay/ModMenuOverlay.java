@@ -1804,6 +1804,68 @@ public class ModMenuOverlay {
         overlayView.animate().alpha(0f).setDuration(180).start();
     }
 
+    /**
+     * Routes one controller key press into the open menu: a d-pad/left-stick direction moves the
+     * selection, a face/shoulder button toggles the selected module.
+     *
+     * <p>Called from the game activity before the preloader sees the key, because the overlay root
+     * is unfocusable on purpose (see {@link #disableFocusHighlight}) — so the framework cannot move
+     * focus for us and the direction has to be applied to the list directly.
+     *
+     * @return true when the press was used by the menu and must be swallowed
+     */
+    public boolean handleControllerKey(int keyCode, boolean down) {
+        if (!isShowing || !down || adapter == null) return false;
+        switch (keyCode) {
+            case android.view.KeyEvent.KEYCODE_DPAD_UP:
+                return adapter.handleControllerNavigation(ModMenuNavigation.Direction.UP);
+            case android.view.KeyEvent.KEYCODE_DPAD_DOWN:
+                return adapter.handleControllerNavigation(ModMenuNavigation.Direction.DOWN);
+            case android.view.KeyEvent.KEYCODE_DPAD_LEFT:
+                return adapter.handleControllerNavigation(ModMenuNavigation.Direction.LEFT);
+            case android.view.KeyEvent.KEYCODE_DPAD_RIGHT:
+                return adapter.handleControllerNavigation(ModMenuNavigation.Direction.RIGHT);
+            case android.view.KeyEvent.KEYCODE_BUTTON_A:
+            case android.view.KeyEvent.KEYCODE_ENTER:
+                return adapter.handleControllerSelect();
+            case android.view.KeyEvent.KEYCODE_BUTTON_START:
+                hide();
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Routes analogue stick movement into the open menu, so the selection can be moved with the
+     * stick and not only the d-pad.
+     *
+     * <p>A repeat delay is applied because a held stick would otherwise race through the list.
+     *
+     * @return true when the movement was used by the menu and must be swallowed
+     */
+    public boolean handleControllerMotion(android.view.MotionEvent event) {
+        if (!isShowing || adapter == null) return false;
+        float axisX = event.getAxisValue(android.view.MotionEvent.AXIS_X);
+        float axisY = event.getAxisValue(android.view.MotionEvent.AXIS_Y);
+        if (Math.abs(axisX) < NAV_AXIS_THRESHOLD && Math.abs(axisY) < NAV_AXIS_THRESHOLD) return false;
+
+        long now = android.os.SystemClock.uptimeMillis();
+        if (now < nextAxisNavMs) return true;
+        nextAxisNavMs = now + NAV_AXIS_REPEAT_MS;
+
+        if (Math.abs(axisX) > Math.abs(axisY)) {
+            return adapter.handleControllerNavigation(axisX > 0
+                    ? ModMenuNavigation.Direction.RIGHT : ModMenuNavigation.Direction.LEFT);
+        }
+        return adapter.handleControllerNavigation(axisY > 0
+                ? ModMenuNavigation.Direction.DOWN : ModMenuNavigation.Direction.UP);
+    }
+
+    private static final float NAV_AXIS_THRESHOLD = 0.6f;
+    private static final long NAV_AXIS_REPEAT_MS = 180L;
+    private volatile long nextAxisNavMs = 0L;
+
     public boolean isShowing() {
         return isShowing;
     }

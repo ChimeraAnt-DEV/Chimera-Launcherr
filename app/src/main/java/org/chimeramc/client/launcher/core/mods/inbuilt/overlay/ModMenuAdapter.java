@@ -40,6 +40,9 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     private OnModActionListener listener;
     private boolean compactMode;
     private ModMenuTheme theme;
+    /** The index a controller has moved the selection to, or NONE. -1 because position 0 is valid. */
+    private int controllerFocus = ModMenuNavigation.NONE;
+    private RecyclerView recycler;
 
     public ModMenuAdapter(ModMenuTheme theme) {
         this.theme = theme != null ? theme : new ModMenuTheme(null);
@@ -54,6 +57,93 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
     public void setOnModActionListener(OnModActionListener listener) {
         this.listener = listener;
+    }
+
+    @Override
+    public void onAttachedToRecyclerView(@NonNull RecyclerView recyclerView) {
+        super.onAttachedToRecyclerView(recyclerView);
+        this.recycler = recyclerView;
+    }
+
+    @Override
+    public void onDetachedFromRecyclerView(@NonNull RecyclerView recyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView);
+        this.recycler = null;
+    }
+
+    /** Columns per row, so vertical moves step by row exactly as the grid lays out. */
+    private int columnCount() {
+        if (recycler != null && recycler.getLayoutManager() instanceof androidx.recyclerview.widget.GridLayoutManager) {
+            return ((androidx.recyclerview.widget.GridLayoutManager) recycler.getLayoutManager()).getSpanCount();
+        }
+        return compactMode ? 1 : 4;
+    }
+
+    /** One flag per item: group headers cannot be selected, module cards can. */
+    private boolean[] selectableFlags() {
+        boolean[] flags = new boolean[items.size()];
+        for (int i = 0; i < items.size(); i++) {
+            MenuItem item = items.get(i);
+            flags[i] = !item.isGroup() && item.mod != null && ModAvailability.isInteractive(item.mod.getId());
+        }
+        return flags;
+    }
+
+    /** One flag per item: a group header spans its own row, so the layout has to say so. */
+    private boolean[] fullRowFlags() {
+        boolean[] flags = new boolean[items.size()];
+        for (int i = 0; i < items.size(); i++) {
+            flags[i] = items.get(i).isGroup();
+        }
+        return flags;
+    }
+
+    /**
+     * Moves the controller selection by one directional press.
+     *
+     * <p>Returns true when the press was consumed, so the caller can swallow it and the stick does
+     * not also reach the game. The move is computed by {@link ModMenuNavigation}, which is pure and
+     * tested; this method only applies the result to the list.
+     */
+    public boolean handleControllerNavigation(ModMenuNavigation.Direction direction) {
+        if (items.isEmpty()) return false;
+        int target = ModMenuNavigation.move(controllerFocus, columnCount(), fullRowFlags(),
+                selectableFlags(), direction);
+        if (target == ModMenuNavigation.NONE || target == controllerFocus) {
+            // Nothing to move to: still consumed, so a press at the edge does not make the stick
+            // act on the game behind the menu.
+            return controllerFocus != ModMenuNavigation.NONE;
+        }
+        int previous = controllerFocus;
+        controllerFocus = target;
+        if (previous >= 0) notifyItemChanged(previous);
+        notifyItemChanged(target);
+        if (recycler != null) recycler.smoothScrollToPosition(target);
+        return true;
+    }
+
+    /**
+     * Activates the focused card: a module toggles (or, when unavailable, says why), a card with a
+     * gear opens its settings.
+     *
+     * <p>The same rules the touch path uses, so a controller cannot switch on a module the touch
+     * path refuses.
+     */
+    public boolean handleControllerSelect() {
+        if (controllerFocus < 0 || controllerFocus >= items.size()) return false;
+        MenuItem item = items.get(controllerFocus);
+        if (item.isGroup() || item.mod == null) return false;
+        if (!ModAvailability.isInteractive(item.mod.getId())) return true;
+        if (listener != null) listener.onToggle(item.mod, !toggleStates.getOrDefault(item.mod.getStableKey(), false));
+        return true;
+    }
+
+    /** Clears the controller selection, e.g. when the menu closes. */
+    public void clearControllerFocus() {
+        if (controllerFocus == ModMenuNavigation.NONE) return;
+        int previous = controllerFocus;
+        controllerFocus = ModMenuNavigation.NONE;
+        if (previous >= 0 && previous < items.size()) notifyItemChanged(previous);
     }
 
     public void setCompactMode(boolean compactMode) {
@@ -278,6 +368,32 @@ public class ModMenuAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         }
 
         updateCardState(modHolder, isEnabled, available);
+        applyControllerFocus(modHolder, position);
+    }
+
+    /**
+     * Dresses the card a controller has selected with an accent ring.
+     *
+     * <p>This is why the overlay root is unfocusable: the platform's own focus highlight is the
+     * white wash that made the menu look broken, so the selection is drawn here instead, in the
+     * theme accent, on exactly one card.
+     */
+    private void applyControllerFocus(ModViewHolder holder, int position) {
+        boolean focused = position == controllerFocus;
+        float density = holder.itemView.getResources().getDisplayMetrics().density;
+        if (focused) {
+            android.graphics.drawable.GradientDrawable ring = new android.graphics.drawable.GradientDrawable();
+            ring.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            ring.setCornerRadius(14f * density);
+            ring.setColor(0x00000000);
+            ring.setStroke(Math.max(2, (int) (2f * density)), theme.accent());
+            holder.itemView.setForeground(ring);
+            holder.itemView.setAlpha(1f);
+            holder.itemView.setTranslationZ(6f * density);
+        } else {
+            holder.itemView.setForeground(null);
+            holder.itemView.setTranslationZ(0f);
+        }
     }
 
     /**

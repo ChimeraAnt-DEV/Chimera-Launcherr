@@ -434,6 +434,13 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
                 return true
             }
         }
+        // An open Mod Menu takes controller navigation next. Its overlay root is unfocusable so the
+        // platform stops painting the white focus wash over the game, which also means the
+        // framework will not route a d-pad or A press to it — so it is offered the raw key here,
+        // before the preloader can swallow the press for the game.
+        if (overlayManager?.handleMenuControllerKey(event.keyCode, event.action) == true) {
+            return true
+        }
         val mouseButton = getMouseButton(event)
         if (mouseButton != 0 &&
             (event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_UP) &&
@@ -537,6 +544,12 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
         if (shouldConsumeMouseMotion(event)) {
+            return true
+        }
+
+        // While the Mod Menu is open the left stick moves the menu selection, so it must not also
+        // reach the game as a look input.
+        if (overlayManager?.handleMenuControllerMotion(event) == true) {
             return true
         }
 
