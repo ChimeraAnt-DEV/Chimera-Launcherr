@@ -328,6 +328,23 @@ invented box is worse than no box — the player would aim at it.
 - Far-to-near sort so a nearer box paints over one behind it. A box behind the camera produces
   no screen rect and is skipped.
 
+### Peer boxes are drawn even with no native feed (the reachable half)
+- **The module is not greyed out and must not be.** `HitboxMod.EntitySource` has no provider, so
+  the native frame is always null — but `HitboxOverlay.drawPeerBoxes` still draws other players
+  from the proximity-voice feed (`PeerHitboxSource` → `VoiceChatModule.audiblePeers()`), which
+  needs no game hook at all. `ModIds.requiresGameData` therefore **excludes** `HITBOX`; only the
+  options that genuinely need the entity list are disabled, via
+  `ModIds.outputRequiresGameData(modId, configKey)` (mobs/items/projectiles/thrown items/crit
+  line/combo box) which `InbuiltModuleProvider.configNode` turns into `"disabled": true` and
+  `ModAvailability.isOptionInteractive` exposes. `ModAvailabilityTest` pins both halves. Greying
+  the whole module (an earlier state) made the working peer boxes unreachable — do not restore it.
+- **The aim line for a peer is the peer's own advertised yaw/pitch** (protocol v5), never a
+  locally guessed heading; `PeerHitboxSource.from` treats 0/0 as the "unknown" sentinel and
+  `hasRotation == false` draws a box with no line.
+- **The chest-height target box is `hitbox_show_target_box`** (default on), drawn inside a peer
+  box by `drawPeerGuides`; it is in the config schema, the configs list and the setter switch, so
+  it is user-toggleable. It is a peer-route output, so it is *not* in the native-outputs set.
+
 ## Select Hit module (HitTimingSolver + HitTimingMod + HitTimingOverlay)
 A small green/red pill centred at the top of the screen: green while a hit will land, red while
 the post-hit window is still open, with the combo count beside it and a slim progress bar. Sized
@@ -349,7 +366,6 @@ only, like the other overlays.
   attack either way, and the timing must be the real input timing.
 - Honest scope: it reads your own attack input and never clicks for you; the server still decides
   whether a hit lands. `hit_timing_scope_note` says so in the dialog.
-
 ## In-game Mod Menu navigation & overlay visibility
 - The Mod Menu nav is a **top bar** inside `overlay_mod_menu.xml`, not a side rail (landscape-only app; a rail only gets the short edge). Entries live in a `HorizontalScrollView` so compact mode's narrow window still fits every destination and the close button.
 - **An unresolved native HUD hook must not hide a mod's UI.** `OverlayVisibility.showGameOverlays` treats `hudScreenOpen == false` as authoritative only once the hook has fired (`gameWorldSeen`); before that it falls back to `sessionActive`. Without the fallback, an overlay appeared only while the Mod Menu was open and vanished the instant it closed. The fallback signals are part of `tick()`'s state hash — a session starting must re-evaluate visibility even when every native flag is unchanged.

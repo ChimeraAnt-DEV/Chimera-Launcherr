@@ -20,7 +20,6 @@ public class ModAvailabilityTest {
     public void modulesNeedingGameDataAreUnavailable() {
         assertTrue(ModAvailability.isUnavailable(ModIds.ARMOR_HUD));
         assertTrue(ModAvailability.isUnavailable(ModIds.CRYSTAL_OPTIMIZER));
-        assertTrue(ModAvailability.isUnavailable(ModIds.HITBOX));
     }
 
     @Test
@@ -38,10 +37,52 @@ public class ModAvailabilityTest {
         }
     }
 
+    /**
+     * The Hitboxes module draws peers from the voice feed, so it must not be greyed out even
+     * though part of what it can draw needs the native entity list. Greying the whole module was
+     * the defect: it made the working peer boxes unreachable.
+     */
+    @Test
+    public void hitboxStaysUsableBecauseThePeerRouteWorks() {
+        assertFalse(ModAvailability.isUnavailable(ModIds.HITBOX));
+        assertTrue(ModAvailability.isInteractive(ModIds.HITBOX));
+        assertNull(ModAvailability.unavailableReason(ModIds.HITBOX));
+    }
+
+    /**
+     * Only the hitbox outputs that need the native entity list are disabled, and the working ones
+     * are not. This is what stops the config dialog offering a switch that can never draw.
+     */
+    @Test
+    public void onlyNativeHitboxOutputsAreDisabledOptions() {
+        for (String nativeOutput : new String[]{
+                "hitbox_show_mobs", "hitbox_show_items", "hitbox_show_projectiles",
+                "hitbox_show_thrown_items", "hitbox_show_crit_line", "hitbox_show_combo_box"}) {
+            assertFalse(nativeOutput + " needs the game, so must be disabled",
+                    ModAvailability.isOptionInteractive(ModIds.HITBOX, nativeOutput));
+            assertEquals(ModAvailability.REASON_NO_GAME_DATA,
+                    ModAvailability.optionUnavailableReason(ModIds.HITBOX, nativeOutput));
+        }
+        for (String peerOutput : new String[]{
+                "hitbox_show_players", "hitbox_show_look_line", "hitbox_show_target_box"}) {
+            assertTrue(peerOutput + " works from the voice feed, so must stay enabled",
+                    ModAvailability.isOptionInteractive(ModIds.HITBOX, peerOutput));
+            assertNull(ModAvailability.optionUnavailableReason(ModIds.HITBOX, peerOutput));
+        }
+    }
+
+    /** Options of other modules are never disabled by the hitbox rule. */
+    @Test
+    public void otherModulesOptionsAreNotAffected() {
+        assertTrue(ModAvailability.isOptionInteractive(ModIds.ARMOR_HUD, "hitbox_show_mobs"));
+        assertTrue(ModAvailability.isOptionInteractive(ModIds.AUTO_SPRINT, "hitbox_show_items"));
+        assertTrue(ModAvailability.isOptionInteractive(ModIds.HITBOX, null));
+    }
+
     @Test
     public void unavailableModulesAllCarryTheNoGameDataReason() {
         for (String id : new String[]{
-                ModIds.ARMOR_HUD, ModIds.CRYSTAL_OPTIMIZER, ModIds.HITBOX}) {
+                ModIds.ARMOR_HUD, ModIds.CRYSTAL_OPTIMIZER}) {
             assertEquals(ModAvailability.REASON_NO_GAME_DATA, ModAvailability.unavailableReason(id));
             assertFalse(id + " must not be clickable", ModAvailability.isInteractive(id));
         }

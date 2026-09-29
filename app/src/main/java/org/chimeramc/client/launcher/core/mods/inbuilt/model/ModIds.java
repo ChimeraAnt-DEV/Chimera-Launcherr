@@ -54,13 +54,36 @@ public final class ModIds {
     }
 
     /**
-     * True for modules that need a per-frame data feed from the game process (durability,
-     * target entity, placement geometry, entity boxes). They render a "no game data"
-     * placeholder rather than a stale or fabricated reading until a native provider publishes
-     * values.
+     * True for modules that are <em>entirely</em> dependent on a per-frame data feed from the
+     * game process and have no other route to a result: durability/target reads (Armor HUD) and
+     * placement geometry (Crystal Optimizer). With no native provider installed these cannot
+     * produce anything, so the Mod Menu badges them and refuses the toggle.
+     *
+     * <p>The Hitboxes module is deliberately <em>not</em> here. It draws other players from the
+     * proximity-voice feed, which needs no native hook at all, so it works today; only some of its
+     * entity kinds need the native feed. Those are listed by {@link #outputRequiresGameData} and
+     * are disabled per-option rather than taking the whole module down.
      */
     public static boolean requiresGameData(String modId) {
-        return ARMOR_HUD.equals(modId) || CRYSTAL_OPTIMIZER.equals(modId) || HITBOX.equals(modId);
+        return ARMOR_HUD.equals(modId) || CRYSTAL_OPTIMIZER.equals(modId);
+    }
+
+    /**
+     * Hitbox outputs that can only be produced by the native entity feed.
+     *
+     * <p>A hitbox for a mob, a dropped item, a thrown item or a projectile needs the game's
+     * entity list, which this build cannot read (see the native-feed notes). The player box, the
+     * aim line and the chest-height target box are <em>not</em> here: peers advertise their own
+     * position and view over the voice protocol, so those three work without the game process.
+     * Keeping the distinction in one place is what stops the config dialog from offering a switch
+     * that can never draw anything.
+     */
+    private static final java.util.Set<String> HITBOX_NATIVE_OUTPUTS = java.util.Set.of(
+            "hitbox_show_mobs", "hitbox_show_items", "hitbox_show_projectiles",
+            "hitbox_show_thrown_items", "hitbox_show_crit_line", "hitbox_show_combo_box");
+
+    public static boolean outputRequiresGameData(String modId, String configKey) {
+        return HITBOX.equals(modId) && configKey != null && HITBOX_NATIVE_OUTPUTS.contains(configKey);
     }
 
     private ModIds() {}

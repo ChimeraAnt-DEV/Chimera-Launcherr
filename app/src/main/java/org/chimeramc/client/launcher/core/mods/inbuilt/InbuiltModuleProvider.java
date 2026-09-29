@@ -404,6 +404,12 @@ public final class InbuiltModuleProvider {
             node.put("enabled_when", new JSONArray().put(new JSONObject()
                     .put("key", config.dependsOn).put("op", "truthy")));
         }
+        // An output the native entity feed would have to supply is disabled rather than hidden:
+        // the switch stays visible so the option is discoverable, but it cannot be turned on to
+        // no effect. The same rule the module-level badge uses, one level down.
+        if (ModIds.outputRequiresGameData(mod.getId(), key)) {
+            node.put("disabled", true);
+        }
         return node;
     }
 
