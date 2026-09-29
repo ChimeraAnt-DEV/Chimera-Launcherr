@@ -161,6 +161,33 @@ public final class ControllerProfileCodec {
                 clean.setRemap(entry.getKey(), entry.getValue());
             }
         }
+        clean.setRumbleStrength(raw.getRumbleStrength());
+        // Alternate maps are rebuilt through the same setters so a layer from a hand-edited file
+        // cannot carry a negative key code into the hot path.
+        java.util.List<RemapLayer> layers = raw.getRemapLayers();
+        if (layers != null) {
+            for (RemapLayer rawLayer : layers) {
+                if (rawLayer == null) continue;
+                RemapLayer layer = new RemapLayer(
+                        rawLayer.getName() == null ? "Layer" : rawLayer.getName().trim());
+                layer.setModifierKeyCode(rawLayer.getModifierKeyCode());
+                java.util.Map<Integer, Integer> layerRemaps = rawLayer.getRemaps();
+                if (layerRemaps != null) {
+                    for (java.util.Map.Entry<Integer, Integer> entry : layerRemaps.entrySet()) {
+                        if (entry.getKey() == null || entry.getValue() == null) continue;
+                        layer.setRemap(entry.getKey(), entry.getValue());
+                    }
+                }
+                clean.addRemapLayer(layer);
+            }
+        }
+        // Click limits and repeat rates were previously dropped on import; carry them so a profile
+        // shared to stop double-fire does not arrive with the fix missing.
+        for (java.util.Map.Entry<Integer, Integer> entry : raw.getRepeatRates().entrySet()) {
+            if (entry.getKey() != null && entry.getValue() != null) {
+                clean.setRepeatRate(entry.getKey(), entry.getValue());
+            }
+        }
         return clean;
     }
 }

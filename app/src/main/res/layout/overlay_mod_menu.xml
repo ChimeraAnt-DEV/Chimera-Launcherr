@@ -295,6 +295,62 @@
                             android:textStyle="bold" />
                     </LinearLayout>
 
+                    <!--
+                        Live stats strip: FPS / ping / battery. FPS reads the same inbuilt FpsMod the
+                        overlay uses, battery reads the BatteryManager, and ping shows an em dash when
+                        no latency figure is available rather than inventing one. Laid out with
+                        wrap_content so it never squeezes the search field below usability.
+                    -->
+                    <LinearLayout
+                        android:id="@+id/mod_menu_stats_strip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/mod_stats_fps"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:minHeight="24dp"
+                            android:background="@drawable/bg_search_field"
+                            android:gravity="center"
+                            android:paddingStart="8dp"
+                            android:paddingEnd="8dp"
+                            android:text="@string/mod_stats_fps_placeholder"
+                            android:textColor="#8CCBFF"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/mod_stats_ping"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:minHeight="24dp"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_search_field"
+                            android:gravity="center"
+                            android:paddingStart="8dp"
+                            android:paddingEnd="8dp"
+                            android:text="@string/mod_stats_ping_placeholder"
+                            android:textColor="#A8B0B8"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/mod_stats_battery"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:minHeight="24dp"
+                            android:layout_marginStart="6dp"
+                            android:layout_marginEnd="8dp"
+                            android:background="@drawable/bg_search_field"
+                            android:gravity="center"
+                            android:paddingStart="8dp"
+                            android:paddingEnd="8dp"
+                            android:text="@string/mod_stats_battery_placeholder"
+                            android:textColor="#A8B0B8"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
                 </LinearLayout>
 
                 <HorizontalScrollView

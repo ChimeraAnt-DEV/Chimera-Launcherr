@@ -450,6 +450,15 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
         // Forwarding that as a "character" alongside the key press is what crashed the instance
         // when Enter was pressed in chat; a control point reads as "no character" instead.
         val unicodeChar = TextInputSanitizer.sanitizeUnicodeChar(event.unicodeChar)
+        // A layer modifier switches the whole button map while held. Recorded on the raw code
+        // (before any remap) and swallowed, so the modifier button does not also fire its own
+        // action — holding it is purely a switch.
+        if (event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_UP) {
+            if (ControllerInputProcessor.handleLayerModifier(
+                    event.keyCode, event.action == KeyEvent.ACTION_DOWN)) {
+                return true
+            }
+        }
         val remappedKey = ControllerInputProcessor.processKeyEvent(event.keyCode)
         // Per-button CPS limit and hold-to-repeat. The limit only drops the press the game sees
         // when the button is over its cap; the real press still drives hit-timing above.

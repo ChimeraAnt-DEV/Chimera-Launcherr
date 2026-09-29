@@ -73,6 +73,17 @@ public class ModMenuOverlay {
     private TextView filterAll, filterFavorites, filterEnabled, filterInbuilt, filterExternal, filterPvp;
     private TextView moduleCountText, emptyStateText;
     private TextView compactFilterSelector, compactModuleCount;
+
+    // The live stats strip in the top bar. Refreshed on a one-second tick while the menu is open,
+    // and never when it is closed, so it costs nothing during gameplay.
+    private TextView statsFps, statsPing, statsBattery;
+    private final Runnable statsTick = new Runnable() {
+        @Override
+        public void run() {
+            refreshStatsStrip();
+            if (isShowing) handler.postDelayed(this, 1000L);
+        }
+    };
     private View settingsContainer;
     private View modulesContainer;
     private FrameLayout cosmeticsContainer;
@@ -279,6 +290,12 @@ public class ModMenuOverlay {
             windowManager.addView(overlayView, wmParams);
             isShowing = true;
 
+            // Start the stats strip tick. Only while the menu is open, so the FPS/battery read
+            // costs nothing during ordinary play.
+            handler.removeCallbacks(statsTick);
+            refreshStatsStrip();
+            handler.postDelayed(statsTick, 1000L);
+
             overlayView.setAlpha(0f);
             overlayView.animate().alpha(1f).setDuration(220).start();
 
@@ -346,6 +363,52 @@ public class ModMenuOverlay {
         clearFocusHighlightRecursive(view);
     }
 
+    /**
+     * Refreshes the FPS / ping / battery strip in the top bar.
+     *
+     * <p>FPS comes from the same inbuilt {@code FpsMod} the FPS overlay uses, so the two can never
+     * disagree. Battery comes from the sticky {@code ACTION_BATTERY_CHANGED} broadcast, and ping
+     * has no source in this build — it renders the em dash rather than a fabricated figure, which
+     * is why {@link ModStatsFormatter} owns the "no reading" rule.
+     */
+    private void refreshStatsStrip() {
+        if (statsFps != null) {
+            int fps = 0;
+            try {
+                if (org.levimc.launcher.core.mods.inbuilt.nativemod.FpsMod.nativeIsInitialized()) {
+                    fps = org.levimc.launcher.core.mods.inbuilt.nativemod.FpsMod.nativeGetFps();
+                }
+            } catch (Throwable ignored) {
+                // A native read must never take the menu down; the em dash is the honest fallback.
+            }
+            statsFps.setText(ModStatsFormatter.fps(fps));
+        }
+        if (statsPing != null) {
+            statsPing.setText(ModStatsFormatter.ping(0));
+        }
+        if (statsBattery != null) {
+            statsBattery.setText(readBattery());
+        }
+    }
+
+    private String readBattery() {
+        try {
+            android.content.Intent battery = activity.registerReceiver(null,
+                    new android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED));
+            if (battery == null) return ModStatsFormatter.battery(-1, false);
+            int level = battery.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1);
+            int scale = battery.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1);
+            if (level < 0 || scale <= 0) return ModStatsFormatter.battery(-1, false);
+            int percent = Math.round(level * 100f / scale);
+            int status = battery.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1);
+            boolean charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING
+                    || status == android.os.BatteryManager.BATTERY_STATUS_FULL;
+            return ModStatsFormatter.battery(percent, charging);
+        } catch (Throwable t) {
+            return ModStatsFormatter.battery(-1, false);
+        }
+    }
+
     private static void clearFocusHighlightRecursive(View view) {
         if (view == null) return;
         view.setDefaultFocusHighlightEnabled(false);
@@ -383,6 +446,9 @@ public class ModMenuOverlay {
         filterExternal = overlayView.findViewById(R.id.filter_external);
         filterPvp = overlayView.findViewById(R.id.filter_pvp);
         moduleCountText = overlayView.findViewById(R.id.module_count_text);
+        statsFps = overlayView.findViewById(R.id.mod_stats_fps);
+        statsPing = overlayView.findViewById(R.id.mod_stats_ping);
+        statsBattery = overlayView.findViewById(R.id.mod_stats_battery);
         settingsContainer = overlayView.findViewById(R.id.settings_container);
         modulesContainer = overlayView.findViewById(R.id.modules_container);
         cosmeticsContainer = overlayView.findViewById(R.id.cosmetics_container);
@@ -1702,6 +1768,8 @@ public class ModMenuOverlay {
 
     public void hide() {
         if (!isShowing || overlayView == null) return;
+
+        handler.removeCallbacks(statsTick);
 
         InbuiltOverlayManager overlayManager = InbuiltOverlayManager.getInstance();
         if (overlayManager != null) {
