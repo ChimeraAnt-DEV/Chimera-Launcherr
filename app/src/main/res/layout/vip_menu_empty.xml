@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Empty state for the VIP module grid.
+
+    An illustrative mark (the brand ant on an accent halo) above a title and a line of explanation,
+    rather than a blank panel. Hidden until the list is genuinely empty.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:visibility="gone">
+
+    <FrameLayout
+        android:layout_width="96dp"
+        android:layout_height="96dp"
+        android:background="@drawable/bg_vip_empty_halo">
+
+        <ImageView
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_gravity="center"
+            android:alpha="0.9"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_glowberry_logo"
+            android:tint="#FFFFFF" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/vip_empty_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:text="@string/vip_empty_title"
+        android:textColor="#F4F1FF"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/vip_empty_message"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:maxWidth="280dp"
+        android:text="@string/vip_empty_no_mods"
+        android:textColor="#8B85A3"
+        android:textSize="12sp" />
+</LinearLayout>

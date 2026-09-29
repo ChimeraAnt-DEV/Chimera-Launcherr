@@ -35,6 +35,14 @@ public class ModMenuButton {
     private static final float DRAG_THRESHOLD = 10f;
     
     private ModMenuOverlay menuOverlay;
+    /**
+     * The VIP Mod Menu (Screen B), created lazily on the first bind press.
+     *
+     * <p>Kept separate from {@link #menuOverlay} (Screen A, the touch menu) on purpose: the two
+     * screens are independent, and only one is open at a time because they are opened from
+     * different inputs.
+     */
+    private org.chimeramc.client.core.mods.inbuilt.vip.VipModMenuOverlay vipMenuOverlay;
     
     public ModMenuButton(Activity activity) {
         this.activity = activity;
@@ -247,6 +255,10 @@ public class ModMenuButton {
             menuOverlay.hide();
             menuOverlay = null;
         }
+        if (vipMenuOverlay != null) {
+            vipMenuOverlay.hide();
+            vipMenuOverlay = null;
+        }
         if (!isShowing || buttonView == null) return;
         handler.post(() -> {
             try {
@@ -286,35 +298,35 @@ public class ModMenuButton {
     }
 
     public boolean isMenuShowing() {
-        return menuOverlay != null && menuOverlay.isShowing();
+        return (menuOverlay != null && menuOverlay.isShowing())
+                || (vipMenuOverlay != null && vipMenuOverlay.isShowing());
     }
 
     /**
-     * Opens or closes the Mod Menu from a bound input, rather than a tap on the floating button.
+     * Opens or closes the VIP Mod Menu from the bound input.
      *
-     * The bind is honoured in-game, where the button may be hidden or the player is looking
-     * straight ahead, so this exists separately from {@code onButtonClick()}.
+     * <p>The bind opens Screen B (the premium VIP screen), never the touch Mod Menu: the touch
+     * screen is Screen A, reached from the launcher nav bar, and the two are deliberately separate
+     * screens. A bind press therefore never touches {@link ModMenuOverlay}.
      */
     public void toggleMenuFromBind() {
         if (!isShowing) return;
-        if (menuOverlay != null && menuOverlay.isShowing()) {
-            menuOverlay.hide();
-            return;
+        if (vipMenuOverlay == null) {
+            vipMenuOverlay = new org.chimeramc.client.core.mods.inbuilt.vip.VipModMenuOverlay(activity);
         }
-        if (menuOverlay == null) {
-            menuOverlay = new ModMenuOverlay(activity);
-            menuOverlay.setCallback(new ModMenuOverlay.ModMenuCallback() {
-                @Override
-                public void onModToggled(String modId, boolean enabled) {
-                }
+        vipMenuOverlay.toggle();
+    }
 
-                @Override
-                public void onButtonOpacityChanged(int opacity) {
-                    applyButtonOpacity();
-                }
-            });
+    /** The open VIP Mod Menu (Screen B), or null. */
+    public org.chimeramc.client.core.mods.inbuilt.vip.VipModMenuOverlay getVipMenuOverlay() {
+        return vipMenuOverlay;
+    }
+
+    /** Closes the VIP screen, e.g. when the game session ends. */
+    public void hideVipMenu() {
+        if (vipMenuOverlay != null && vipMenuOverlay.isShowing()) {
+            vipMenuOverlay.hide();
         }
-        menuOverlay.show();
     }
 
     public void hideMenu() {

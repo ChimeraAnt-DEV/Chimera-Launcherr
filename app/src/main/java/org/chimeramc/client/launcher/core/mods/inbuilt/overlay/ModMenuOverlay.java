@@ -125,25 +125,19 @@ public class ModMenuOverlay {
     }
 
     /**
-     * The picker currently waiting for a button, or null.
+     * Offers the raw key to whichever menu is currently waiting for a bind.
      *
-     * <p>The in-game activity dispatches keys through the preloader first, which can consume the
-     * very press the picker is waiting for, so the picker registers here and the activity offers
-     * each key before anything else may swallow it. Static because the overlay is not the object
-     * that receives the event.
+     * <p>The capture itself lives in {@link org.chimeramc.client.core.mods.inbuilt.vip.MenuBindRelay},
+     * shared with the VIP Mod Menu (Screen B), so the touch screen and the VIP screen cannot both
+     * hold a capture and silently steal each other's presses. This method is kept as the single
+     * entry point the game activity calls at the top of {@code dispatchKeyEvent}.
      */
-    private static volatile BindCapture sBindCapture;
-
-    /** Called by the game activity on the raw key code; true when a bind picker took the key. */
     public static boolean deliverBindKey(int keyCode) {
-        BindCapture capture = sBindCapture;
-        if (capture == null) return false;
-        capture.onKey(keyCode);
-        return true;
+        return org.chimeramc.client.core.mods.inbuilt.vip.MenuBindRelay.deliver(keyCode);
     }
 
     static boolean isCapturingBind() {
-        return sBindCapture != null;
+        return org.chimeramc.client.core.mods.inbuilt.vip.MenuBindRelay.isCapturing();
     }
 
 
@@ -938,11 +932,11 @@ public class ModMenuOverlay {
         dialog.setCanceledOnTouchOutside(false);
 
         Runnable commit = () -> {
-            sBindCapture = null;
+            org.chimeramc.client.core.mods.inbuilt.vip.MenuBindRelay.clear();
             dialog.dismiss();
         };
         Runnable capture = () -> {
-            sBindCapture = keyCode -> {
+            org.chimeramc.client.core.mods.inbuilt.vip.MenuBindRelay.set(keyCode -> {
                 if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
                     commit.run();
                     return;
@@ -950,9 +944,10 @@ public class ModMenuOverlay {
                 modManager.setModMenuKeybind(keyCode);
                 refreshKeyboardBindLabel(modManager);
                 commit.run();
-            };
+            });
         };
-        dialog.setOnDismissListener(d -> sBindCapture = null);
+        dialog.setOnDismissListener(d ->
+                org.chimeramc.client.core.mods.inbuilt.vip.MenuBindRelay.clear());
         // The dialog's own key listener covers the launcher-side receiver; the static capture
         // covers the in-game path where the preloader dispatches keys first.
         dialog.setOnKeyListener((d, keyCode, event) -> {
@@ -1000,7 +995,8 @@ public class ModMenuOverlay {
                 .setNegativeButton(android.R.string.cancel, null)
                 .create();
         dialog.setCanceledOnTouchOutside(false);
-        dialog.setOnDismissListener(d -> sBindCapture = null);
+        dialog.setOnDismissListener(d ->
+                org.chimeramc.client.core.mods.inbuilt.vip.MenuBindRelay.clear());
 
         content.findViewById(R.id.bind_dialog_clear).setOnClickListener(v -> {
             modManager.setModMenuControllerBind(0);
@@ -1010,7 +1006,7 @@ public class ModMenuOverlay {
 
         // The in-game activity offers every raw key here first, so a controller press is captured
         // even when the preloader would otherwise consume it.
-        sBindCapture = keyCode -> {
+        org.chimeramc.client.core.mods.inbuilt.vip.MenuBindRelay.set(keyCode -> {
             illustration.handleKeyEvent(keyCode, true);
             String region = illustration.regionIdForKey(keyCode);
             if (region == null) return;
@@ -1020,7 +1016,7 @@ public class ModMenuOverlay {
             modManager.setModMenuControllerBind(keyCode);
             refreshControllerBindLabel(modManager);
             content.postDelayed(dialog::dismiss, 550);
-        };
+        });
 
         // Every key and stick movement is mirrored on the illustration; a click on a pad button is
         // what commits the bind, after which the button flashes green and the dialog closes.
