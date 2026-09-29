@@ -356,6 +356,36 @@ only, like the other overlays.
 - **`gameWorldSeen` is never set false.** The HUD hook only *ever* reports true once installed; a false is indistinguishable from "not installed", so treating it as "left the world" would re-hide overlays after the first menu.
 - Compact mode **narrows** the window (`applyCompactModeLayout`); it must never hide the navigation. The old sidebar/compact-icon swap was the bug.
 
+## Controller remap layers & rumble (RemapLayer + RumbleCurve + ControllerRumble)
+- **A layer is an alternate button map selected by a held modifier.** `RemapLayer` holds a
+  modifier key code and its own `Map<Integer,Integer>`; `ControllerProfile.getRemapLayers()`
+  carries them and `ControllerProfileCodec` persists them. `ControllerResponse` precomputes one
+  flat `int[]` per layer so the hot path (`remapKey(keyCode, modifier)`) still allocates nothing.
+- **A button the layer does not list falls through to the base map**, not to identity — otherwise
+  holding a modifier would silently un-remap every button the layer does not mention.
+- **The modifier is tracked by *raw* key code**, before any remap: a base remap that changes the
+  modifier button's meaning must not stop it selecting. `ControllerInputProcessor.handleLayerModifier`
+  returns true for the modifier press so `MinecraftActivity.dispatchKeyEvent` can swallow it — the
+  modifier is a switch, not an action. `resetLayerState()` runs in `setActiveProfile`.
+- **Layers only apply to a gamepad.** `ControllerResponse.isGamepadKeyCode` is an explicit set, not
+  a range test: the lettered faces sit at 96..110 while `KEYCODE_BUTTON_1..16` sit at 188..203, so
+  no min/max works. The d-pad codes are included. A keyboard key sharing a code must not swap a
+  player's whole map while they type.
+- **`ControllerRumble` reaches the pad through API 31+ `InputDevice.getVibrator()`, behind a nested
+  holder** — `getVibrator` does not exist on minSdk 28 and referencing it from a reachable method
+  would class-init crash. Below 31 it returns false and the caller falls back; `RumbleCurve` owns
+  the strength→amplitude math (a 1% strength must stay above `MIN_AMPLITUDE`, not round to a value
+  a vibrator cannot render). Pinned by `RemapLayerTest` / `RumbleCurveTest` (no mocks).
+
+## Mod Menu live stats strip (ModStatsFormatter)
+- **FPS / ping / battery in the top bar, refreshed on a one-second tick only while the menu is
+  open** (`ModMenuOverlay.statsTick`, registered in `showInternal`, removed in `hide`). FPS reads
+  the same inbuilt `FpsMod` the FPS overlay uses so the two cannot disagree; battery reads the
+  sticky `ACTION_BATTERY_CHANGED` broadcast.
+- **An unknown reading renders an em dash, never `0`.** A "0 FPS" or "0 ms" reads as a real
+  measurement. `ModStatsFormatter` owns that rule and is pure, so `ModStatsFormatterTest` pins it.
+  Ping has no source in this build and correctly shows the em dash.
+
 ## Controller input latency (StickDriftGate + ControllerInputProcessor)
 - The anti-drift gate must release on **elapsed time** (`SUSTAIN_MS`), not only on event count. Many pads deliver a motion event only when an axis *changes*, so a stick held at a steady deflection across the threshold produces one crossing and no second event; an event-count-only rule held that deflection back indefinitely, which the player feels as input delay.
 - `ControllerInputProcessor.transformMotionEvent` uses pooled scratch arrays so the hot path allocates nothing. Keep it that way — it runs per controller event on the input-to-photon path.
