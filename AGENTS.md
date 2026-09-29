@@ -366,6 +366,13 @@ only, like the other overlays.
   attack either way, and the timing must be the real input timing.
 - Honest scope: it reads your own attack input and never clicks for you; the server still decides
   whether a hit lands. `hit_timing_scope_note` says so in the dialog.
+- **Phase 2 (the game's own combo counter) is a documented limitation, not shipped.** The pill's
+  `decision.combo` is the player's own landed-in-window attacks, counted by `HitTimingSolver`;
+  it is not a read of the game's server-side combo counter. Reading that needs a per-frame
+  `libminecraftpe.so` feed, and the mask-scan anchors used for the local-player position do not
+  expose a combo field in the shipped builds (no `combo` symbol exists in the preloader). The
+  local counter is the honest deliverable; `hit_timing_scope_note` states the distinction in the
+  dialog so the readout cannot be mistaken for the server value.
 ## In-game Mod Menu navigation & overlay visibility
 - The Mod Menu nav is a **top bar** inside `overlay_mod_menu.xml`, not a side rail (landscape-only app; a rail only gets the short edge). Entries live in a `HorizontalScrollView` so compact mode's narrow window still fits every destination and the close button.
 - **An unresolved native HUD hook must not hide a mod's UI.** `OverlayVisibility.showGameOverlays` treats `hudScreenOpen == false` as authoritative only once the hook has fired (`gameWorldSeen`); before that it falls back to `sessionActive`. Without the fallback, an overlay appeared only while the Mod Menu was open and vanished the instant it closed. The fallback signals are part of `tick()`'s state hash — a session starting must re-evaluate visibility even when every native flag is unchanged.

@@ -1550,7 +1550,7 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="mod_config_hit_timing_show_combo_desc">Displays how many hits are in the current streak</string>
     <string name="mod_config_hit_timing_show_bar">Show Timing Bar</string>
     <string name="mod_config_hit_timing_show_bar_desc">Progress line along the indicator so you can see the rhythm, not just the state</string>
-    <string name="hit_timing_scope_note">This reads your own attack input and tells you when the next click will count. It never clicks for you, and it cannot make a hit land — the server still decides that.</string>
+    <string name="hit_timing_scope_note">This reads your own attack input and tells you when the next click will count. It never clicks for you, and it cannot make a hit land — the server still decides that. The combo count is your own landed-in-window attacks, not the game\'s server-side combo counter, which this build cannot read.</string>
 
     <!-- Hitboxes -->
     <string name="inbuilt_mod_hitbox">Hitboxes</string>

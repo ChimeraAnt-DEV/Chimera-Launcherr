@@ -30,6 +30,14 @@ import org.chimeramc.client.core.mods.inbuilt.model.ModIds;
  *
  * <p>Draggable in HUD-editor mode only, matching the other overlays; position persists through
  * {@link InbuiltModManager#setOverlayPosition}.
+
+ * <p><b>What the combo count is, and is not.</b> The counter beside the pill counts the player's
+ * own attacks that landed inside the timing window, which this module times from the input path.
+ * It is <em>not</em> the game's server-side combo/combo-counter: reading that would need a live
+ * per-frame feed from {@code libminecraftpe.so}, and the mask-scan anchors used for the local
+ * player position do not expose a combo field in the shipped builds. Showing the local counter is
+ * the honest deliverable - it reflects real input timing and never fabricates a value - and the
+ * scope note says as much in the dialog.
  */
 public final class HitTimingOverlay {
     private static final float DRAG_THRESHOLD = 10f;
