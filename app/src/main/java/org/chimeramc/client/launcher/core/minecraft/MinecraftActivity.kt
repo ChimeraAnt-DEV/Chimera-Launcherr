@@ -288,6 +288,7 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
             return
         }
         if (org.chimeramc.client.core.mods.inbuilt.overlay.MoreButtonsEditor.onActivityResult(requestCode, resultCode, data)) return
+        if (org.chimeramc.client.core.replay.ReplayManager.onActivityResult(requestCode, resultCode, data)) return
         if (PojavControls.onActivityResult(requestCode, resultCode, data)) return
         super.onActivityResult(requestCode, resultCode, data)
     }

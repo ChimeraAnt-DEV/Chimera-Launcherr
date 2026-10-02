@@ -161,6 +161,24 @@
                         android:textStyle="bold" />
 
                     <TextView
+                        android:id="@+id/vip_tab_replay"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:defaultFocusHighlightEnabled="false"
+                        android:drawableStart="@drawable/ic_replay"
+                        android:drawablePadding="8dp"
+                        android:drawableTint="#B6B0CC"
+                        android:gravity="center_vertical"
+                        android:minHeight="34dp"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="16dp"
+                        android:text="@string/vip_tab_replay"
+                        android:textColor="#B6B0CC"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
                         android:id="@+id/vip_tab_controller"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -342,6 +360,14 @@
 
                 <FrameLayout
                     android:id="@+id/vip_keyboard_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+
+                <!-- Replay: the same ReplayPanel the touch Mod Menu hosts, so both screens show
+                     one feature. -->
+                <FrameLayout
+                    android:id="@+id/vip_replay_view"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:visibility="gone" />

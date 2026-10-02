@@ -16,6 +16,7 @@ import org.chimeramc.client.R;
  */
 public enum VipTab {
     MODULES(R.string.vip_tab_modules, R.drawable.ic_modules),
+    REPLAY(R.string.vip_tab_replay, R.drawable.ic_replay),
     CONTROLLER(R.string.vip_tab_controller, R.drawable.ic_controller),
     KEYBOARD(R.string.vip_tab_keyboard, R.drawable.ic_keyboard);
 
