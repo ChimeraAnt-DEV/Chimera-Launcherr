@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ChimeraAnt-DEV/GlowberryClient/main/docs/public/appicon.png" width="150" height="150" alt="GlowberryClient">
+  <img src="https://raw.githubusercontent.com/ChimeraAnt-DEV/Glowberry-Client-LOGO/main/In%20Mod%20Menu%20Icon.png" width="150" height="150" alt="GlowberryClient">
 </p>
 
 
