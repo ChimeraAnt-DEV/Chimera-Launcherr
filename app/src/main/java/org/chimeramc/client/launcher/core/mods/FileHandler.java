@@ -87,6 +87,16 @@ public class FileHandler {
         void onProgressUpdate(int progress);
     }
 
+    /**
+     * Implemented by callers that can route a Java Edition {@code .jar} to the JavaBridge screen.
+     *
+     * <p>JavaBridge is an Activity, so the hand-off is expressed as a callback rather than a
+     * {@code startActivity} from this class — FileHandler stays free of navigation.
+     */
+    public interface JavaBridgeHandoff {
+        void onJavaJarSelected(Uri jarUri);
+    }
+
     public FileHandler(Context context, MainViewModel modManager, VersionManager version) {
         this.context = context;
         this.modManager = modManager;
@@ -101,6 +111,14 @@ public class FileHandler {
 
     public void processIncomingFilesWithConfirmation(Intent intent, FileOperationCallback callback, boolean isButtonClick) {
         List<Uri> fileUris = extractFileUris(intent);
+
+        // A Java Edition .jar is not a Bedrock mod package, so it is never imported by this
+        // pipeline. JavaBridge rewrites it into a Bedrock .AntEgg instead, and it owns that flow
+        // from the picker onward — hence the hand-off here rather than an "unsupported file" error.
+        if (callback instanceof JavaBridgeHandoff && handOffJar(fileUris, (JavaBridgeHandoff) callback)) {
+            return;
+        }
+
         List<Uri> supportedUris = new ArrayList<>();
         for (Uri uri : fileUris) {
             String fileName = resolveImportFileName(uri);
@@ -1292,6 +1310,34 @@ public class FileHandler {
         return lowerName.endsWith(".so")
                 || org.chimeramc.client.core.antegg.AntEggPackage.looksLikeAntEgg(lowerName)
                 || isZipModPackageFile(uri, fileName);
+    }
+
+    /**
+     * True when the picked document is a Java Edition {@code .jar} rather than a Bedrock package.
+     *
+     * <p>Deliberately narrow: only a {@code .jar} name qualifies, and a plain {@code .zip} that a
+     * picker happens to report with a zip MIME type is still handled by the existing zip path. A
+     * jar has the same magic bytes as a zip, so the name is the only reliable discriminator.
+     */
+    private static boolean looksLikeJavaJar(String fileName) {
+        return fileName != null && fileName.toLowerCase(Locale.ROOT).endsWith(".jar");
+    }
+
+    /**
+     * Routes a Java jar to the JavaBridge screen, if one was picked.
+     *
+     * <p>Returns true when the hand-off happened and this pipeline must stop; false lets the normal
+     * import continue. The callback is invoked on the main thread because the caller starts an
+     * Activity from it.
+     */
+    private boolean handOffJar(List<Uri> fileUris, JavaBridgeHandoff handoff) {
+        for (Uri uri : fileUris) {
+            if (looksLikeJavaJar(resolveImportFileName(uri))) {
+                new Handler(Looper.getMainLooper()).post(() -> handoff.onJavaJarSelected(uri));
+                return true;
+            }
+        }
+        return false;
     }
 
     private String getStringProperty(JsonObject object, String key) {

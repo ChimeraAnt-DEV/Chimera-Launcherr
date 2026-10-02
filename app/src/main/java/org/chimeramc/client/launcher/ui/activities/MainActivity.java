@@ -2043,27 +2043,41 @@ import okhttp3.OkHttpClient;
                 return;
             }
         }
-        fileHandler.processIncomingFilesWithConfirmation(intent, new FileHandler.FileOperationCallback() {
-            @Override
-            public void onSuccess(int processedFiles) {
-                hideProgressLoader();
-                if (processedFiles > 0)
-                    UIHelper.showToast(MainActivity.this, getString(R.string.files_processed, processedFiles));
-            }
+        fileHandler.processIncomingFilesWithConfirmation(intent, new IncomingCallback(), false);
+    }
 
-            @Override
-            public void onError(String errorMessage) {
-                hideProgressLoader();
-                if (errorMessage != null && !errorMessage.isEmpty()) {
-                    UIHelper.showToast(MainActivity.this, errorMessage);
-                }
-            }
+    /**
+     * Handles the normal Bedrock import and, when the picked file is a Java Edition .jar, opens the
+     * JavaBridge screen instead of reporting it as an unsupported package.
+     */
+    private final class IncomingCallback implements FileHandler.FileOperationCallback,
+            FileHandler.JavaBridgeHandoff {
+        @Override
+        public void onSuccess(int processedFiles) {
+            hideProgressLoader();
+            if (processedFiles > 0)
+                UIHelper.showToast(MainActivity.this, getString(R.string.files_processed, processedFiles));
+        }
 
-            @Override
-            public void onProgressUpdate(int progress) {
-                if (binding != null) animateProgressTo(progress);
+        @Override
+        public void onError(String errorMessage) {
+            hideProgressLoader();
+            if (errorMessage != null && !errorMessage.isEmpty()) {
+                UIHelper.showToast(MainActivity.this, errorMessage);
             }
-        }, false);
+        }
+
+        @Override
+        public void onProgressUpdate(int progress) {
+            if (binding != null) animateProgressTo(progress);
+        }
+
+        @Override
+        public void onJavaJarSelected(Uri jarUri) {
+            Intent bridge = new Intent(MainActivity.this, JavaBridgeActivity.class);
+            bridge.putExtra(JavaBridgeActivity.EXTRA_JAR_URI, jarUri.toString());
+            startActivity(bridge);
+        }
     }
 
     private boolean forwardIncomingMinecraftResourceToRunningGame() {
