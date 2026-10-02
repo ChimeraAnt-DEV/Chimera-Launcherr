@@ -1,8 +1,6 @@
 package org.chimeramc.client.core.replay;
 
 import android.app.Activity;
-import android.content.ActivityNotFoundException;
-import android.content.Intent;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Handler;
@@ -18,8 +16,6 @@ import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
-
-import androidx.core.content.FileProvider;
 
 import org.chimeramc.client.R;
 import org.chimeramc.client.ui.animation.DynamicAnim;
@@ -41,15 +37,15 @@ import java.util.concurrent.Executors;
  * <ul>
  *   <li><b>Capture</b> — start/stop, elapsed timer, quality badge, the clip-length limit and the
  *       highlight-trigger switches.</li>
- *   <li><b>Review</b> — the clip grid with real thumbnails, play (opens the device player), rename,
- *       delete, favorite, sort and filter.</li>
+ *   <li><b>Review</b> — the clip grid with real thumbnails, play (in an embedded in-overlay
+ *       player), rename, delete, favorite, sort and filter.</li>
  *   <li><b>Export</b> — trim to a window and export to the gallery, both real file operations.</li>
  * </ul>
  *
  * <p><b>Honest limits.</b> Highlight capture flags the clip being recorded; this build has no ring
  * buffer of encoded frames to rewind, and the scope note in the settings says so. Playback is
- * handed to the device's video player rather than an in-app player. Both are stated in the UI
- * rather than implied away.
+ * embedded in this overlay so watching never leaves the game; the recorder is paused while a clip
+ * plays so the two do not share the decoder.
  */
 public final class ReplayPanel {
 
@@ -64,6 +60,10 @@ public final class ReplayPanel {
     });
 
     private final LinearLayout root;
+    /** Holds the library and, when a clip is playing, the embedded player over it. */
+    private final FrameLayout host;
+    /** The library column, hidden while the player is shown. */
+    private final LinearLayout libraryContent;
     private final LinearLayout grid;
     private final TextView emptyTitle;
     private final TextView emptyMessage;
@@ -91,6 +91,7 @@ public final class ReplayPanel {
     private final List<ReplayClip> lastFiltered = new ArrayList<>();
     private boolean gamepadDetected;
     private TextView hintView;
+    private ReplayPlayerView playerView;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ReplayManager.Listener stateListener = (state, elapsed, profile) ->
@@ -128,7 +129,14 @@ public final class ReplayPanel {
 
         root.addView(buildLibraryHeader());
 
-        // Content: grid over skeleton over empty art, in one frame.
+        // Content: the library column and, when a clip plays, the embedded player over it. The
+        // player is a sibling of the library in this frame, not a child of the column, so it can
+        // cover the whole section without being squeezed into leftover space.
+        host = new FrameLayout(activity);
+
+        libraryContent = new LinearLayout(activity);
+        libraryContent.setOrientation(LinearLayout.VERTICAL);
+
         FrameLayout contentFrame = new FrameLayout(activity);
         LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
@@ -172,7 +180,13 @@ public final class ReplayPanel {
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.CENTER));
 
-        root.addView(contentFrame, contentParams);
+        libraryContent.addView(contentFrame, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        host.addView(libraryContent, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        root.addView(host, contentParams);
 
         root.addView(buildHintStrip());
     }
@@ -191,11 +205,14 @@ public final class ReplayPanel {
         refreshLibrary();
     }
 
-    /** Called by the host when the section is hidden; stops the live refresh. */
+    /** Called by the host when the section is hidden; stops the live refresh and any playback. */
     public void onHidden() {
         ReplayManager manager = ReplayManager.get();
         if (manager != null) manager.removeListener(stateListener);
         mainHandler.removeCallbacks(tick);
+        // Never leave a decode session running behind a closed menu: it competes with the game
+        // for the same hardware and would keep the ReplayPlaybackGate latched.
+        closePlayer();
     }
 
     /** Releases the panel's background executor when the host discards it. */
@@ -763,16 +780,49 @@ public final class ReplayPanel {
 
     private void openClip(ReplayClip clip) {
         selected = clip;
-        try {
-            Uri uri = FileProvider.getUriForFile(activity,
-                    activity.getPackageName() + ".fileprovider", clip.file());
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(uri, "video/mp4");
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            activity.startActivity(intent);
-        } catch (ActivityNotFoundException | IllegalArgumentException e) {
+        if (clip == null || clip.file() == null || !clip.file().isFile()) {
             Toast.makeText(activity, R.string.replay_playback_hint, Toast.LENGTH_SHORT).show();
+            return;
         }
+        // Embedded playback: the clip plays inside this overlay window rather than being handed to
+        // an external player, so watching never leaves the game.
+        if (playerView == null) {
+            playerView = new ReplayPlayerView(activity, style, clip, new ReplayPlayerView.Callbacks() {
+                @Override
+                public void onClose() {
+                    closePlayer();
+                }
+
+                @Override
+                public void onPlaybackStarted() {
+                    ReplayPlaybackGate.onPlaybackStarted();
+                    // If a capture is running, end it: the encoder and the decoder must not fight
+                    // over the same hardware while a clip plays.
+                    ReplayManager manager = ReplayManager.get();
+                    if (manager != null && manager.isRecording()) manager.stop();
+                }
+
+                @Override
+                public void onPlaybackEnded() {
+                    ReplayPlaybackGate.onPlaybackEnded();
+                }
+            });
+            host.addView(playerView.getView(), new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        }
+        libraryContent.setVisibility(View.GONE);
+        playerView.show(clip);
+    }
+
+    /** Stops playback, releases the player and returns to the library grid. */
+    private void closePlayer() {
+        if (playerView != null) {
+            playerView.release();
+            host.removeView(playerView.getView());
+            playerView = null;
+        }
+        ReplayPlaybackGate.onPlaybackEnded();
+        if (libraryContent != null) libraryContent.setVisibility(View.VISIBLE);
     }
 
     private void toggleFavorite(ReplayClip clip) {

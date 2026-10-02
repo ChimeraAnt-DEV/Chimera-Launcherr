@@ -1901,7 +1901,11 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="replay_settings_trigger_streak">On %1$d+ kill streak</string>
     <string name="replay_settings_trigger_combo">On combo over %1$d hits</string>
     <string name="replay_scope_note">Clips are saved to this app\'s private ChimeraAnt-DEV/replays folder and removed with the app. Highlight capture flags the clip being recorded; it does not rewind an encoded buffer. Metadata is burned into the video, so it cannot be removed afterwards.</string>
-    <string name="replay_playback_hint">Playback opens in your device\'s video player</string>
+    <string name="replay_playback_hint">This clip could not be played</string>
+    <string name="replay_player_close">Close</string>
+    <string name="replay_player_speed_1x">1x</string>
+    <string name="replay_player_speed">%1$.1fx</string>
+    <string name="replay_player_recording_note">Recording stopped so playback and capture do not share the decoder</string>
     <string name="replay_controller_hint">A select · X delete · Y favorite · L1/R1 cycle</string>
     <string name="replay_keyboard_hint">Click select · Del delete · Space play · Arrows scrub</string>
     <string name="replay_permission_denied">Screen capture was not granted</string>
