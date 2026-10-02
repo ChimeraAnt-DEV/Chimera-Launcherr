@@ -73,6 +73,15 @@ public final class KillEffectsMod {
     private static volatile int style = STYLE_BURST;
     private static volatile int color = 0xFFFFC24B;
 
+    /**
+     * The id of the most recently credited kill, consumed by {@link #pollCreditedKill()}.
+     *
+     * <p>Kept independent of {@link #active} so the Replay kill-streak trigger can read the same
+     * credit decision even when the particle visual is turned off — the credit is a signal, the
+     * burst is only its presentation.
+     */
+    private static volatile String lastCreditedKill;
+
     private KillEffectsMod() {}
 
     public static void setKillSource(KillSource source) {
@@ -114,18 +123,32 @@ public final class KillEffectsMod {
 
     /** Records a hit you landed, so a death within the window can be credited. */
     public static void onHit(String playerId, long nowMs) {
-        if (!active) return;
+        // Recorded regardless of the visual toggle: the credit decision feeds the Replay
+        // kill-streak trigger as well as this module's burst.
         REGISTRY.recordHit(playerId, nowMs);
+    }
+
+    /**
+     * Returns and clears the id of the most recently credited kill, or null when none.
+     *
+     * <p>Consumed once so a single credit cannot raise two kill-streak events. The Replay trigger
+     * feed reads this after {@link #tick(long)} has run for the frame.
+     */
+    public static String pollCreditedKill() {
+        String value = lastCreditedKill;
+        lastCreditedKill = null;
+        return value;
     }
 
     /**
      * Polls the death feed and spawns a burst for any death credited to you.
      *
-     * <p>Called from the overlay manager's frame tick. When no feed is installed this is a no-op,
-     * which is why the module shows "waiting for game data" rather than pretending to work.
+     * <p>Called from the overlay manager's frame tick. The credit decision runs even when the
+     * visual is off, because it is the shared kill signal; only the burst is gated on
+     * {@link #active}. When no feed is installed this is a no-op, which is why the module shows
+     * "waiting for game data" rather than pretending to work.
      */
     public static void tick(long nowMs) {
-        if (!active) return;
         KillSource source = killSource;
         if (source != null) {
             String dead;
@@ -135,9 +158,11 @@ public final class KillEffectsMod {
                 dead = null;
             }
             if (dead != null && REGISTRY.creditKill(dead, nowMs)) {
-                spawn(dead, nowMs);
+                lastCreditedKill = dead;
+                if (active) spawn(dead, nowMs);
             }
         }
+        if (!active) return;
         // Retire spent bursts here so the list never grows past MAX_BURSTS even if nothing draws.
         for (java.util.Iterator<Burst> it = BURSTS.iterator(); it.hasNext(); ) {
             if (nowMs - it.next().bornMs >= BURST_DURATION_MS) it.remove();

@@ -34,6 +34,8 @@ public class PreloaderInput {
     public static native boolean nativeIsLocalPlayerAvailable();
     public static native float[] nativeReadLocalPlayerPosition();
     public static native float[] nativeReadLocalPlayerRotation();
+    public static native float[] nativeReadLocalPlayerHealth();
+
     /**
      * Asks the running game to re-read the active resource-pack list.
      *
@@ -115,6 +117,23 @@ public class PreloaderInput {
         try {
             float[] value = nativeReadLocalPlayerRotation();
             return value != null && value.length >= 2 ? value : null;
+        } catch (UnsatisfiedLinkError e) {
+            return null;
+        }
+    }
+
+    /**
+     * The local player's health, or null when no live read is possible.
+     *
+     * <p>Fail-closed in two ways: the native library being absent reads as "no data", and the
+     * native side reports "no data" when the per-version health offset is not configured or the
+     * field does not hold a plausible health value. A highlight trigger therefore never fires
+     * from an unverified offset.
+     */
+    public static float[] readLocalPlayerHealth() {
+        try {
+            float[] value = nativeReadLocalPlayerHealth();
+            return value != null && value.length >= 1 ? value : null;
         } catch (UnsatisfiedLinkError e) {
             return null;
         }
