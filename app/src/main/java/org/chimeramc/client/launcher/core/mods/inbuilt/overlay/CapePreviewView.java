@@ -209,8 +209,11 @@ public class CapePreviewView extends View {
         }
         if (cape != null) {
             // The cloth is driven by the residual spin velocity, so a flick sends the cape out
-            // and it settles naturally instead of looping forever.
-            float speed = Math.abs(spinVelocity) * 0.05f;
+            // and it settles naturally instead of looping forever. The drive is clamped: an
+            // unclamped flick could reach hundreds of blocks/s of "wind", which is what made the
+            // cape flap wildly and look broken. A hard cap keeps even the sharpest flick to a
+            // believable billow, and the cape's own damping does the rest.
+            float speed = Math.min(Math.abs(spinVelocity) * 0.03f, 2.6f);
             float fx = (float) Math.sin(Math.toRadians(yawDeg));
             float fz = (float) Math.cos(Math.toRadians(yawDeg));
             capeSim.step(dt, 0f, 0f, -0.02f, fx, fz, speed);

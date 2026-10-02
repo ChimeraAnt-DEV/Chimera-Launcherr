@@ -46,11 +46,22 @@ public final class CapeSimulator {
     /** Gravity in blocks/s^2. Gentler than 9.8 so the cloth falls with a fabric's weight. */
     public static final float GRAVITY = 14f;
 
-    /** Velocity retained per second (air drag). Below 1 so the cape settles instead of ringing. */
-    public static final float DAMPING = 0.86f;
+    /**
+     * Velocity retained per second (air drag). Well below 1 so the cape settles quickly instead of
+     * ringing: the old value of 0.86 left the cloth almost undamped, so a flick set it flapping for
+     * seconds and a still character kept jittering — the "way too much physics" report. Fabric
+     * loses energy fast, so the preview should too.
+     */
+    public static final float DAMPING = 0.22f;
 
-    /** How strongly a particle is pulled back to its anchor's rest offset, per second. */
-    public static final float STIFFNESS = 26f;
+    /**
+     * How strongly a particle is pulled back to its anchor's rest offset, per second.
+     *
+     * <p>Raised with the damping so the cape returns to a clean hanging shape instead of drooping
+     * and swinging. High stiffness alone would be stiff cloth; paired with strong drag it reads as
+     * heavy fabric that moves a little and stops.
+     */
+    public static final float STIFFNESS = 52f;
 
     /** Maximum stretch of a structural link, as a fraction of its rest length. */
     public static final float MAX_STRETCH = 1.35f;
