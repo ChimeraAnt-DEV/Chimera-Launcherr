@@ -40,6 +40,7 @@ import org.chimeramc.client.core.mods.inbuilt.model.ModAvailability;
 import org.chimeramc.client.core.mods.inbuilt.overlay.InbuiltOverlayManager;
 import org.chimeramc.client.core.mods.inbuilt.overlay.ModConfigView;
 import org.chimeramc.client.core.mods.inbuilt.overlay.ModMenuNavigation;
+import org.chimeramc.client.core.replay.ReplayPanel;
 import org.chimeramc.client.launcher.controller.ControllerInputProcessor;
 import org.chimeramc.client.launcher.controller.ControllerProfile;
 import org.chimeramc.client.launcher.controller.ControllerProfileManager;
@@ -95,6 +96,7 @@ public class VipModMenuOverlay {
     private FrameLayout container;
     private TextView modeBadge;
     private TextView tabModules;
+    private TextView tabReplay;
     private TextView tabController;
     private TextView tabKeyboard;
     private View tabIndicator;
@@ -102,7 +104,9 @@ public class VipModMenuOverlay {
     private View modulesView;
     private FrameLayout controllerView;
     private FrameLayout keyboardView;
+    private FrameLayout replayView;
     private View configView;
+    private ReplayPanel replayPanel;
 
     private RecyclerView recycler;
     private VipModuleAdapter adapter;
@@ -248,9 +252,13 @@ public class VipModMenuOverlay {
     }
 
     private void setupViews() {
+        // The overlay tree is inflated fresh on every show, so any panel built against the previous
+        // tree must not be carried over.
+        replayPanel = null;
         container = overlayView.findViewById(R.id.vip_menu_container);
         modeBadge = overlayView.findViewById(R.id.vip_mode_badge);
         tabModules = overlayView.findViewById(R.id.vip_tab_modules);
+        tabReplay = overlayView.findViewById(R.id.vip_tab_replay);
         tabController = overlayView.findViewById(R.id.vip_tab_controller);
         tabKeyboard = overlayView.findViewById(R.id.vip_tab_keyboard);
         tabIndicator = overlayView.findViewById(R.id.vip_tab_indicator);
@@ -258,6 +266,7 @@ public class VipModMenuOverlay {
         modulesView = overlayView.findViewById(R.id.vip_modules_view);
         controllerView = overlayView.findViewById(R.id.vip_controller_view);
         keyboardView = overlayView.findViewById(R.id.vip_keyboard_view);
+        replayView = overlayView.findViewById(R.id.vip_replay_view);
         configView = overlayView.findViewById(R.id.vip_config_view);
 
         recycler = overlayView.findViewById(R.id.vip_mods_recycler);
@@ -335,13 +344,14 @@ public class VipModMenuOverlay {
         }
 
         tabModules.setOnClickListener(v -> selectTab(VipTab.MODULES));
+        tabReplay.setOnClickListener(v -> selectTab(VipTab.REPLAY));
         tabController.setOnClickListener(v -> selectTab(VipTab.CONTROLLER));
         tabKeyboard.setOnClickListener(v -> selectTab(VipTab.KEYBOARD));
         ImageButton close = overlayView.findViewById(R.id.vip_close);
         close.setOnClickListener(v -> hide());
 
-        for (View v : new View[]{tabModules, tabController, tabKeyboard, close, searchClear,
-                modeBadge}) {
+        for (View v : new View[]{tabModules, tabReplay, tabController, tabKeyboard, close,
+                searchClear, modeBadge}) {
             if (v != null) DynamicAnim.applyPressScale(v);
         }
 
@@ -439,6 +449,8 @@ public class VipModMenuOverlay {
 
     private TextView tabView(VipTab tab) {
         switch (tab) {
+            case REPLAY:
+                return tabReplay;
             case CONTROLLER:
                 return tabController;
             case KEYBOARD:
@@ -457,14 +469,30 @@ public class VipModMenuOverlay {
         modulesView.setVisibility(tab == VipTab.MODULES ? View.VISIBLE : View.GONE);
         controllerView.setVisibility(tab == VipTab.CONTROLLER ? View.VISIBLE : View.GONE);
         keyboardView.setVisibility(tab == VipTab.KEYBOARD ? View.VISIBLE : View.GONE);
+        replayView.setVisibility(tab == VipTab.REPLAY ? View.VISIBLE : View.GONE);
         configView.setVisibility(View.GONE);
 
         View shown = tab == VipTab.MODULES ? modulesView
+                : tab == VipTab.REPLAY ? replayView
                 : tab == VipTab.CONTROLLER ? controllerView : keyboardView;
+        if (tab == VipTab.REPLAY) {
+            ensureReplayPanel();
+            replayPanel.setGamepadDetected(inputMode == VipInputMode.Mode.CONTROLLER);
+            replayPanel.onShown();
+        } else if (replayPanel != null) {
+            replayPanel.onHidden();
+        }
         crossfade(shown);
         if (tab == VipTab.MODULES && adapter != null) {
             adapter.clearFocus();
         }
+    }
+
+    private void ensureReplayPanel() {
+        if (replayPanel != null || replayView == null) return;
+        replayPanel = new ReplayPanel(activity, false);
+        replayView.addView(replayPanel.getView(), new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
     /** One tab is accented and bold; the rest are muted. */
@@ -921,6 +949,9 @@ public class VipModMenuOverlay {
             default:
                 break;
         }
+        if (activeTab == VipTab.REPLAY) {
+            return handleReplayKey(keyCode);
+        }
         if (activeTab != VipTab.MODULES || configView.getVisibility() == View.VISIBLE
                 || adapter == null) {
             return false;
@@ -941,6 +972,32 @@ public class VipModMenuOverlay {
             case KeyEvent.KEYCODE_BUTTON_X:
             case KeyEvent.KEYCODE_BUTTON_Y:
                 return adapter.openConfig();
+            default:
+                return false;
+        }
+    }
+
+    /** Controller handling for the VIP Replay tab, matching its bind hints. */
+    private boolean handleReplayKey(int keyCode) {
+        if (replayPanel == null || replayView.getVisibility() != View.VISIBLE) return false;
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_BUTTON_L1:
+                replayPanel.cycleSelection(false);
+                return true;
+            case KeyEvent.KEYCODE_BUTTON_R1:
+                replayPanel.cycleSelection(true);
+                return true;
+            case KeyEvent.KEYCODE_BUTTON_A:
+            case KeyEvent.KEYCODE_ENTER:
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+                replayPanel.playSelected();
+                return true;
+            case KeyEvent.KEYCODE_BUTTON_X:
+                replayPanel.deleteSelectedOrFirst();
+                return true;
+            case KeyEvent.KEYCODE_BUTTON_Y:
+                replayPanel.favoriteSelected();
+                return true;
             default:
                 return false;
         }
@@ -979,6 +1036,10 @@ public class VipModMenuOverlay {
 
     public void hide() {
         if (!isShowing || overlayView == null) return;
+        if (replayPanel != null) {
+            replayPanel.dispose();
+            replayPanel = null;
+        }
         MenuBindRelay.clear();
         handler.removeCallbacks(searchRunnable);
         if (adapter != null) adapter.clearFocus();

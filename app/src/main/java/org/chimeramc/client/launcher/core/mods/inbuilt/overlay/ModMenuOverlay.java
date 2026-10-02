@@ -34,6 +34,7 @@ import org.chimeramc.client.core.mods.inbuilt.ExternalModuleProvider;
 import org.chimeramc.client.core.mods.inbuilt.InbuiltModuleProvider;
 import org.chimeramc.client.core.mods.inbuilt.UnifiedMod;
 import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
+import org.chimeramc.client.core.replay.ReplayPanel;
 import org.chimeramc.client.core.mods.inbuilt.model.ModIds;
 import org.chimeramc.client.core.mods.inbuilt.model.ModLoadoutStore;
 import java.util.ArrayList;
@@ -69,7 +70,7 @@ public class ModMenuOverlay {
     private boolean hasStaggeredOnce = false;
     private EditText searchInput;
     private ImageButton clearSearchBtn;
-    private TextView navModules, navSettings, navHudEditor, navCosmetics, navPacks, navVoice;
+    private TextView navModules, navSettings, navHudEditor, navCosmetics, navPacks, navVoice, navReplay;
     private TextView filterAll, filterFavorites, filterEnabled, filterInbuilt, filterExternal, filterPvp;
     private TextView moduleCountText, emptyStateText;
     private TextView compactFilterSelector, compactModuleCount;
@@ -90,6 +91,8 @@ public class ModMenuOverlay {
     private FrameLayout packsContainer;
     private FrameLayout voiceContainer;
     private VoicePanel voicePanel;
+    private FrameLayout replayContainer;
+    private ReplayPanel replayPanel;
     private PackChangerPanel packChangerPanel;
     private View emptyState;
     private View menuContainer;
@@ -439,6 +442,7 @@ public class ModMenuOverlay {
         navHudEditor = overlayView.findViewById(R.id.nav_hud_editor);
         navCosmetics = overlayView.findViewById(R.id.nav_cosmetics);
         navPacks = overlayView.findViewById(R.id.nav_packs);
+        navReplay = overlayView.findViewById(R.id.nav_replay);
         filterAll = overlayView.findViewById(R.id.filter_all);
         filterFavorites = overlayView.findViewById(R.id.filter_favorites);
         filterEnabled = overlayView.findViewById(R.id.filter_enabled);
@@ -454,6 +458,7 @@ public class ModMenuOverlay {
         cosmeticsContainer = overlayView.findViewById(R.id.cosmetics_container);
         packsContainer = overlayView.findViewById(R.id.packs_container);
         voiceContainer = overlayView.findViewById(R.id.voice_container);
+        replayContainer = overlayView.findViewById(R.id.replay_container);
         emptyState = overlayView.findViewById(R.id.empty_state);
         emptyStateText = overlayView.findViewById(R.id.empty_state_text);
         notificationsSwitch = overlayView.findViewById(R.id.switch_notifications);
@@ -497,7 +502,7 @@ public class ModMenuOverlay {
         // Touch feedback on the stable chrome (nav + filter chips + close). Recycler rows get
         // their own feedback in the adapter, since they are recycled and rebound.
         for (View v : new View[]{navVoice, navModules, navSettings, navHudEditor, navCosmetics,
-                navPacks,
+                navPacks, navReplay,
                 filterAll, filterFavorites, filterEnabled, filterInbuilt, filterExternal, filterPvp,
                 closeBtn, clearSearchBtn}) {
             if (v != null) DynamicAnim.applyPressScale(v);
@@ -568,6 +573,7 @@ public class ModMenuOverlay {
         navSettings.setOnClickListener(v -> showSettingsSection());
         if (navCosmetics != null) navCosmetics.setOnClickListener(v -> showCosmeticsSection());
         if (navPacks != null) navPacks.setOnClickListener(v -> showPacksSection());
+        if (navReplay != null) navReplay.setOnClickListener(v -> showReplaySection());
 
         // Settings
         InbuiltModManager modManager = InbuiltModManager.getInstance(activity);
@@ -692,7 +698,7 @@ public class ModMenuOverlay {
     }
 
     private void showModulesSection() {
-        updateNavigationItems(true, false, false, false, false, false);
+        updateNavigationItems(true, false, false, false, false, false, false);
 
         if (modulesContainer.getVisibility() != View.VISIBLE) {
             modulesContainer.setVisibility(View.VISIBLE);
@@ -702,6 +708,7 @@ public class ModMenuOverlay {
         hideCosmetics();
         hidePacks();
         hideVoice();
+        hideReplay();
 
         if (overlayView != null) {
             View modConfigContainer = overlayView.findViewById(R.id.mod_config_container);
@@ -715,12 +722,13 @@ public class ModMenuOverlay {
     }
 
     private void showSettingsSection() {
-        updateNavigationItems(false, false, false, true, false, false);
+        updateNavigationItems(false, false, false, true, false, false, false);
 
         modulesContainer.setVisibility(View.GONE);
         hideCosmetics();
         hidePacks();
         hideVoice();
+        hideReplay();
         if (settingsContainer.getVisibility() != View.VISIBLE) {
             settingsContainer.setVisibility(View.VISIBLE);
             crossfade(settingsContainer);
@@ -1072,12 +1080,13 @@ public class ModMenuOverlay {
      * decides which section is on screen.
      */
     private void showCosmeticsSection() {
-        updateNavigationItems(false, true, false, false, false, false);
+        updateNavigationItems(false, true, false, false, false, false, false);
 
         modulesContainer.setVisibility(View.GONE);
         settingsContainer.setVisibility(View.GONE);
         hidePacks();
         hideVoice();
+        hideReplay();
         if (cosmeticsContainer != null) {
             if (cosmeticsPanel == null) {
                 cosmeticsPanel = new CosmeticsPanel(activity, compactMode);
@@ -1114,13 +1123,14 @@ public class ModMenuOverlay {
      * panel reports itself rather than hiding the tab — a hidden destination reads as a bug.
      */
     private void showPacksSection() {
-        updateNavigationItems(false, false, false, false, true, false);
+        updateNavigationItems(false, false, false, false, true, false, false);
 
         modulesContainer.setVisibility(View.GONE);
         settingsContainer.setVisibility(View.GONE);
         hideCosmetics();
         hidePacks();
         hideVoice();
+        hideReplay();
         if (packsContainer != null) {
             packsContainer.removeAllViews();
             packChangerPanel = new PackChangerPanel(activity, compactMode);
@@ -1153,13 +1163,14 @@ public class ModMenuOverlay {
      * never starts the module, which is the deliberate action behind the Mods-tab switch.
      */
     private void showVoiceSection() {
-        updateNavigationItems(false, false, false, false, false, true);
+        updateNavigationItems(false, false, false, false, false, true, false);
 
         if (modulesContainer != null) modulesContainer.setVisibility(View.GONE);
         if (settingsContainer != null) settingsContainer.setVisibility(View.GONE);
         hideCosmetics();
         hidePacks();
         hideVoice();
+        hideReplay();
         if (voiceContainer != null) {
             voiceContainer.removeAllViews();
             voicePanel = new VoicePanel(activity, compactMode);
@@ -1202,6 +1213,75 @@ public class ModMenuOverlay {
         if (voiceContainer != null) voiceContainer.setVisibility(View.GONE);
     }
 
+    /**
+     * Replay: the recorder controls and the clip library.
+     *
+     * <p>Built lazily and kept alive once built, because the panel owns a background executor and
+     * the live recorder listener. It is the same {@link ReplayPanel} the VIP menu hosts, so the
+     * touch menu and the in-game bind show one feature rather than two implementations.
+     */
+    private void showReplaySection() {
+        updateNavigationItems(false, false, false, false, false, false, true);
+
+        if (modulesContainer != null) modulesContainer.setVisibility(View.GONE);
+        if (settingsContainer != null) settingsContainer.setVisibility(View.GONE);
+        hideCosmetics();
+        hidePacks();
+        hideVoice();
+        if (replayContainer != null) {
+            if (replayPanel == null) {
+                replayPanel = new ReplayPanel(activity, compactMode);
+                replayContainer.addView(replayPanel.getView(),
+                        new FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT));
+            }
+            replayPanel.setGamepadDetected(hasConnectedGamepad());
+            replayContainer.setVisibility(View.VISIBLE);
+            replayPanel.onShown();
+            crossfade(replayContainer);
+        }
+
+        if (overlayView != null) {
+            View modConfigContainer = overlayView.findViewById(R.id.mod_config_container);
+            View searchContainer = overlayView.findViewById(R.id.search_container);
+            View configHeader = overlayView.findViewById(R.id.config_header);
+            if (modConfigContainer != null) modConfigContainer.setVisibility(View.GONE);
+            if (searchContainer != null) searchContainer.setVisibility(View.GONE);
+            if (configHeader != null) configHeader.setVisibility(View.VISIBLE);
+            TextView configTitle = overlayView.findViewById(R.id.config_title);
+            if (configTitle != null) configTitle.setText(R.string.replay_header_title);
+            if (filterBar != null) filterBar.setVisibility(View.GONE);
+            if (compactFilterBar != null) compactFilterBar.setVisibility(View.GONE);
+        }
+    }
+
+    /** True when any device on the InputManager reports a gamepad source. */
+    private boolean hasConnectedGamepad() {
+        try {
+            android.hardware.input.InputManager inputManager =
+                    (android.hardware.input.InputManager)
+                            activity.getSystemService(android.content.Context.INPUT_SERVICE);
+            if (inputManager == null) return false;
+            for (int id : inputManager.getInputDeviceIds()) {
+                android.view.InputDevice device = inputManager.getInputDevice(id);
+                if (device == null) continue;
+                int sources = device.getSources();
+                if ((sources & android.view.InputDevice.SOURCE_GAMEPAD) != 0
+                        || (sources & android.view.InputDevice.SOURCE_JOYSTICK) != 0) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    private void hideReplay() {
+        if (replayContainer != null) replayContainer.setVisibility(View.GONE);
+        if (replayPanel != null) replayPanel.onHidden();
+    }
+
     private void hidePacks() {
         if (packsContainer != null) packsContainer.setVisibility(View.GONE);
     }
@@ -1211,12 +1291,13 @@ public class ModMenuOverlay {
             hide();
             return;
         }
-        updateNavigationItems(false, false, false, false, false, false);
+        updateNavigationItems(false, false, false, false, false, false, false);
 
         modulesContainer.setVisibility(View.GONE);
         settingsContainer.setVisibility(View.GONE);
         hideCosmetics();
         hidePacks();
+        hideReplay();
 
         if (overlayView != null) {
             View modConfigContainer = overlayView.findViewById(R.id.mod_config_container);
@@ -1315,7 +1396,7 @@ public class ModMenuOverlay {
     }
 
     private void enterHudEditorMode(View modMenuContainer, View hudEditorTools) {
-        updateNavigationItems(false, false, true, false, false, false);
+        updateNavigationItems(false, false, true, false, false, false, false);
 
         if (modMenuContainer != null) {
             modMenuContainer.setVisibility(View.GONE);
@@ -1511,7 +1592,8 @@ public class ModMenuOverlay {
         boolean cosmeticsSelected = cosmeticsContainer != null && cosmeticsContainer.getVisibility() == View.VISIBLE;
         boolean packsSelected = packsContainer != null && packsContainer.getVisibility() == View.VISIBLE;
         boolean voiceSelected = voiceContainer != null && voiceContainer.getVisibility() == View.VISIBLE;
-        updateNavigationItems(modulesSelected, cosmeticsSelected, false, settingsSelected, packsSelected, voiceSelected);
+        boolean replaySelected = replayContainer != null && replayContainer.getVisibility() == View.VISIBLE;
+        updateNavigationItems(modulesSelected, cosmeticsSelected, false, settingsSelected, packsSelected, voiceSelected, replaySelected);
 
         if (modsRecycler != null) {
             int padding = dp(compact ? 4 : 14);
@@ -1698,13 +1780,15 @@ public class ModMenuOverlay {
      * is a compile error at each call site rather than a silently untinted entry.
      */
     private void updateNavigationItems(boolean modules, boolean cosmetics, boolean hudEditor,
-                                       boolean settings, boolean packs, boolean voice) {
+                                       boolean settings, boolean packs, boolean voice,
+                                       boolean replay) {
         updateNavigationItem(navVoice, voice);
         updateNavigationItem(navModules, modules);
         updateNavigationItem(navCosmetics, cosmetics);
         updateNavigationItem(navHudEditor, hudEditor);
         updateNavigationItem(navSettings, settings);
         updateNavigationItem(navPacks, packs);
+        updateNavigationItem(navReplay, replay);
     }
 
     private void updateModuleCount() {
@@ -1772,6 +1856,7 @@ public class ModMenuOverlay {
         if (!isShowing || overlayView == null) return;
 
         handler.removeCallbacks(statsTick);
+        if (replayPanel != null) replayPanel.onHidden();
 
         InbuiltOverlayManager overlayManager = InbuiltOverlayManager.getInstance();
         if (overlayManager != null) {
@@ -1817,7 +1902,14 @@ public class ModMenuOverlay {
      * @return true when the press was used by the menu and must be swallowed
      */
     public boolean handleControllerKey(int keyCode, boolean down) {
-        if (!isShowing || !down || adapter == null) return false;
+        if (!isShowing || !down) return false;
+        // The Replay section owns input while it is on screen: its buttons (record, cards) are
+        // touch-driven and controller input cycles the selection and acts on it.
+        if (replayPanel != null && replayContainer != null
+                && replayContainer.getVisibility() == View.VISIBLE) {
+            return handleReplayKey(keyCode);
+        }
+        if (adapter == null) return false;
         switch (keyCode) {
             case android.view.KeyEvent.KEYCODE_DPAD_UP:
                 return adapter.handleControllerNavigation(ModMenuNavigation.Direction.UP);
@@ -1832,6 +1924,31 @@ public class ModMenuOverlay {
                 return adapter.handleControllerSelect();
             case android.view.KeyEvent.KEYCODE_BUTTON_START:
                 hide();
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /** Controller handling for the Replay section, matching the VIP menu's bind hints. */
+    private boolean handleReplayKey(int keyCode) {
+        switch (keyCode) {
+            case android.view.KeyEvent.KEYCODE_BUTTON_L1:
+                replayPanel.cycleSelection(false);
+                return true;
+            case android.view.KeyEvent.KEYCODE_BUTTON_R1:
+                replayPanel.cycleSelection(true);
+                return true;
+            case android.view.KeyEvent.KEYCODE_BUTTON_A:
+            case android.view.KeyEvent.KEYCODE_ENTER:
+            case android.view.KeyEvent.KEYCODE_DPAD_CENTER:
+                replayPanel.playSelected();
+                return true;
+            case android.view.KeyEvent.KEYCODE_BUTTON_X:
+                replayPanel.deleteSelected();
+                return true;
+            case android.view.KeyEvent.KEYCODE_BUTTON_Y:
+                replayPanel.favoriteSelected();
                 return true;
             default:
                 return false;

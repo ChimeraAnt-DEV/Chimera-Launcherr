@@ -35,18 +35,21 @@ public class VipMenuLogicTest {
     @Test
     public void declarationOrderIsTheTabOrder() {
         assertEquals(VipTab.MODULES, VipTab.values()[0]);
-        assertEquals(VipTab.CONTROLLER, VipTab.values()[1]);
-        assertEquals(VipTab.KEYBOARD, VipTab.values()[2]);
+        assertEquals(VipTab.REPLAY, VipTab.values()[1]);
+        assertEquals(VipTab.CONTROLLER, VipTab.values()[2]);
+        assertEquals(VipTab.KEYBOARD, VipTab.values()[3]);
     }
 
     @Test
     public void shouldersWrapInBothDirections() {
-        assertEquals(VipTab.CONTROLLER, VipTab.MODULES.next());
+        assertEquals(VipTab.REPLAY, VipTab.MODULES.next());
+        assertEquals(VipTab.CONTROLLER, VipTab.REPLAY.next());
         assertEquals(VipTab.KEYBOARD, VipTab.CONTROLLER.next());
         assertEquals(VipTab.MODULES, VipTab.KEYBOARD.next());
 
         assertEquals(VipTab.KEYBOARD, VipTab.MODULES.previous());
-        assertEquals(VipTab.MODULES, VipTab.CONTROLLER.previous());
+        assertEquals(VipTab.REPLAY, VipTab.CONTROLLER.previous());
+        assertEquals(VipTab.MODULES, VipTab.REPLAY.previous());
         assertEquals(VipTab.CONTROLLER, VipTab.KEYBOARD.previous());
     }
 

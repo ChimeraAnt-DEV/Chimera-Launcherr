@@ -33,6 +33,9 @@ class LauncherApplication : Application() {
         NewsNotificationHelper.initialize(this)
         LogcatOverlayManager.init(this)
         PlaytimeManager.init(applicationContext)
+        // The Replay recorder's state lives in a process singleton so a screen opened mid-capture
+        // sees the running state; init here so it exists before any Mod Menu screen asks for it.
+        org.chimeramc.client.core.replay.ReplayManager.init(applicationContext)
 
         preferences = PreferenceManager.getDefaultSharedPreferences(this)
     }
