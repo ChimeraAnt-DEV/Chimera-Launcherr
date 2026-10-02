@@ -540,7 +540,7 @@ A migração deve ser concluída antes que o GlowberryClient continue.</string>
     <string name="structures_found_count">%d estruturas encontradas neste mundo</string>
 
     <string name="mod_menu">Menu de Mods</string>
-    <string name="mod_menu_modules">Módulos</string>
+    <string name="mod_menu_general">Geral</string>
     <string name="mod_menu_search_hint">Procurar mods…</string>
     <string name="mod_menu_no_mods">Nenhum mod adicionado</string>
     <string name="mod_menu_settings_coming">Configurações em breve</string>

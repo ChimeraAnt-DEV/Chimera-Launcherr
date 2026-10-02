@@ -77,6 +77,12 @@ public class InbuiltModManager {
     private static final String KEY_HITBOX_SHOW_TARGET_BOX = "hitbox_show_target_box";
     /** ARGB colour of the peer boxes; -1 means "use the default white". */
     private static final String KEY_HITBOX_PEER_COLOR = "hitbox_peer_color";
+    // PvP Suite (V1.1). Every key here is a display preference only; nothing reads game state.
+    private static final String KEY_REACH_POSITION = "reach_indicator_position";
+    private static final String KEY_TRAJECTORY_COLOR = "trajectory_color";
+    private static final String KEY_HIT_PREDICTION_LOOKAHEAD_MS = "hit_prediction_lookahead_ms";
+    private static final String KEY_KILL_EFFECT_STYLE = "kill_effect_style";
+    private static final String KEY_KILL_EFFECT_COLOR = "kill_effect_color";
     private static final String KEY_VOICE_RANGE = "voice_range_blocks";
     private static final String KEY_VOICE_VOLUME = "voice_volume_percent";
     private static final String KEY_VOICE_CHANNEL = "voice_channel";
@@ -1008,6 +1014,53 @@ public class InbuiltModManager {
         if (loadout == null) return false;
         ModLoadoutStore.apply(loadout, this::setInbuiltModEnabled);
         return true;
+    }
+
+    // ---- PvP Suite (V1.1) ----------------------------------------------------------------
+
+    /** Where the Reach Indicator sits: {@code below_crosshair} (0) or {@code above_hotbar} (1). */
+    public int getReachIndicatorPosition() {
+        return prefs.getInt(KEY_REACH_POSITION, 0);
+    }
+
+    public void setReachIndicatorPosition(int position) {
+        prefs.edit().putInt(KEY_REACH_POSITION, Math.max(0, Math.min(1, position))).apply();
+    }
+
+    /** ARGB colour of the predicted trajectory arc. Default a bright lime. */
+    public int getTrajectoryColor() {
+        return prefs.getInt(KEY_TRAJECTORY_COLOR, 0xFF7CFC5A);
+    }
+
+    public void setTrajectoryColor(int color) {
+        prefs.edit().putInt(KEY_TRAJECTORY_COLOR, color).apply();
+    }
+
+    /** How far ahead the hit-prediction marker is drawn, in milliseconds. */
+    public int getHitPredictionLookAheadMs() {
+        return prefs.getInt(KEY_HIT_PREDICTION_LOOKAHEAD_MS, 1000);
+    }
+
+    public void setHitPredictionLookAheadMs(int ms) {
+        prefs.edit().putInt(KEY_HIT_PREDICTION_LOOKAHEAD_MS, Math.max(500, Math.min(1500, ms))).apply();
+    }
+
+    /** Kill-effect particle style index: burst (0), column (1), ring (2). */
+    public int getKillEffectStyle() {
+        return prefs.getInt(KEY_KILL_EFFECT_STYLE, 0);
+    }
+
+    public void setKillEffectStyle(int style) {
+        prefs.edit().putInt(KEY_KILL_EFFECT_STYLE, Math.max(0, Math.min(2, style))).apply();
+    }
+
+    /** ARGB colour of the kill-effect particles. Default a warm gold. */
+    public int getKillEffectColor() {
+        return prefs.getInt(KEY_KILL_EFFECT_COLOR, 0xFFFFC24B);
+    }
+
+    public void setKillEffectColor(int color) {
+        prefs.edit().putInt(KEY_KILL_EFFECT_COLOR, color).apply();
     }
 
     public void deleteLoadout(String name) {

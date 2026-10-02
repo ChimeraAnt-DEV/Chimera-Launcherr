@@ -95,13 +95,13 @@ public class VipModMenuOverlay {
 
     private FrameLayout container;
     private TextView modeBadge;
-    private TextView tabModules;
+    private TextView tabGeneral;
     private TextView tabReplay;
     private TextView tabController;
     private TextView tabKeyboard;
     private View tabIndicator;
     private View tabBar;
-    private View modulesView;
+    private View generalView;
     private FrameLayout controllerView;
     private FrameLayout keyboardView;
     private FrameLayout replayView;
@@ -135,7 +135,7 @@ public class VipModMenuOverlay {
     private final List<UnifiedMod> allMods = new ArrayList<>();
     private final List<UnifiedMod> visibleMods = new ArrayList<>();
 
-    private VipTab activeTab = VipTab.MODULES;
+    private VipTab activeTab = VipTab.GENERAL;
     private VipInputMode.Mode inputMode = VipInputMode.Mode.KEYBOARD;
     private long nextAxisNavMs;
     private long shownAtMs;
@@ -257,13 +257,13 @@ public class VipModMenuOverlay {
         replayPanel = null;
         container = overlayView.findViewById(R.id.vip_menu_container);
         modeBadge = overlayView.findViewById(R.id.vip_mode_badge);
-        tabModules = overlayView.findViewById(R.id.vip_tab_modules);
+        tabGeneral = overlayView.findViewById(R.id.vip_tab_general);
         tabReplay = overlayView.findViewById(R.id.vip_tab_replay);
         tabController = overlayView.findViewById(R.id.vip_tab_controller);
         tabKeyboard = overlayView.findViewById(R.id.vip_tab_keyboard);
         tabIndicator = overlayView.findViewById(R.id.vip_tab_indicator);
         tabBar = overlayView.findViewById(R.id.vip_tab_bar);
-        modulesView = overlayView.findViewById(R.id.vip_modules_view);
+        generalView = overlayView.findViewById(R.id.vip_general_view);
         controllerView = overlayView.findViewById(R.id.vip_controller_view);
         keyboardView = overlayView.findViewById(R.id.vip_keyboard_view);
         replayView = overlayView.findViewById(R.id.vip_replay_view);
@@ -343,14 +343,14 @@ public class VipModMenuOverlay {
             });
         }
 
-        tabModules.setOnClickListener(v -> selectTab(VipTab.MODULES));
+        tabGeneral.setOnClickListener(v -> selectTab(VipTab.GENERAL));
         tabReplay.setOnClickListener(v -> selectTab(VipTab.REPLAY));
         tabController.setOnClickListener(v -> selectTab(VipTab.CONTROLLER));
         tabKeyboard.setOnClickListener(v -> selectTab(VipTab.KEYBOARD));
         ImageButton close = overlayView.findViewById(R.id.vip_close);
         close.setOnClickListener(v -> hide());
 
-        for (View v : new View[]{tabModules, tabReplay, tabController, tabKeyboard, close,
+        for (View v : new View[]{tabGeneral, tabReplay, tabController, tabKeyboard, close,
                 searchClear, modeBadge}) {
             if (v != null) DynamicAnim.applyPressScale(v);
         }
@@ -455,9 +455,9 @@ public class VipModMenuOverlay {
                 return tabController;
             case KEYBOARD:
                 return tabKeyboard;
-            case MODULES:
+            case GENERAL:
             default:
-                return tabModules;
+                return tabGeneral;
         }
     }
 
@@ -466,13 +466,13 @@ public class VipModMenuOverlay {
         updateTabSelection();
         moveIndicator(tab, true);
 
-        modulesView.setVisibility(tab == VipTab.MODULES ? View.VISIBLE : View.GONE);
+        generalView.setVisibility(tab == VipTab.GENERAL ? View.VISIBLE : View.GONE);
         controllerView.setVisibility(tab == VipTab.CONTROLLER ? View.VISIBLE : View.GONE);
         keyboardView.setVisibility(tab == VipTab.KEYBOARD ? View.VISIBLE : View.GONE);
         replayView.setVisibility(tab == VipTab.REPLAY ? View.VISIBLE : View.GONE);
         configView.setVisibility(View.GONE);
 
-        View shown = tab == VipTab.MODULES ? modulesView
+        View shown = tab == VipTab.GENERAL ? generalView
                 : tab == VipTab.REPLAY ? replayView
                 : tab == VipTab.CONTROLLER ? controllerView : keyboardView;
         if (tab == VipTab.REPLAY) {
@@ -483,7 +483,7 @@ public class VipModMenuOverlay {
             replayPanel.onHidden();
         }
         crossfade(shown);
-        if (tab == VipTab.MODULES && adapter != null) {
+        if (tab == VipTab.GENERAL && adapter != null) {
             adapter.clearFocus();
         }
     }
@@ -911,7 +911,7 @@ public class VipModMenuOverlay {
     /**
      * Routes one raw key press into the open VIP screen.
      *
-     * <p>On the Modules tab a d-pad/stick moves the selection and a face button toggles the focused
+     * <p>On the General tab a d-pad/stick moves the selection and a face button toggles the focused
      * module; the shoulders cycle tabs and Start closes. On the Controller/Keyboard tabs the face
      * buttons are left to the tab, so only the shoulders and Start are claimed. The pressed control
      * is also echoed onto the pad illustration so the Controller tab shows the live input.
@@ -952,7 +952,7 @@ public class VipModMenuOverlay {
         if (activeTab == VipTab.REPLAY) {
             return handleReplayKey(keyCode);
         }
-        if (activeTab != VipTab.MODULES || configView.getVisibility() == View.VISIBLE
+        if (activeTab != VipTab.GENERAL || configView.getVisibility() == View.VISIBLE
                 || adapter == null) {
             return false;
         }
@@ -1007,7 +1007,7 @@ public class VipModMenuOverlay {
     public boolean handleControllerMotion(MotionEvent event) {
         if (!isShowing || adapter == null) return false;
         if (controllerIllustration != null) controllerIllustration.handleMotionEvent(event);
-        if (activeTab != VipTab.MODULES || configView.getVisibility() == View.VISIBLE) return false;
+        if (activeTab != VipTab.GENERAL || configView.getVisibility() == View.VISIBLE) return false;
         float axisX = event.getAxisValue(MotionEvent.AXIS_X);
         float axisY = event.getAxisValue(MotionEvent.AXIS_Y);
         if (Math.abs(axisX) < NAV_AXIS_THRESHOLD && Math.abs(axisY) < NAV_AXIS_THRESHOLD) {

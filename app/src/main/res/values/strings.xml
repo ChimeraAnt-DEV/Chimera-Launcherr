@@ -760,7 +760,7 @@ Migration must complete before GlowberryClient can continue.</string>
 
     <!-- Mod Menu -->
     <string name="mod_menu">Mod Menu</string>
-    <string name="mod_menu_modules">Modules</string>
+    <string name="mod_menu_general">General</string>
     <string name="mod_menu_favorites">Favorites</string>
     <string name="mod_menu_favorite">Add to favorites</string>
     <string name="mod_menu_unfavorite">Remove from favorites</string>
@@ -802,7 +802,7 @@ Migration must complete before GlowberryClient can continue.</string>
          from the touch Mod Menu opened by the launcher nav bar. -->
     <string name="vip_menu_title">VIP Mod Menu</string>
     <string name="vip_menu_subtitle">Premium in-game control</string>
-    <string name="vip_tab_modules">Modules</string>
+    <string name="vip_tab_general">General</string>
     <string name="vip_tab_controller">Controller</string>
     <string name="vip_tab_keyboard">Keyboard</string>
     <string name="vip_mode_controller">Controller detected</string>
@@ -1608,6 +1608,38 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="mod_config_hitbox_show_target_box">Show Target Box</string>
     <string name="mod_config_hitbox_show_target_box_desc">Blue chest-height box marking what to aim at on another player</string>
     <string name="hitbox_scope_note">Other players running this launcher are drawn from the voice link: their position and view travel with the audio, so their box and aim line need no game hook. Mobs, items, projectiles and the crit/combo guides need the game\'s own entity list, which this build cannot read — those options are disabled rather than drawing a made-up box.</string>
+
+    <!-- PvP Suite (V1.1): overlay-only visual modules, filed under the General tab -->
+    <string name="inbuilt_mod_reach_indicator">Reach Indicator</string>
+    <string name="inbuilt_mod_reach_indicator_desc">Shows the distance to the player under your crosshair</string>
+    <string name="mod_config_reach_position">Position</string>
+    <string name="mod_config_reach_position_desc">Where the distance readout sits on screen</string>
+    <string name="mod_config_reach_position_below">Below crosshair</string>
+    <string name="mod_config_reach_position_hotbar">Above hotbar</string>
+    <string name="reach_indicator_scope_note">Reads other players running this launcher from the voice link, the same source the Hitboxes peer boxes use. Vanilla players and mobs cannot be measured, so nothing is shown rather than a guessed distance.</string>
+
+    <string name="inbuilt_mod_trajectory_prediction">Trajectory Prediction</string>
+    <string name="inbuilt_mod_trajectory_prediction_desc">Predicts the flight arc of the arrow, ender pearl or snowball you are holding</string>
+    <string name="mod_config_trajectory_color">Arc Colour</string>
+    <string name="mod_config_trajectory_color_desc">Colour of the dotted arc and its landing ring</string>
+    <string name="trajectory_prediction_scope_note">Predicts where the projectile you are holding would fly from your current aim, using each item\'s own speed, drop and drag. It cannot see a projectile already in flight, and it draws nothing until a held-item feed is available.</string>
+
+    <string name="inbuilt_mod_hit_prediction">Hit Prediction</string>
+    <string name="inbuilt_mod_hit_prediction_desc">Ghost box at where a moving player is about to be</string>
+    <string name="mod_config_hit_prediction_lookahead">Look-ahead (ms)</string>
+    <string name="mod_config_hit_prediction_lookahead_desc">How far ahead the ghost box is placed; velocity is smoothed over the last five samples so the marker does not jitter</string>
+    <string name="hit_prediction_scope_note">Draws a ghost box at another launcher user\'s predicted next position. It cannot make a hit land — the server decides that — and a player moving too fast for a straight-line guess gets no marker rather than a misleading one.</string>
+
+    <string name="inbuilt_mod_kill_effects">Custom Kill Effects</string>
+    <string name="inbuilt_mod_kill_effects_desc">Client-side particle burst when you get a kill</string>
+    <string name="mod_config_kill_effect_style">Particle Style</string>
+    <string name="mod_config_kill_effect_style_desc">Shape of the burst: an outward spark burst, a rising column, or an expanding ground ring</string>
+    <string name="mod_config_kill_effect_color">Particle Colour</string>
+    <string name="mod_config_kill_effect_color_desc">Colour of the kill-effect particles</string>
+    <string name="kill_effect_style_burst">Burst</string>
+    <string name="kill_effect_style_column">Column</string>
+    <string name="kill_effect_style_ring">Ring</string>
+    <string name="kill_effects_scope_note">A purely visual effect on your own screen. Credit is inferred: a player you hit within the last two seconds who then dies counts as your kill. It never damages anyone and cannot see a server-confirmed kill.</string>
 
     <!-- Proximity Voice Chat -->
     <string name="inbuilt_mod_voice_chat">Proximity Voice Chat</string>

@@ -81,6 +81,12 @@ public final class InbuiltModuleProvider {
     private static final String CFG_VOICE_ICON_STYLE = "voice_icon_style";
     private static final String CFG_VOICE_ICON_ANIMATE = "voice_icon_animate";
     private static final String CFG_VOICE_ICON_NAMETAG = "voice_icon_show_nametag";
+    // PvP Suite (V1.1): overlay-only visual modules, filed under the General tab.
+    private static final String CFG_REACH_POSITION = "reach_indicator_position";
+    private static final String CFG_TRAJECTORY_COLOR = "trajectory_color";
+    private static final String CFG_HIT_PREDICTION_LOOKAHEAD = "hit_prediction_lookahead_ms";
+    private static final String CFG_KILL_EFFECT_STYLE = "kill_effect_style";
+    private static final String CFG_KILL_EFFECT_COLOR = "kill_effect_color";
 
     private InbuiltModuleProvider() {
     }
@@ -133,6 +139,22 @@ public final class InbuiltModuleProvider {
         mods.add(create(activity, manager, overlayManager, ModIds.HOTBAR_SLOT,
                 R.string.inbuilt_mod_hotbar_slot, R.string.inbuilt_mod_hotbar_slot_desc,
                 groupName));
+        // PvP Suite (V1.1): overlay-only visual aids. They sit in the General section, not a
+        // separate PvP section - the suite is not gameplay automation and the spec is explicit
+        // that no new tab is added.
+        mods.add(create(activity, manager, overlayManager, ModIds.REACH_INDICATOR,
+                R.string.inbuilt_mod_reach_indicator, R.string.inbuilt_mod_reach_indicator_desc,
+                groupName));
+        mods.add(create(activity, manager, overlayManager, ModIds.TRAJECTORY_PREDICTION,
+                R.string.inbuilt_mod_trajectory_prediction,
+                R.string.inbuilt_mod_trajectory_prediction_desc,
+                groupName));
+        mods.add(create(activity, manager, overlayManager, ModIds.HIT_PREDICTION,
+                R.string.inbuilt_mod_hit_prediction, R.string.inbuilt_mod_hit_prediction_desc,
+                groupName));
+        mods.add(create(activity, manager, overlayManager, ModIds.KILL_EFFECTS,
+                R.string.inbuilt_mod_kill_effects, R.string.inbuilt_mod_kill_effects_desc,
+                groupName));
         mods.add(create(activity, manager, overlayManager, ModIds.AIM_SETTINGS,
                 R.string.inbuilt_mod_aim_settings, R.string.inbuilt_mod_aim_settings_desc,
                 groupName));
@@ -183,7 +205,9 @@ public final class InbuiltModuleProvider {
         boolean customConfig = ModIds.POJAV_CONTROLS.equals(id) || ModIds.MORE_BUTTONS.equals(id)
                 || ModIds.ARMOR_HUD.equals(id) || ModIds.CRYSTAL_OPTIMIZER.equals(id)
                 || ModIds.HIT_REGISTRATION.equals(id) || ModIds.HIT_TIMING.equals(id)
-                || ModIds.HITBOX.equals(id) || ModIds.VOICE_CHAT.equals(id);
+                || ModIds.HITBOX.equals(id) || ModIds.VOICE_CHAT.equals(id)
+                || ModIds.REACH_INDICATOR.equals(id) || ModIds.TRAJECTORY_PREDICTION.equals(id)
+                || ModIds.HIT_PREDICTION.equals(id) || ModIds.KILL_EFFECTS.equals(id);
         // Combat modules get their own PvP section so the tab is a real destination, not just a
         // filter over the inbuilt list. They remain inbuilt modules, so the Inbuilt filter and
         // the "Inbuilt" grouping still find them.
@@ -218,6 +242,10 @@ public final class InbuiltModuleProvider {
         }
         if (ModIds.VOICE_CHAT.equals(modId)) {
             return createVoiceConfigSchema(context, mod);
+        }
+        if (ModIds.REACH_INDICATOR.equals(modId) || ModIds.TRAJECTORY_PREDICTION.equals(modId)
+                || ModIds.HIT_PREDICTION.equals(modId) || ModIds.KILL_EFFECTS.equals(modId)) {
+            return createPvpSuiteConfigSchema(context, mod);
         }
         boolean hotbar = ModIds.HOTBAR_SLOT.equals(mod.getId());
         if (!hotbar && !ModIds.GYRO.equals(mod.getId())) return null;
@@ -387,6 +415,48 @@ public final class InbuiltModuleProvider {
         }
     }
 
+    /**
+     * Category layout for the four PvP Suite modules (V1.1).
+     *
+     * <p>Each gets a short, focused dialog: the module's own display options plus the shared
+     * "show everywhere" switch, and an info node carrying its scope note. The note is deliberate -
+     * every module in the suite is named after an outcome (Reach Indicator, Hit Prediction) but
+     * only works from the peer feed this build can actually reach, so the dialog says what it can
+     * and cannot see rather than leaving the limit to read as a broken feature.
+     */
+    private static RuntimeConfigSchema createPvpSuiteConfigSchema(Context context, UnifiedMod mod) {
+        String modId = mod.getId();
+        try {
+            JSONArray categories = new JSONArray();
+            JSONArray nodes = new JSONArray();
+            categories.put(configCategory(context, "display", R.string.mod_config_category_appearance));
+            categories.put(configCategory(context, "behavior", R.string.mod_config_category_behavior));
+            if (ModIds.REACH_INDICATOR.equals(modId)) {
+                nodes.put(configNode(context, mod, CFG_REACH_POSITION, "display"));
+                nodes.put(configNode(context, mod, CFG_OVERLAY_SHOW_EVERYWHERE, "behavior"));
+            } else if (ModIds.TRAJECTORY_PREDICTION.equals(modId)) {
+                nodes.put(configNode(context, mod, CFG_TRAJECTORY_COLOR, "display"));
+                nodes.put(configNode(context, mod, CFG_OVERLAY_SHOW_EVERYWHERE, "behavior"));
+            } else if (ModIds.HIT_PREDICTION.equals(modId)) {
+                nodes.put(configNode(context, mod, CFG_HIT_PREDICTION_LOOKAHEAD, "display"));
+                nodes.put(configNode(context, mod, CFG_OVERLAY_SHOW_EVERYWHERE, "behavior"));
+            } else {
+                nodes.put(configNode(context, mod, CFG_KILL_EFFECT_STYLE, "display"));
+                nodes.put(configNode(context, mod, CFG_KILL_EFFECT_COLOR, "display"));
+                nodes.put(configNode(context, mod, CFG_OVERLAY_SHOW_EVERYWHERE, "behavior"));
+            }
+            int noteRes = scopeNoteRes(modId);
+            if (noteRes != 0) {
+                nodes.put(scopeNoteNode(context, mod, noteRes, "display"));
+            }
+            return RuntimeConfigSchema.parse(new JSONObject().put("version", 2)
+                    .put("default_category", "display")
+                    .put("categories", categories).put("nodes", nodes).toString());
+        } catch (JSONException e) {
+            throw new IllegalStateException("Unable to build PvP suite config schema", e);
+        }
+    }
+
     private static JSONObject configCategory(Context context, String id, int titleRes) throws JSONException {
         return new JSONObject().put("id", id).put("title", context.getString(titleRes));
     }
@@ -398,6 +468,18 @@ public final class InbuiltModuleProvider {
                 .put("type", schemaTypeFor(config.type))
                 .put("default_value", config.defaultValue)
                 .put("min_value", config.minValue).put("max_value", config.maxValue);
+        // A choice node needs its options in the schema: the dialog builds the control from the
+        // node alone, so a RADIO without options renders an empty selector. The labels live in
+        // min_value and the values are their indices, matching the legacy config renderer.
+        if (config.type == UnifiedMod.ConfigType.RADIO) {
+            JSONArray options = new JSONArray();
+            String[] labels = config.minValue != null ? config.minValue.split(",") : new String[0];
+            for (int i = 0; i < labels.length; i++) {
+                options.put(new JSONObject().put("value", String.valueOf(i))
+                        .put("label", labels[i].trim()));
+            }
+            node.put("options", options);
+        }
         int descRes = configDescriptionRes(key);
         if (descRes != 0) {
             node.put("description", context.getString(descRes));
@@ -451,6 +533,11 @@ public final class InbuiltModuleProvider {
             case CFG_VOICE_ICON_STYLE: return R.string.mod_config_voice_icon_style_desc;
             case CFG_VOICE_ICON_ANIMATE: return R.string.mod_config_voice_icon_animate_desc;
             case CFG_VOICE_ICON_NAMETAG: return R.string.mod_config_voice_icon_nametag_desc;
+            case CFG_REACH_POSITION: return R.string.mod_config_reach_position_desc;
+            case CFG_TRAJECTORY_COLOR: return R.string.mod_config_trajectory_color_desc;
+            case CFG_HIT_PREDICTION_LOOKAHEAD: return R.string.mod_config_hit_prediction_lookahead_desc;
+            case CFG_KILL_EFFECT_STYLE: return R.string.mod_config_kill_effect_style_desc;
+            case CFG_KILL_EFFECT_COLOR: return R.string.mod_config_kill_effect_color_desc;
             default: return 0;
         }
     }
@@ -479,6 +566,10 @@ public final class InbuiltModuleProvider {
         if (ModIds.HITBOX.equals(modId)) return R.string.hitbox_scope_note;
         if (ModIds.ARMOR_HUD.equals(modId)) return R.string.armor_hud_no_data;
         if (ModIds.VOICE_CHAT.equals(modId)) return R.string.voice_chat_scope_note;
+        if (ModIds.REACH_INDICATOR.equals(modId)) return R.string.reach_indicator_scope_note;
+        if (ModIds.TRAJECTORY_PREDICTION.equals(modId)) return R.string.trajectory_prediction_scope_note;
+        if (ModIds.HIT_PREDICTION.equals(modId)) return R.string.hit_prediction_scope_note;
+        if (ModIds.KILL_EFFECTS.equals(modId)) return R.string.kill_effects_scope_note;
         return 0;
     }
 
@@ -791,6 +882,44 @@ public final class InbuiltModuleProvider {
                     UnifiedMod.ConfigType.TOGGLE,
                     "true", "", "",
                     String.valueOf(manager.isHitboxShowTargetBox())));
+        } else if (ModIds.REACH_INDICATOR.equals(modId)) {
+            configs.add(config(CFG_REACH_POSITION,
+                    context.getString(R.string.mod_config_reach_position),
+                    UnifiedMod.ConfigType.RADIO,
+                    "0",
+                    context.getString(R.string.mod_config_reach_position_below) + ","
+                            + context.getString(R.string.mod_config_reach_position_hotbar),
+                    "",
+                    String.valueOf(manager.getReachIndicatorPosition())));
+        } else if (ModIds.TRAJECTORY_PREDICTION.equals(modId)) {
+            configs.add(config(CFG_TRAJECTORY_COLOR,
+                    context.getString(R.string.mod_config_trajectory_color),
+                    UnifiedMod.ConfigType.COLOR,
+                    "#FF7CFC5A", "", "",
+                    colorToHex(manager.getTrajectoryColor())));
+        } else if (ModIds.HIT_PREDICTION.equals(modId)) {
+            configs.add(config(CFG_HIT_PREDICTION_LOOKAHEAD,
+                    context.getString(R.string.mod_config_hit_prediction_lookahead),
+                    UnifiedMod.ConfigType.SLIDER_INT,
+                    String.valueOf(org.chimeramc.client.core.mods.inbuilt.overlay.HitPredictor.DEFAULT_LOOK_AHEAD_MS),
+                    String.valueOf(org.chimeramc.client.core.mods.inbuilt.overlay.HitPredictor.MIN_LOOK_AHEAD_MS),
+                    String.valueOf(org.chimeramc.client.core.mods.inbuilt.overlay.HitPredictor.MAX_LOOK_AHEAD_MS),
+                    String.valueOf(manager.getHitPredictionLookAheadMs())));
+        } else if (ModIds.KILL_EFFECTS.equals(modId)) {
+            configs.add(config(CFG_KILL_EFFECT_STYLE,
+                    context.getString(R.string.mod_config_kill_effect_style),
+                    UnifiedMod.ConfigType.RADIO,
+                    "0",
+                    context.getString(R.string.kill_effect_style_burst) + ","
+                            + context.getString(R.string.kill_effect_style_column) + ","
+                            + context.getString(R.string.kill_effect_style_ring),
+                    "",
+                    String.valueOf(manager.getKillEffectStyle())));
+            configs.add(config(CFG_KILL_EFFECT_COLOR,
+                    context.getString(R.string.mod_config_kill_effect_color),
+                    UnifiedMod.ConfigType.COLOR,
+                    "#FFFFC24B", "", "",
+                    colorToHex(manager.getKillEffectColor())));
         } else if (ModIds.VOICE_CHAT.equals(modId)) {
             // Trimmed to mic-only scope: the mic master switch plus the in-world icon's look and
             // behaviour. Channel, visibility, capacity and per-member mute are owned by the Voice
@@ -998,6 +1127,27 @@ public final class InbuiltModuleProvider {
             case CFG_HITBOX_SHOW_TARGET_BOX:
                 manager.setHitboxShowTargetBox(parseBoolean(value));
                 break;
+            case CFG_REACH_POSITION:
+                manager.setReachIndicatorPosition(parseInt(value, manager.getReachIndicatorPosition()));
+                break;
+            case CFG_TRAJECTORY_COLOR:
+                try {
+                    manager.setTrajectoryColor(Color.parseColor(value));
+                } catch (Exception ignored) {
+                }
+                break;
+            case CFG_HIT_PREDICTION_LOOKAHEAD:
+                manager.setHitPredictionLookAheadMs(parseInt(value, manager.getHitPredictionLookAheadMs()));
+                break;
+            case CFG_KILL_EFFECT_STYLE:
+                manager.setKillEffectStyle(parseInt(value, manager.getKillEffectStyle()));
+                break;
+            case CFG_KILL_EFFECT_COLOR:
+                try {
+                    manager.setKillEffectColor(Color.parseColor(value));
+                } catch (Exception ignored) {
+                }
+                break;
             case CFG_VOICE_MIC:
                 manager.setVoiceMicEnabled(parseBoolean(value));
                 break;
@@ -1044,6 +1194,14 @@ public final class InbuiltModuleProvider {
             org.chimeramc.client.core.mods.inbuilt.overlay.HitTimingMod.onConfigChanged(manager);
         } else if (ModIds.HITBOX.equals(mod.getId())) {
             org.chimeramc.client.core.mods.inbuilt.overlay.HitboxMod.onConfigChanged(manager);
+        } else if (ModIds.REACH_INDICATOR.equals(mod.getId())) {
+            org.chimeramc.client.core.mods.inbuilt.overlay.ReachIndicatorMod.onConfigChanged(manager);
+        } else if (ModIds.TRAJECTORY_PREDICTION.equals(mod.getId())) {
+            org.chimeramc.client.core.mods.inbuilt.overlay.TrajectoryPredictionMod.onConfigChanged(manager);
+        } else if (ModIds.HIT_PREDICTION.equals(mod.getId())) {
+            org.chimeramc.client.core.mods.inbuilt.overlay.HitPredictionMod.onConfigChanged(manager);
+        } else if (ModIds.KILL_EFFECTS.equals(mod.getId())) {
+            org.chimeramc.client.core.mods.inbuilt.overlay.KillEffectsMod.onConfigChanged(manager);
         } else if (ModIds.VOICE_CHAT.equals(mod.getId())) {
             org.chimeramc.client.core.voice.VoiceChatModule module =
                     org.chimeramc.client.core.voice.VoiceChatModule.peek();

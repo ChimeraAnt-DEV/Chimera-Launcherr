@@ -502,7 +502,7 @@ Migrasi harus selesai sebelum GlowberryClient dapat melanjutkan.</string>
 
     <!-- Mod Menu -->
     <string name="mod_menu">Menu Mod</string>
-    <string name="mod_menu_modules">Modul</string>
+    <string name="mod_menu_general">Umum</string>
     <string name="mod_menu_search_hint">Cari mod…</string>
     <string name="mod_menu_no_mods">Tidak ada mod yang ditambahkan</string>
     <string name="mod_menu_settings_coming">Pengaturan segera hadir</string>

@@ -43,6 +43,10 @@ public class InbuiltOverlayManager {
     private CrystalOptimizerOverlay crystalOptimizerOverlay;
     private HitTimingOverlay hitTimingOverlay;
     private HitboxOverlay hitboxOverlay;
+    private ReachIndicatorOverlay reachIndicatorOverlay;
+    private TrajectoryPredictionOverlay trajectoryPredictionOverlay;
+    private HitPredictionOverlay hitPredictionOverlay;
+    private KillEffectsOverlay killEffectsOverlay;
     private VoiceChatOverlay voiceChatOverlay;
     private VoiceNametagOverlay voiceNametagOverlay;
     private ModMenuButton modMenuButton;
@@ -114,6 +118,10 @@ public class InbuiltOverlayManager {
         modActiveStates.put(ModIds.HIT_REGISTRATION, false);
         modActiveStates.put(ModIds.HIT_TIMING, false);
         modActiveStates.put(ModIds.HITBOX, false);
+        modActiveStates.put(ModIds.REACH_INDICATOR, false);
+        modActiveStates.put(ModIds.TRAJECTORY_PREDICTION, false);
+        modActiveStates.put(ModIds.HIT_PREDICTION, false);
+        modActiveStates.put(ModIds.KILL_EFFECTS, false);
         modActiveStates.put(ModIds.VOICE_CHAT, false);
 
         modPositionMap.put(ModIds.QUICK_DROP, nextY + SPACING);
@@ -157,6 +165,10 @@ public class InbuiltOverlayManager {
         restorePersistedInbuiltModState(manager, ModIds.HIT_REGISTRATION);
         restorePersistedInbuiltModState(manager, ModIds.HIT_TIMING);
         restorePersistedInbuiltModState(manager, ModIds.HITBOX);
+        restorePersistedInbuiltModState(manager, ModIds.REACH_INDICATOR);
+        restorePersistedInbuiltModState(manager, ModIds.TRAJECTORY_PREDICTION);
+        restorePersistedInbuiltModState(manager, ModIds.HIT_PREDICTION);
+        restorePersistedInbuiltModState(manager, ModIds.KILL_EFFECTS);
         restorePersistedInbuiltModState(manager, ModIds.VOICE_CHAT);
 
         modMenuButton = new ModMenuButton(activity);
@@ -332,6 +344,34 @@ public class InbuiltOverlayManager {
                 hitboxOverlay.show();
                 HitboxMod.setEnabled(true, manager);
                 break;
+            case ModIds.REACH_INDICATOR:
+                if (reachIndicatorOverlay == null) {
+                    reachIndicatorOverlay = new ReachIndicatorOverlay(activity);
+                }
+                reachIndicatorOverlay.show();
+                ReachIndicatorMod.setEnabled(true, manager);
+                break;
+            case ModIds.TRAJECTORY_PREDICTION:
+                if (trajectoryPredictionOverlay == null) {
+                    trajectoryPredictionOverlay = new TrajectoryPredictionOverlay(activity);
+                }
+                trajectoryPredictionOverlay.show();
+                TrajectoryPredictionMod.setEnabled(true, manager);
+                break;
+            case ModIds.HIT_PREDICTION:
+                if (hitPredictionOverlay == null) {
+                    hitPredictionOverlay = new HitPredictionOverlay(activity);
+                }
+                hitPredictionOverlay.show();
+                HitPredictionMod.setEnabled(true, manager);
+                break;
+            case ModIds.KILL_EFFECTS:
+                if (killEffectsOverlay == null) {
+                    killEffectsOverlay = new KillEffectsOverlay(activity);
+                }
+                killEffectsOverlay.show();
+                KillEffectsMod.setEnabled(true, manager);
+                break;
             case ModIds.VOICE_CHAT: {
                 if (voiceChatOverlay == null) {
                     voiceChatOverlay = new VoiceChatOverlay(activity);
@@ -391,6 +431,38 @@ public class InbuiltOverlayManager {
                 hitboxOverlay = null;
             }
             HitboxMod.setEnabled(false, null);
+            return;
+        }
+        if (modId.equals(ModIds.REACH_INDICATOR)) {
+            if (reachIndicatorOverlay != null) {
+                reachIndicatorOverlay.hide();
+                reachIndicatorOverlay = null;
+            }
+            ReachIndicatorMod.setEnabled(false, null);
+            return;
+        }
+        if (modId.equals(ModIds.TRAJECTORY_PREDICTION)) {
+            if (trajectoryPredictionOverlay != null) {
+                trajectoryPredictionOverlay.hide();
+                trajectoryPredictionOverlay = null;
+            }
+            TrajectoryPredictionMod.setEnabled(false, null);
+            return;
+        }
+        if (modId.equals(ModIds.HIT_PREDICTION)) {
+            if (hitPredictionOverlay != null) {
+                hitPredictionOverlay.hide();
+                hitPredictionOverlay = null;
+            }
+            HitPredictionMod.setEnabled(false, null);
+            return;
+        }
+        if (modId.equals(ModIds.KILL_EFFECTS)) {
+            if (killEffectsOverlay != null) {
+                killEffectsOverlay.hide();
+                killEffectsOverlay = null;
+            }
+            KillEffectsMod.setEnabled(false, null);
             return;
         }
         if (modId.equals(ModIds.VOICE_CHAT)) {
@@ -779,6 +851,26 @@ public class InbuiltOverlayManager {
             hitboxOverlay.hide();
             hitboxOverlay = null;
         }
+        if (reachIndicatorOverlay != null) {
+            reachIndicatorOverlay.hide();
+            reachIndicatorOverlay = null;
+        }
+        if (trajectoryPredictionOverlay != null) {
+            trajectoryPredictionOverlay.hide();
+            trajectoryPredictionOverlay = null;
+        }
+        if (hitPredictionOverlay != null) {
+            hitPredictionOverlay.hide();
+            hitPredictionOverlay = null;
+        }
+        if (killEffectsOverlay != null) {
+            killEffectsOverlay.hide();
+            killEffectsOverlay = null;
+        }
+        ReachIndicatorMod.setEnabled(false, null);
+        TrajectoryPredictionMod.setEnabled(false, null);
+        HitPredictionMod.setEnabled(false, null);
+        KillEffectsMod.setEnabled(false, null);
         stopVoiceChat();
         if (voiceChatOverlay != null) {
             voiceChatOverlay.hide();
@@ -1078,6 +1170,18 @@ public class InbuiltOverlayManager {
         if (modId.equals(ModIds.HITBOX) && hitboxOverlay != null) {
             hitboxOverlay.applyConfigurationChanges();
         }
+        if (modId.equals(ModIds.REACH_INDICATOR) && reachIndicatorOverlay != null) {
+            reachIndicatorOverlay.applyConfigurationChanges();
+        }
+        if (modId.equals(ModIds.TRAJECTORY_PREDICTION) && trajectoryPredictionOverlay != null) {
+            trajectoryPredictionOverlay.applyConfigurationChanges();
+        }
+        if (modId.equals(ModIds.HIT_PREDICTION) && hitPredictionOverlay != null) {
+            hitPredictionOverlay.applyConfigurationChanges();
+        }
+        if (modId.equals(ModIds.KILL_EFFECTS) && killEffectsOverlay != null) {
+            killEffectsOverlay.applyConfigurationChanges();
+        }
         if (modId.equals(ModIds.VOICE_CHAT) && voiceChatOverlay != null) {
             voiceChatOverlay.applyConfigurationChanges();
             VoiceNametagMod.onConfigChanged(InbuiltModManager.getInstance(activity));
@@ -1110,6 +1214,18 @@ public class InbuiltOverlayManager {
         }
         if (hitboxOverlay != null) {
             hitboxOverlay.setHudEditorMode(active);
+        }
+        if (reachIndicatorOverlay != null) {
+            reachIndicatorOverlay.setHudEditorMode(active);
+        }
+        if (trajectoryPredictionOverlay != null) {
+            trajectoryPredictionOverlay.setHudEditorMode(active);
+        }
+        if (hitPredictionOverlay != null) {
+            hitPredictionOverlay.setHudEditorMode(active);
+        }
+        if (killEffectsOverlay != null) {
+            killEffectsOverlay.setHudEditorMode(active);
         }
         if (voiceChatOverlay != null) {
             voiceChatOverlay.setHudEditorMode(active);
@@ -1312,8 +1428,14 @@ public class InbuiltOverlayManager {
     public void tick() {
         // Hold-to-repeat runs off the game's own frame tick, so a held button injects at a
         // steady rate rather than in bursts when some other timer happened to fire.
+        long frameNow = android.os.SystemClock.uptimeMillis();
         org.chimeramc.client.launcher.controller.ControllerInputProcessor
-                .tickCpsRepeats(android.os.SystemClock.uptimeMillis());
+                .tickCpsRepeats(frameNow);
+        // PvP Suite run state advances on the game's own frame tick, like the CPS repeats:
+        // Hit Prediction smooths peer velocity and Kill Effects ages its bursts and polls the
+        // death feed. Both are no-ops when their module is off.
+        HitPredictionMod.tick(frameNow);
+        KillEffectsMod.tick(frameNow);
         InbuiltModManager manager = InbuiltModManager.getInstance(activity);
         boolean isPauseOnly = manager.isPauseMenuOnly();
         boolean isPauseOpen = org.chimeramc.client.preloader.PreloaderInput.isPauseMenuOpen();
@@ -1443,6 +1565,34 @@ public class InbuiltOverlayManager {
                         ? android.view.View.VISIBLE
                         : android.view.View.GONE;
                 hitboxOverlay.setOverlayVisibility(visibility);
+            }
+
+            if (reachIndicatorOverlay != null) {
+                int visibility = inbuiltVisible || manager.isOverlayShowEverywhere(ModIds.REACH_INDICATOR)
+                        ? android.view.View.VISIBLE
+                        : android.view.View.GONE;
+                reachIndicatorOverlay.setOverlayVisibility(visibility);
+            }
+
+            if (trajectoryPredictionOverlay != null) {
+                int visibility = inbuiltVisible || manager.isOverlayShowEverywhere(ModIds.TRAJECTORY_PREDICTION)
+                        ? android.view.View.VISIBLE
+                        : android.view.View.GONE;
+                trajectoryPredictionOverlay.setOverlayVisibility(visibility);
+            }
+
+            if (hitPredictionOverlay != null) {
+                int visibility = inbuiltVisible || manager.isOverlayShowEverywhere(ModIds.HIT_PREDICTION)
+                        ? android.view.View.VISIBLE
+                        : android.view.View.GONE;
+                hitPredictionOverlay.setOverlayVisibility(visibility);
+            }
+
+            if (killEffectsOverlay != null) {
+                int visibility = inbuiltVisible || manager.isOverlayShowEverywhere(ModIds.KILL_EFFECTS)
+                        ? android.view.View.VISIBLE
+                        : android.view.View.GONE;
+                killEffectsOverlay.setOverlayVisibility(visibility);
             }
 
             if (voiceChatOverlay != null) {

@@ -498,7 +498,7 @@
 
     <!-- Mod Menu -->
     <string name="mod_menu">Мод-меню</string>
-    <string name="mod_menu_modules">Модули</string>
+    <string name="mod_menu_general">Общие</string>
     <string name="mod_menu_search_hint">Поиск модов…</string>
     <string name="mod_menu_no_mods">Моды не добавлены</string>
     <string name="mod_menu_settings_coming">Настройки скоро появятся</string>

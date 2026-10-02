@@ -626,7 +626,7 @@ GlowberryClient\'ın devam edebilmesi için taşımanın tamamlanması gerekiyor
 
     <!-- Mod Menu -->
     <string name="mod_menu">Mod Menüsü</string>
-    <string name="mod_menu_modules">Modüller</string>
+    <string name="mod_menu_general">Genel</string>
     <string name="mod_menu_search_hint">Mod ara…</string>
     <string name="mod_menu_no_mods">Mod eklenmedi</string>
     <string name="mod_menu_settings_coming">Ayarlar yakında geliyor</string>

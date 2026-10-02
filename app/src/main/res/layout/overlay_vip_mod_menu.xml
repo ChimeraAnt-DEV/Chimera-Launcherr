@@ -143,7 +143,7 @@
                     android:paddingEnd="14dp">
 
                     <TextView
-                        android:id="@+id/vip_tab_modules"
+                        android:id="@+id/vip_tab_general"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginEnd="8dp"
@@ -155,7 +155,7 @@
                         android:minHeight="34dp"
                         android:paddingStart="14dp"
                         android:paddingEnd="16dp"
-                        android:text="@string/vip_tab_modules"
+                        android:text="@string/vip_tab_general"
                         android:textColor="#B6B0CC"
                         android:textSize="13sp"
                         android:textStyle="bold" />
@@ -236,7 +236,7 @@
                 android:layout_weight="1">
 
                 <LinearLayout
-                    android:id="@+id/vip_modules_view"
+                    android:id="@+id/vip_general_view"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:orientation="vertical">

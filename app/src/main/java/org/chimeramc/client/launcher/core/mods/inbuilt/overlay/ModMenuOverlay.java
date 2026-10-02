@@ -70,7 +70,7 @@ public class ModMenuOverlay {
     private boolean hasStaggeredOnce = false;
     private EditText searchInput;
     private ImageButton clearSearchBtn;
-    private TextView navModules, navSettings, navHudEditor, navCosmetics, navPacks, navVoice, navReplay;
+    private TextView navGeneral, navSettings, navHudEditor, navCosmetics, navPacks, navVoice, navReplay;
     private TextView filterAll, filterFavorites, filterEnabled, filterInbuilt, filterExternal, filterPvp;
     private TextView moduleCountText, emptyStateText;
     private TextView compactFilterSelector, compactModuleCount;
@@ -436,7 +436,7 @@ public class ModMenuOverlay {
         searchInput = overlayView.findViewById(R.id.search_input);
         clearSearchBtn = overlayView.findViewById(R.id.btn_clear_search);
         modsRecycler = overlayView.findViewById(R.id.mods_grid_recycler);
-        navModules = overlayView.findViewById(R.id.nav_modules);
+        navGeneral = overlayView.findViewById(R.id.nav_general);
         navVoice = overlayView.findViewById(R.id.nav_voice);
         navSettings = overlayView.findViewById(R.id.nav_settings);
         navHudEditor = overlayView.findViewById(R.id.nav_hud_editor);
@@ -501,7 +501,7 @@ public class ModMenuOverlay {
 
         // Touch feedback on the stable chrome (nav + filter chips + close). Recycler rows get
         // their own feedback in the adapter, since they are recycled and rebound.
-        for (View v : new View[]{navVoice, navModules, navSettings, navHudEditor, navCosmetics,
+        for (View v : new View[]{navVoice, navGeneral, navSettings, navHudEditor, navCosmetics,
                 navPacks, navReplay,
                 filterAll, filterFavorites, filterEnabled, filterInbuilt, filterExternal, filterPvp,
                 closeBtn, clearSearchBtn}) {
@@ -569,7 +569,7 @@ public class ModMenuOverlay {
 
         // Navigation
         if (navVoice != null) navVoice.setOnClickListener(v -> showVoiceSection());
-        navModules.setOnClickListener(v -> showModulesSection());
+        navGeneral.setOnClickListener(v -> showModulesSection());
         navSettings.setOnClickListener(v -> showSettingsSection());
         if (navCosmetics != null) navCosmetics.setOnClickListener(v -> showCosmeticsSection());
         if (navPacks != null) navPacks.setOnClickListener(v -> showPacksSection());
@@ -1783,7 +1783,7 @@ public class ModMenuOverlay {
                                        boolean settings, boolean packs, boolean voice,
                                        boolean replay) {
         updateNavigationItem(navVoice, voice);
-        updateNavigationItem(navModules, modules);
+        updateNavigationItem(navGeneral, modules);
         updateNavigationItem(navCosmetics, cosmetics);
         updateNavigationItem(navHudEditor, hudEditor);
         updateNavigationItem(navSettings, settings);
