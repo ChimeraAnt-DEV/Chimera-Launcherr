@@ -1,0 +1,43 @@
+name: Discord Beta Release Notify
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  notify-beta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check tag for BETA and notify Discord
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK2 }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "Webhook secret DISCORD_WEBHOOK2 is empty!"
+            exit 1
+          fi
+
+          TAG="${{ github.event.release.tag_name }}"
+          NAME="${{ github.event.release.name }}"
+          URL="${{ github.event.release.html_url }}"
+
+          # Case-SENSITIVE check — only matches literal "BETA" in caps
+          if echo "$TAG" | grep -q "BETA"; then
+            echo "BETA tag detected: $TAG"
+
+            SANITIZED_URL=$(echo "$WEBHOOK_URL" | tr -d '[:space:]')
+
+            MESSAGE=$(printf "@everyone\n\n🚨 **Beta Release Published!** 🚨\n\n**Version:** %s\n**Release:** %s\n\n🔗 **[View Release on GitHub](%s)**\n\nThis is a beta build. Report any bugs in #bug-reports." "$TAG" "$NAME" "$URL")
+
+            PAYLOAD=$(jq -n --arg content "$MESSAGE" '{
+              content: $content,
+              allowed_mentions: { parse: ["everyone"] }
+            }')
+
+            curl -H "Content-Type: application/json" \
+                 -X POST \
+                 -d "$PAYLOAD" \
+                 "$SANITIZED_URL"
+          else
+            echo "Tag '$TAG' does not contain BETA (caps-only). Skipping."
+           fi
