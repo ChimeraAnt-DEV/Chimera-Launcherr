@@ -29,6 +29,11 @@ public final class ModIds {
     public static final String HIT_TIMING = "hit_timing";
     public static final String HITBOX = "hitbox";
     public static final String VOICE_CHAT = "voice_chat";
+    /** PvP Suite (V1.1): overlay-only visual aids, filed under the General tab. */
+    public static final String REACH_INDICATOR = "reach_indicator";
+    public static final String TRAJECTORY_PREDICTION = "trajectory_prediction";
+    public static final String HIT_PREDICTION = "hit_prediction";
+    public static final String KILL_EFFECTS = "kill_effects";
 
     /**
      * Combat-oriented modules the Mod Menu files under its PvP tab. Kept here rather than

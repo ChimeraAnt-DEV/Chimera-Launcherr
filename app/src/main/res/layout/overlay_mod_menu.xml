@@ -93,7 +93,7 @@
                             android:textStyle="bold" />
 
                         <TextView
-                            android:id="@+id/nav_modules"
+                            android:id="@+id/nav_general"
                             android:layout_width="wrap_content"
                             android:layout_height="match_parent"
                             android:alpha="0.82"
@@ -107,7 +107,7 @@
                             android:paddingStart="10dp"
                             android:paddingEnd="10dp"
                             android:singleLine="true"
-                            android:text="@string/mod_menu_modules"
+                            android:text="@string/mod_menu_general"
                             android:textColor="#A8B0B8"
                             android:textSize="13sp" />
 

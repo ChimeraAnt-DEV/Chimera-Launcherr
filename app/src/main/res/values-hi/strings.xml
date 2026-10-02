@@ -559,7 +559,7 @@ GlowberryClient जारी रखने से पहले माइग्र
 
     <!-- Mod Menu -->
     <string name="mod_menu">मॉड मेनू</string>
-    <string name="mod_menu_modules">मॉड्यूल</string>
+    <string name="mod_menu_general">सामान्य</string>
     <string name="mod_menu_search_hint">मॉड्स खोजें…</string>
     <string name="mod_menu_no_mods">कोई मॉड नहीं जोड़ा गया</string>
     <string name="mod_menu_settings_coming">सेटिंग्स जल्द ही आ रही हैं</string>

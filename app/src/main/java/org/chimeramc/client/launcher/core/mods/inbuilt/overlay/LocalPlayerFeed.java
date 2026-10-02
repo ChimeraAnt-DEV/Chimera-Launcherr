@@ -69,6 +69,18 @@ public final class LocalPlayerFeed {
         return PreloaderInput.readLocalPlayerPosition();
     }
 
+    /**
+     * The local camera, available whether or not any seam has been installed.
+     *
+     * <p>The PvP Suite overlays need the player's own view but are independent of the voice
+     * module, so they cannot rely on {@link VoiceNametagOverlay#cameraSource()} being set. This
+     * reads the same native snapshot directly; with no native read it returns null and the
+     * overlays draw nothing.
+     */
+    public static HitboxProjector.Camera localCamera(int screenWidth, int screenHeight) {
+        return readCamera(screenWidth, screenHeight);
+    }
+
     /** The local player's camera, or null when any input is missing. */
     static HitboxProjector.Camera readCamera(int screenWidth, int screenHeight) {
         return cameraFrom(PreloaderInput.readLocalPlayerPosition(),

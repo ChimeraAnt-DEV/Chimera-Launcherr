@@ -545,7 +545,7 @@
 
     <!-- Mod Menu -->
     <string name="mod_menu">模组菜单</string>
-    <string name="mod_menu_modules">模块</string>
+    <string name="mod_menu_general">常规</string>
     <string name="mod_menu_favorites">收藏</string>
     <string name="mod_menu_favorite">加入收藏</string>
     <string name="mod_menu_unfavorite">取消收藏</string>

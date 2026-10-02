@@ -540,7 +540,7 @@ GlowberryClient を続行するには移行を完了する必要があります�
     <string name="structures_found_count">このワールドで %d 個の構造物が見つかりました</string>
 
     <string name="mod_menu">モッドメニュー</string>
-    <string name="mod_menu_modules">モジュール</string>
+    <string name="mod_menu_general">一般</string>
     <string name="mod_menu_search_hint">モッドを検索…</string>
     <string name="mod_menu_no_mods">モッドが追加されていません</string>
     <string name="mod_menu_settings_coming">設定は近日追加予定</string>

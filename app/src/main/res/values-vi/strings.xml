@@ -612,7 +612,7 @@ Quá trình chuyển đổi phải hoàn tất trước khi GlowberryClient có 
 
     <!-- Mod Menu -->
     <string name="mod_menu">Mod Menu</string>
-    <string name="mod_menu_modules">Mô-đun</string>
+    <string name="mod_menu_general">Chung</string>
     <string name="mod_menu_search_hint">Tìm mods…</string>
     <string name="mod_menu_no_mods">Không có bản mods nào được thêm vào.</string>
     <string name="mod_menu_settings_coming">Các cài đặt sẽ sớm được cập nhật.</string>

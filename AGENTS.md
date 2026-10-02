@@ -39,7 +39,7 @@
 - **The canonical GitHub repo is `ChimeraAnt-DEV/ChimeraLauncher`, not `.../ChimeraClient`.** The rename PR repointed every URL (update check, news feed, signature-rule source, README badges, docs) at `ChimeraAnt-DEV/ChimeraClient`, which does not exist — the GitHub API 404s and nothing redirects, so the news feed, signature-rule refresh and update check all failed at runtime. The brand name changed but the repo slug did not. If a URL looks wrong, test it with `curl -o /dev/null -w '%{http_code}'` before assuming the code is at fault.
 
 ## Mod Menu tabs (PvP group)
-- The Mod Menu's top-level nav is Modules / HUD Editor / Settings. The **PvP tab is a filter + section**, not a fourth nav entry: `ModuleFilter.PVP` with a `filter_pvp` chip, plus `ModIds.GROUP_PVP`.
+- The Mod Menu's top-level nav is General / HUD Editor / Settings. The **PvP tab is a filter + section**, not a fourth nav entry: `ModuleFilter.PVP` with a `filter_pvp` chip, plus `ModIds.GROUP_PVP`.
 - `ModIds.isPvpModule(id)` is the single source of truth for what counts as PvP (`aim_settings`, `cps_display`, `snaplook`). The filter predicate and the provider's grouping both call it so they cannot drift.
 - **PvP modules must stay contiguous in the provider's list.** `ModMenuAdapter` emits one group header per contiguous run of `groupId`, so `InbuiltModuleProvider.groupPvpLast(...)` moves them to the end. Reordering them apart renders the PvP header more than once. `PvpModuleGroupingTest` pins this.
 - PvP modules remain `Source.INBUILT`, so the Inbuilt filter/grouping still finds them — do not move them into a separate store.
@@ -123,7 +123,7 @@
   - **`LauncherTab.shouldHandleKey(code, navBarPresent, gameSessionActive)`** — tab switching is suppressed while `LowLatencyNetworkManager.isGameSessionActive()`. Note `MinecraftActivity` extends the *game's* `com.mojang.minecraftpe.MainActivity`, NOT the launcher's, so gameplay never had the nav bar or this handler — but the session guard is kept as defence in depth.
 - `BaseActivity.NAV_TAB_IDS` is the single id array shared by `setupBaseNavBar()` and `setActiveNavTab()`; adding a tab means updating the layout, that array, the click handler, and `LauncherTab`. `LauncherTabTest` covers ordering, activity mapping, wraparound, the key map and both guards.
 - **There are six tabs.** `LAUNCH, VERSIONS, INSTALLATIONS, MODS, CUSTOMIZE, SETTINGS`. About is *not* a tab — it is reached from Settings (`SettingsActivity` `openAbout`). Controller and Skins are *not* tabs either; both live inside `CustomizeActivity` as `ControllerSettingsFragment` / `SkinsSettingsFragment` swapped behind `customize_tab_controller` / `customize_tab_skins`. Do not re-promote About/Controller/Skins to top-level tabs; add a new destination inside an existing tab instead.
-- **VOICE is not a launcher nav tab; it is a Mod Menu section.** `VoiceChatActivity` exists and is reachable (the Mod Menu's Voice entry and the mod's own screen), but the launcher's top bar is navigation, and a communication feature does not belong in that row — `LauncherTab` documents this and `nav_bar.xml` has six tabs. The in-game home is the Mod Menu's Voice section (`nav_voice`), which is the first entry ahead of Modules
+- **VOICE is not a launcher nav tab; it is a Mod Menu section.** `VoiceChatActivity` exists and is reachable (the Mod Menu's Voice entry and the mod's own screen), but the launcher's top bar is navigation, and a communication feature does not belong in that row — `LauncherTab` documents this and `nav_bar.xml` has six tabs. The in-game home is the Mod Menu's Voice section (`nav_voice`), which is the first entry ahead of General
 - **Screens that tint the rail themselves must touch all three pieces.** `SettingsActivity` re-applies a freshly chosen accent to the Settings entry directly (indicator + icon + label); the old text-view+compound-drawable path no longer applies. `MainActivity`/`InstancesActivity` still swallow a click on their own row via `nav_item_*`.
 - `ControllerSettingsFragment` is the live home of the controller illustration and profile editor. It exposes `wantsRawKeyEvents()`, `handleHardwareKey(keyCode, down)` and `handleHardwareMotion(event)`, which `CustomizeActivity.dispatchKeyEvent` / `dispatchGenericMotionEvent` forward. The old standalone `ControllerActivity` was deleted — do not reintroduce it.
 - `focus_ring` was prototyped and removed — no focus system consumes it; do not re-add a token without a consumer. Nav rows get touch feedback from `DynamicAnim.applyPressScale(row)`.
@@ -442,6 +442,51 @@ only, like the other overlays.
 ## Combat module empty states
 - A module that needs a native feed (Crystal Optimizer's `WorldSource`, Armor HUD's `DataSource`, Hitboxes' `EntitySource`) must distinguish **"no data source"** from **"data source says nothing is there"**. Crystal Optimizer's `isAwaitingGameData()` renders "waiting for game data"; without it the readout said "no safe spot", blaming the player's aim for a feed that does not exist. `HitboxOverlay` shows an equivalent "awaiting data" state.
 - `TouchTapDetector` classifies a touch attack for the Select Hit metronome. A `POINTER_UP` for a *different* pointer must not end the gesture — ending there dropped the real tap the moment a jump/sneak button was released. Fixed and pinned by `TouchTapDetectorTest`.
+
+## PvP Suite (V1.1) — four overlay-only modules in the General tab
+Four client-side visual modules, all under `core.mods.inbuilt.overlay`, all filed in the Mod Menu's
+**General** tab (the tab formerly called "Modules"). They are **not** PvP-classified and no new
+section or tab exists for them — `ModIds.isPvpModule` deliberately excludes them, so the PvP run
+stays a single contiguous section. `PvpSuiteModulesTest` pins the placement, the usability and the
+single-section invariant.
+
+- **The target seam is the proximity-voice peer feed.** `PeerPositions.read()` is the one place the
+  suite asks for other players' positions (`VoiceChatModule.audiblePeers()`); a missing module, a
+  throwing feed or a non-finite coordinate all degrade to an empty list. Vanilla players, mobs and
+  items are invisible to it — the same limit the Hitboxes peer boxes document — and every module
+  fails closed (draws nothing) rather than guessing.
+- **Reach Indicator** (`ReachIndicator` + `ReachIndicatorMod` + `ReachIndicatorOverlay`). Distance
+  to the peer under the crosshair, from the same crosshair test the Hitboxes module uses so the
+  number and the box agree. A reading is `null` for every no-data case, so the overlay cannot render
+  a stale or zero distance. Placement is a below-crosshair/above-hotbar choice.
+- **Trajectory Prediction** (`TrajectorySolver` + `TrajectoryPredictionMod` + overlay). The arc is
+  pure arithmetic — per-projectile speed, gravity and drag, with an arrow's draw charge adding
+  range. `TrajectoryPredictionMod.HeldItemSource` is the seam; with no provider the arc is empty and
+  the overlay says "waiting for game data". It predicts from your aim, never a projectile in flight
+  (that needs the native entity feed).
+- **Hit Prediction** (`VelocitySmoother` + `HitPredictor` + `HitPredictionMod` + overlay). A ghost
+  box at a peer's predicted next position. Velocity is the mean over the last five samples, not the
+  last frame, so one jittery sample cannot fling the marker; a peer above
+  `HitPredictor.UNRELIABLE_SPEED` gets no marker rather than a misleading one.
+- **Custom Kill Effects** (`KillCreditRegistry` + `KillEffectsMod` + overlay). A client-side particle
+  burst on a credited kill. Credit is inferred: a hit you landed within `CREDIT_WINDOW_MS` (2s)
+  followed by that player's death. Three styles (burst/column/ring), computed from elapsed time so a
+  dropped frame cannot make the effect jump. `KillEffectsMod.KillSource` is the death seam; with no
+  provider the overlay shows "waiting for game data".
+- **Overlays read the camera directly, not through the voice seam.** They use
+  `LocalPlayerFeed.localCamera(...)`, because they work without the voice module and so cannot depend
+  on a seam the voice feature installs. All four are full-screen, `FLAG_NOT_TOUCHABLE` and
+  world-positioned (nothing to drag), like the Hitboxes overlay.
+- Run state advances on the game's own frame tick: `InbuiltOverlayManager.tick()` calls
+  `HitPredictionMod.tick(now)` and `KillEffectsMod.tick(now)` alongside the CPS repeats; both are
+  no-ops when their module is off.
+- Config: each module gets a short `createPvpSuiteConfigSchema` dialog (its own display options plus
+  "show everywhere") and an `info` node carrying its scope note (`reach_indicator_scope_note`,
+  `trajectory_prediction_scope_note`, `hit_prediction_scope_note`, `kill_effects_scope_note`). The
+  RADIO choice nodes get their `options` generated from the config's `min_value` label list, or the
+  dialog would render an empty selector.
+- Tests (no mocks): `TrajectorySolverTest`, `ReachIndicatorTest`, `VelocitySmootherTest`,
+  `HitPredictorTest`, `KillCreditRegistryTest`, `PvpSuiteModulesTest`.
 
 ## Native entity/camera feed — what is and is not reachable (verified against 1.26.50.04_RC3 and 1.26.60.28)
 Verified by downloading the real `lib/arm64-v8a/libminecraftpe.so`. First against `26-50-arm64-v8a`
@@ -982,7 +1027,7 @@ these are the conclusions.
   B (`VipModMenuOverlay`, the in-game bind menu) in `vip_replay_view`. Neither screen has its own
   clip list, sort, filter or export code - that is the point of the shared panel.
 - **Two screens, two navigation homes.** In Screen A Replay is a top-bar entry
-  (`nav_replay` / `R.id.nav_replay`) alongside Modules/Cosmetics/Packs/Voice/Settings. In Screen B
+  (`nav_replay` / `R.id.nav_replay`) alongside General/Cosmetics/Packs/Voice/Settings. In Screen B
   Replay is a `VipTab` (`MODULES, REPLAY, CONTROLLER, KEYBOARD`), so the shoulder cycle and the tab
   indicator cover it. `VipMenuLogicTest.declarationOrderIsTheTabOrder` /
   `shouldersWrapInBothDirections` pin that order - adding or moving a tab must update both.
