@@ -152,23 +152,23 @@ final class PackChangerPanel {
         toggle.setOnClickListener(v -> {
             // Apply to every candidate root the way the cape/installer does: the game picks its
             // storage from isolation + internal/external, and a write to only the wrong guess is
-            // silently ignored. setActive writes both the global list and each world's own list,
-            // because the running world reads the latter.
-            boolean ok = false;
-            for (File gameDataDir : resolveGameDataDirs()) {
-                ok |= InGamePackChanger.setActive(
-                        gameDataDir, pack.uuid, pack.version, !pack.active);
-            }
-            if (!ok) {
+            // silently ignored. InGamePackChanger.apply then applies it live (in-place reload, or
+            // a relaunch) and tells us which happened.
+            InGamePackChanger.ApplyOutcome outcome = InGamePackChanger.apply(
+                    resolveGameDataDirs(), pack.uuid, pack.version, !pack.active);
+            if (outcome == InGamePackChanger.ApplyOutcome.FAILED) {
                 statusLine.setText(R.string.pack_changer_write_failed);
                 return;
             }
-            // Ask the running session to re-read its packs. When no live hook is installed the
-            // write still applies on the next world load, and we say so rather than pretending
-            // the change is live.
-            boolean live = InGamePackChanger.requestReload();
+            // A relaunch tears this overlay and the game down; there is nothing left to rebuild,
+            // and rebuilding now would race the teardown.
+            if (outcome == InGamePackChanger.ApplyOutcome.RESTARTING) {
+                statusLine.setText(R.string.pack_changer_restarting);
+                return;
+            }
             rebuild();
-            statusLine.setText(live ? R.string.pack_changer_reloaded
+            statusLine.setText(outcome == InGamePackChanger.ApplyOutcome.RELOADED
+                    ? R.string.pack_changer_reloaded
                     : R.string.pack_changer_reload_on_next_load);
         });
         row.addView(toggle);

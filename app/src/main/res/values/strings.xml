@@ -839,6 +839,7 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="pack_changer_write_failed">Could not update the pack list.</string>
     <string name="pack_changer_reloaded">Pack applied. Minecraft reloaded its packs.</string>
     <string name="pack_changer_reload_on_next_load">Pack list saved. It applies the next time the world is loaded.</string>
+    <string name="pack_changer_restarting">Pack applied. Minecraft is reloading the world…</string>
     <string name="pack_changer_enable">Enable</string>
     <string name="pack_changer_disable">Disable</string>
     <string name="pack_changer_on">on</string>

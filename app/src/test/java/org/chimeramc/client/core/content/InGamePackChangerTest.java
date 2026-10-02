@@ -250,6 +250,85 @@ public class InGamePackChangerTest {
     }
 
     @Test
+    public void applyFailsWhenNothingWasWritten() {
+        InGamePackChanger.setReloader(null);
+        InGamePackChanger.setRestarter(null);
+        assertEquals(InGamePackChanger.ApplyOutcome.FAILED,
+                InGamePackChanger.apply(java.util.Collections.singletonList(null), "u", "1.0.0", true));
+    }
+
+    @Test
+    public void applyPrefersALiveReloadOverARestart() throws Exception {
+        File root = tempDir();
+        InGamePackChanger.setReloader(() -> true);
+        InGamePackChanger.setRestarter(() -> {
+            throw new AssertionError("a restart must not run when a live reload succeeded");
+        });
+        try {
+            assertEquals(InGamePackChanger.ApplyOutcome.RELOADED,
+                    InGamePackChanger.apply(java.util.Collections.singletonList(root),
+                            "aaaa0000-0000-0000-0000-000000000001", "1.0.0", true));
+        } finally {
+            InGamePackChanger.setReloader(null);
+            InGamePackChanger.setRestarter(null);
+        }
+    }
+
+    @Test
+    public void applyRestartsWhenNoLiveReloadIsAvailable() throws Exception {
+        File root = tempDir();
+        InGamePackChanger.setReloader(null);
+        InGamePackChanger.setRestarter(() -> true);
+        try {
+            assertEquals(InGamePackChanger.ApplyOutcome.RESTARTING,
+                    InGamePackChanger.apply(java.util.Collections.singletonList(root),
+                            "aaaa0000-0000-0000-0000-000000000001", "1.0.0", true));
+            // The write still happened even though the apply path is a relaunch.
+            assertTrue(InGamePackChanger.activeUuids(root)
+                    .contains("aaaa0000-0000-0000-0000-000000000001"));
+        } finally {
+            InGamePackChanger.setReloader(null);
+            InGamePackChanger.setRestarter(null);
+        }
+    }
+
+    @Test
+    public void applyReportsNextLoadWhenNoSessionCanApplyIt() throws Exception {
+        File root = tempDir();
+        InGamePackChanger.setReloader(null);
+        InGamePackChanger.setRestarter(null);
+        assertEquals(InGamePackChanger.ApplyOutcome.NEXT_LOAD,
+                InGamePackChanger.apply(java.util.Collections.singletonList(root),
+                        "aaaa0000-0000-0000-0000-000000000001", "1.0.0", true));
+    }
+
+    @Test
+    public void requestRestartIsFalseWithoutASessionAndForwardsWhenInstalled() {
+        InGamePackChanger.setRestarter(null);
+        assertFalse(InGamePackChanger.requestRestart());
+        InGamePackChanger.setRestarter(() -> true);
+        try {
+            assertTrue(InGamePackChanger.requestRestart());
+        } finally {
+            InGamePackChanger.setRestarter(null);
+        }
+    }
+
+    @Test
+    public void hasLiveSessionTracksEitherHook() {
+        InGamePackChanger.setReloader(null);
+        InGamePackChanger.setRestarter(null);
+        assertFalse(InGamePackChanger.hasLiveSession());
+        InGamePackChanger.setReloader(() -> false);
+        assertTrue(InGamePackChanger.hasLiveSession());
+        InGamePackChanger.setReloader(null);
+        InGamePackChanger.setRestarter(() -> false);
+        assertTrue(InGamePackChanger.hasLiveSession());
+        InGamePackChanger.setRestarter(null);
+        assertFalse(InGamePackChanger.hasLiveSession());
+    }
+
+    @Test
     public void requestReloadForwardsToTheInstalledReloader() {
         InGamePackChanger.setReloader(() -> true);
         try {

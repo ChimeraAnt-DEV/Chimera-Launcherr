@@ -680,6 +680,42 @@ import okhttp3.OkHttpClient;
             handleVersionDependentIntent();
         }
         refreshContentCounts();
+        // After the launcher has settled, honour a relaunch the in-game pack changer requested.
+        // It is a runnable (not a plain boolean) because the request must survive the process
+        // restart the relaunch itself performs: the flag is static, so the freshly started
+        // launcher reads it here and re-launches the instance the player was in.
+        binding.getRoot().post(this::maybeRelaunchForPendingRestart);
+    }
+
+    /**
+     * Re-launches the instance after the in-game pack changer applied a change.
+     *
+     * <p>The changer writes the pack lists and, when the build cannot refresh packs in place,
+     * asks the session to relaunch. The game process is killed and the launcher is reopened by
+     * {@link MinecraftProcessRestarter}, then this runs and re-runs the normal launch so the
+     * player lands back in the same instance with the new pack list — no manual relaunch.
+     */
+    private void maybeRelaunchForPendingRestart() {
+        if (!org.chimeramc.client.core.minecraft.MinecraftSessionRestarter
+                .consumePendingRelaunch(this)) return;
+        if (versionManager == null) return;
+        if (isFinishing() || isDestroyed()) return;
+        GameVersion version = versionManager.getSelectedVersion();
+        if (version == null) return;
+        Intent launchIntent = createMinecraftLaunchIntent();
+        minecraftLauncher.launch(launchIntent, version, new MinecraftLauncher.LaunchCallback() {
+            @Override
+            public void onLaunchStarted() {
+            }
+
+            @Override
+            public void onLaunchFailed(Exception e) {
+                runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                        getString(R.string.dialog_message_launch_failed,
+                                e != null ? e.getMessage() : ""),
+                        Toast.LENGTH_LONG).show());
+            }
+        });
     }
 
     private void handleVersionDependentIntent() {
