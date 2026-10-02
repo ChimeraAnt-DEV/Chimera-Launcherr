@@ -847,9 +847,16 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="pack_changer_pack_meta">v%1$s · %2$s</string>
     <string name="cosmetics_capes">Capes</string>
     <string name="cosmetics_accessories">Accessories</string>
+    <string name="cosmetics_pets">Pets</string>
+    <string name="cosmetics_pet_gait">Gait</string>
+    <string name="cosmetics_gait_walk">Walk</string>
+    <string name="cosmetics_gait_run">Run</string>
+    <string name="cosmetics_gait_crouch">Crouch</string>
+    <string name="cosmetics_gait_fly">Fly</string>
+    <string name="cosmetics_gait_swim">Swim</string>
     <string name="cosmetics_none">None</string>
     <string name="cosmetics_equipped">Equipped %1$s</string>
-    <string name="cosmetics_scope_note">The preview above shows your own skin with the equipped cape. To put a cape on your character in the running game, use Apply in game below — that installs a resource pack which replaces the player cape texture for the selected instance. Only you see it, and only while that instance has the pack applied. Cape movement is drawn in the preview; in-game the pack supplies a still texture, so the cape itself does not animate.</string>
+    <string name="cosmetics_scope_note">Capes, accessories and pets are launcher-side looks. The preview shows your own skin wearing the equipped cape, accessory and pet, and pets animate their walk, run, crouch, fly and swim gaits here. Only the cape can reach the running game: Apply in game installs a resource pack that replaces the player cape texture for the selected instance, so only you see it and only while that pack is applied. Accessories and pets are preview-only — Bedrock gives a launcher no way to spawn a client-side companion. Cape movement is drawn in the preview; in-game the pack supplies a still texture, so the cape itself does not animate.</string>
     <string name="cosmetics_in_game">On your character in-game</string>
     <string name="cosmetics_apply_in_game">Apply in game</string>
     <string name="cosmetics_remove_in_game">Remove</string>

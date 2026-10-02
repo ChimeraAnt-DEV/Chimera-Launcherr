@@ -34,7 +34,8 @@ public class CapeInGameInstallerTest {
 
     private CosmeticCatalog.Cape cape() {
         return new CosmeticCatalog.Cape(
-                "test_cape", "Test Cape", 0xFF6236E8, 0xFFA88CFF, true, true);
+                "test_cape", "Test Cape", 0xFF6236E8, 0xFFA88CFF, 0xFFFFD86B,
+                CosmeticCatalog.CapePattern.SOLID, true, true);
     }
 
     @Test

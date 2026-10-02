@@ -31,16 +31,30 @@ public final class CapeTexturePainter {
     }
 
     /**
-     * Renders a cape texture.
+     * Renders a cape texture with a plain weave.
      *
      * @param baseColor cloth colour, 0xAARRGGBB
      * @param trimColor colour of the border band and the brand mark
      * @param branded   whether the Chimera mark is drawn on the cloth
      */
     public static byte[] paint(int baseColor, int trimColor, boolean branded) {
+        return paint(baseColor, trimColor, trimColor, CosmeticCatalog.CapePattern.SOLID, branded);
+    }
+
+    /**
+     * Renders a cape texture with a pattern.
+     *
+     * @param baseColor   cloth colour, 0xAARRGGBB
+     * @param trimColor   colour of the border band and the brand mark
+     * @param accentColor secondary colour the pattern weave uses
+     * @param pattern     the weave; {@code null} is treated as solid
+     * @param branded     whether the Chimera mark is drawn on the cloth
+     */
+    public static byte[] paint(int baseColor, int trimColor, int accentColor,
+                               CosmeticCatalog.CapePattern pattern, boolean branded) {
         int[] pixels = new int[TEXTURE_WIDTH * TEXTURE_HEIGHT];
 
-        paintCapeRegion(pixels, baseColor, trimColor, branded);
+        paintCapeRegion(pixels, baseColor, trimColor, accentColor, pattern, branded);
         paintElytraRegion(pixels, baseColor, trimColor);
 
         return PngWriter.encode(TEXTURE_WIDTH, TEXTURE_HEIGHT, pixels);
@@ -56,7 +70,9 @@ public final class CapeTexturePainter {
      * the cape swings is painted, because leaving one transparent makes the cape show holes and
      * read as a flapping paper sheet instead of cloth.
      */
-    private static void paintCapeRegion(int[] pixels, int baseColor, int trimColor, boolean branded) {
+    private static void paintCapeRegion(int[] pixels, int baseColor, int trimColor,
+                                        int accentColor, CosmeticCatalog.CapePattern pattern,
+                                        boolean branded) {
         // The whole cape box first, in a mid shade: this covers the top/bottom edge rows and the
         // two side columns, which are only sampled at a glancing angle but are visible then.
         fillRect(pixels, 0, 0, 22, 17, shade(baseColor, 0.85f));
@@ -64,8 +80,12 @@ public final class CapeTexturePainter {
         // Front panel, against the player's back: darker so the cape has two distinct sides.
         fillRect(pixels, 1, 1, 10, 16, shade(baseColor, 0.72f));
 
-        // Visible back panel: the main artwork the player sees on their character.
+        // Visible back panel: the main artwork the player sees on their character, now carrying
+        // the weave. Painting the pattern here rather than only the flat colour is what makes the
+        // hundred-plus cape variants actually look different in-game.
         fillRect(pixels, 12, 1, 10, 16, baseColor);
+        paintPattern(pixels, CLOTH_X, CLOTH_Y, CLOTH_WIDTH, CLOTH_HEIGHT, baseColor, accentColor,
+                pattern);
 
         // Border band, inset by one pixel inside the back panel. The game's capes have their trim
         // just inside the silhouette, so painting the very edge would put the band where it is
@@ -77,6 +97,29 @@ public final class CapeTexturePainter {
 
         if (branded) {
             paintMark(pixels, CLOTH_X + 3, CLOTH_Y + 5, 4, 6, trimColor);
+        }
+    }
+
+    /**
+     * Paints a pattern weave into the cloth rectangle.
+     *
+     * <p>The per-pixel rule lives in {@link CapePatterns} so the texture and the launcher preview
+     * cannot disagree about what a weave looks like. A weave never touches the outermost row or
+     * column, which the trim band owns.
+     */
+    private static void paintPattern(int[] pixels, int x, int y, int width, int height,
+                                     int baseColor, int accentColor,
+                                     CosmeticCatalog.CapePattern pattern) {
+        if (pattern == null || pattern == CosmeticCatalog.CapePattern.SOLID) return;
+        for (int row = 1; row < height - 1; row++) {
+            float v = row / (float) (height - 1);
+            for (int col = 1; col < width - 1; col++) {
+                float u = col / (float) (width - 1);
+                int color = CapePatterns.colorAt(pattern, u, v, baseColor, accentColor);
+                if (color != baseColor) {
+                    pixels[(y + row) * TEXTURE_WIDTH + (x + col)] = color;
+                }
+            }
         }
     }
 

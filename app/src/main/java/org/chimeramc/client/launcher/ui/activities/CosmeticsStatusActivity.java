@@ -42,7 +42,8 @@ public class CosmeticsStatusActivity extends BaseActivity {
 
     /** A solid magenta stands out against any skin, so "did anything appear" is unambiguous. */
     private static final CosmeticCatalog.Cape TEST_CAPE =
-            new CosmeticCatalog.Cape("test_magenta", "Test Cape", 0xFFFF00FF, 0xFFFFFFFF, false, false);
+            new CosmeticCatalog.Cape("test_magenta", "Test Cape", 0xFFFF00FF, 0xFFFFFFFF, 0xFFFFFFFF,
+                    CosmeticCatalog.CapePattern.SOLID, false, false);
 
     private LinearLayout checksContainer;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());

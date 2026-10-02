@@ -9,9 +9,11 @@ import android.graphics.Path;
 import android.view.MotionEvent;
 import android.view.View;
 
+import org.chimeramc.client.core.cosmetics.CapePatterns;
 import org.chimeramc.client.core.cosmetics.CapeSimulator;
 import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
 import org.chimeramc.client.core.cosmetics.CosmeticLayering;
+import org.chimeramc.client.core.cosmetics.PetPose;
 import org.chimeramc.client.core.cosmetics.PlayerSkinProvider;
 import org.chimeramc.client.core.cosmetics.SkinModel;
 import org.chimeramc.client.ui.animation.DynamicAnim;
@@ -63,6 +65,10 @@ public class CapePreviewView extends View {
     private final PlayerSkinProvider.SkinBitmap skin;
     private CosmeticCatalog.Cape cape;
     private CosmeticCatalog.Accessory accessory;
+    private CosmeticCatalog.Pet pet;
+    private CosmeticCatalog.PetLocomotion petLocomotion = CosmeticCatalog.PetLocomotion.WALK;
+    private final PetPose petPose = new PetPose();
+    private float petPhase;
 
     private final CapeSimulator capeSim = new CapeSimulator();
     private final List<FaceQuad> drawList = new ArrayList<>();
@@ -142,6 +148,23 @@ public class CapePreviewView extends View {
         invalidate();
     }
 
+    public void setPet(CosmeticCatalog.Pet pet) {
+        this.pet = pet;
+        syncAnimation();
+        invalidate();
+    }
+
+    /** The gait the equipped pet is currently animating; the panel offers the ones it supports. */
+    public void setPetLocomotion(CosmeticCatalog.PetLocomotion locomotion) {
+        this.petLocomotion = PetPose.resolveGait(pet == null ? null : pet.species, locomotion);
+        syncAnimation();
+        invalidate();
+    }
+
+    public CosmeticCatalog.PetLocomotion getPetLocomotion() {
+        return petLocomotion;
+    }
+
     /** True when the displayed skin is the built-in stand-in rather than the player's own. */
     public boolean isShowingFallbackSkin() {
         return skin == null || skin.isFallback;
@@ -178,7 +201,8 @@ public class CapePreviewView extends View {
      * redrawing identical frames forever.
      */
     private void syncAnimation() {
-        boolean want = DynamicAnim.areAnimationsEnabled() && getVisibility() == VISIBLE && attached;
+        boolean want = DynamicAnim.areAnimationsEnabled() && getVisibility() == VISIBLE && attached
+                && (pet != null || cape != null);
         if (want && !animating) {
             animating = true;
             lastFrameNanos = 0L;
@@ -217,6 +241,11 @@ public class CapePreviewView extends View {
             float fx = (float) Math.sin(Math.toRadians(yawDeg));
             float fz = (float) Math.cos(Math.toRadians(yawDeg));
             capeSim.step(dt, 0f, 0f, -0.02f, fx, fz, speed);
+        }
+        if (pet != null) {
+            petPhase += PetPose.cyclesPerSecond(petLocomotion) * dt;
+            if (petPhase > 1f) petPhase -= (float) Math.floor(petPhase);
+            petPose.compute(pet.species, petLocomotion, petPhase);
         }
     }
 
@@ -261,12 +290,18 @@ public class CapePreviewView extends View {
         int h = getHeight();
         if (w <= 0 || h <= 0) return;
 
-        // The model is 32 px tall. Fit it, leaving headroom for the cape to swing.
-        float scale = Math.min(w / 34f, h / 42f);
-        float originX = w / 2f;
+        // The model is 32 px tall. Fit it, leaving headroom for the cape to swing and room to the
+        // right for the pet to trot beside the character.
+        float scale = Math.min(w / 52f, h / 42f);
+        float originX = w * 0.40f;
         float originY = h * 0.58f + SkinModel.heightPixels() * 0.5f * scale;
 
         drawGroundShadow(canvas, originX, originY, scale);
+        if (pet != null) {
+            // The pet is drawn first so the character always reads as the subject; it sits to the
+            // character's right, on the same ground line, so it looks like it is walking with them.
+            drawPet(canvas, originX, originY, scale);
+        }
         // Wings sit behind the character, so they must be painted before the cape and the body;
         // drawing them last (as the accessories used to be) made them cover the torso and read as
         // a flat sheet stuck to the front of the model. The over-head and beside-head pieces stay
@@ -275,6 +310,288 @@ public class CapePreviewView extends View {
         if (cape != null) drawCape(canvas, originX, originY, scale);
         drawModel(canvas, originX, originY, scale);
         if (accessory != null) drawAccessoryFront(canvas, originX, originY, scale);
+    }
+
+    // ---- Pet -----------------------------------------------------------------------------
+
+    /**
+     * Draws the equipped pet beside the character.
+     *
+     * <p>The pet is a blocky Minecraft-style animal built from the same {@link SkinModel.Box}
+     * primitive the player model uses, so it belongs to the same visual language. Its pose comes
+     * from {@link PetPose}, which decides the gait: legs swing for a walk or run, wings beat for a
+     * flyer (crawlers get their own elytra), a swimmer paddles with a dedicated set, and a crouch
+     * sinks the body. The pet stands on the character's right, scaled by its own size trait.
+     */
+    private void drawPet(Canvas canvas, float originX, float originY, float scale) {
+        if (pet == null) return;
+        float ps = scale * pet.scale;
+        // Ground the pet on the same baseline as the character, a little to the right.
+        float px = originX + 20f * scale;
+        float py = originY - SkinModel.heightPixels() * 0.5f * scale + 0.5f * scale;
+
+        CosmeticCatalog.PetSpecies species = pet.species;
+        int body = pet.color;
+        int accent = pet.accentColor;
+        int dark = darker(body);
+
+        // Body dimensions per species, in model pixels, so a bee is small and a dragon is long.
+        float bodyW, bodyH, bodyD, legLen;
+        switch (species) {
+            case BEE:
+            case BUTTERFLY:
+            case DRAGONFLY:
+                bodyW = 4f; bodyH = 3f; bodyD = 6f; legLen = 1.5f;
+                break;
+            case SPIDER:
+            case ANT:
+                bodyW = 5f; bodyH = 2.5f; bodyD = 7f; legLen = 2.5f;
+                break;
+            case FROG:
+            case AXOLOTL:
+            case LIZARD:
+                bodyW = 5f; bodyH = 3f; bodyD = 7f; legLen = 2f;
+                break;
+            case SNAKE:
+                bodyW = 3.5f; bodyH = 3f; bodyD = 10f; legLen = 0.5f;
+                break;
+            case DRAGON:
+                bodyW = 7f; bodyH = 5f; bodyD = 11f; legLen = 3.5f;
+                break;
+            case PARROT:
+                bodyW = 4f; bodyH = 5f; bodyD = 5f; legLen = 2.5f;
+                break;
+            case TURTLE:
+                bodyW = 7f; bodyH = 3.5f; bodyD = 9f; legLen = 1.5f;
+                break;
+            case RABBIT:
+                bodyW = 4f; bodyH = 4f; bodyD = 6f; legLen = 2f;
+                break;
+            default:
+                bodyW = 5f; bodyH = 4f; bodyD = 8f; legLen = 3f;
+                break;
+        }
+
+        // Crouch sinks the whole body; flying lifts it and adds a hover bob.
+        float lift = 0f;
+        if (petLocomotion == CosmeticCatalog.PetLocomotion.FLY) {
+            lift = 5f + petPose.bodyBob * 0.6f;
+        } else if (petLocomotion == CosmeticCatalog.PetLocomotion.SWIM) {
+            lift = 1.5f;
+        }
+        float bodyCenterY = legLen + bodyH / 2f + lift - petPose.crouchDrop;
+
+        // Legs first (behind the body), swinging opposite each other so the gait reads.
+        if (species != CosmeticCatalog.PetSpecies.SNAKE) {
+            int legs = (species == CosmeticCatalog.PetSpecies.SPIDER
+                    || species == CosmeticCatalog.PetSpecies.ANT) ? 3 : 2;
+            for (int i = 0; i < legs; i++) {
+                float along = legs == 1 ? 0f : (i / (float) (legs - 1) - 0.5f) * bodyD * 0.7f;
+                float swing = petPose.legSwing * ((i % 2 == 0) ? 1f : -1f);
+                float lx = px + swing * 1.4f;
+                float lz = along + swing * 0.8f;
+                int legColor = darker(body);
+                drawPetBox(canvas, lx, py + legLen / 2f, lz,
+                        1.6f, legLen, 1.6f, ps, originX, originY, legColor);
+            }
+        } else {
+            // A snake gets a segmented tail that ripples with the swim/walk stroke.
+            for (int seg = 1; seg <= 4; seg++) {
+                float segZ = -bodyD / 2f - seg * 1.6f;
+                float wobble = petPose.swimStroke * seg * 0.5f;
+                drawPetBox(canvas, px + wobble, py + legLen + bodyH / 2f, segZ,
+                        2.4f - seg * 0.3f, 2.4f - seg * 0.3f, 1.6f, ps, originX, originY,
+                        seg % 2 == 0 ? body : dark);
+            }
+        }
+
+        // Tail behind the body, wagging.
+        if (species != CosmeticCatalog.PetSpecies.SNAKE
+                && species != CosmeticCatalog.PetSpecies.BEE
+                && species != CosmeticCatalog.PetSpecies.BUTTERFLY
+                && species != CosmeticCatalog.PetSpecies.DRAGONFLY
+                && species != CosmeticCatalog.PetSpecies.ANT
+                && species != CosmeticCatalog.PetSpecies.SPIDER) {
+            float tailZ = -bodyD / 2f - 1.2f;
+            float wag = petPose.tailWag * 1.6f;
+            drawPetBox(canvas, px + wag, py + legLen + bodyH * 0.7f, tailZ,
+                    1.4f, 1.4f, 3.2f, ps, originX, originY, body);
+        }
+
+        // The body itself.
+        drawPetBox(canvas, px, py + legLen + bodyH / 2f - petPose.crouchDrop,
+                petPose.bodyBob * 0.2f, bodyW, bodyH, bodyD, ps, originX, originY, body);
+
+        // Head at the front of the body, bobbing.
+        float headSize = Math.min(bodyH, 5f) + 1f;
+        float headZ = bodyD / 2f + headSize * 0.3f;
+        drawPetBox(canvas, px, py + legLen + bodyH + headSize * 0.3f - petPose.crouchDrop
+                        + petPose.headBob, headZ, headSize, headSize, headSize,
+                ps, originX, originY, body);
+
+        // Ears / antennae per species.
+        drawPetHeadgear(canvas, species, px, py + legLen + bodyH + headSize * 0.3f
+                - petPose.crouchDrop, headZ, headSize, ps, originX, originY, accent);
+
+        // Wings: flyers beat them; crawlers get a smaller elytra shell (their own flight set).
+        if (petLocomotion == CosmeticCatalog.PetLocomotion.FLY) {
+            if (species.isCrawler()) {
+                // Crawlers cannot have feathered wings, so they carry a hard elytra shell.
+                drawElytra(canvas, px, py + legLen + bodyH, ps, originX, originY,
+                        accent, petPose.wingFlap);
+            } else {
+                drawWings(canvas, px, py + legLen + bodyH, ps, originX, originY,
+                        accent, petPose.wingFlap, bodyW, bodyD);
+            }
+        }
+
+        // A swimmer gets a dedicated swim set: a snorkel mask and fins, so swimming looks
+        // intentional rather than the pet just floating.
+        if (petLocomotion == CosmeticCatalog.PetLocomotion.SWIM && species.isSwimmer()) {
+            drawSwimSet(canvas, species, px, py + legLen + bodyH + headSize * 0.3f - petPose.crouchDrop,
+                    headZ, headSize, ps, originX, originY, accent);
+        }
+    }
+
+    /** A single shaded pet box, projected with the same camera as the character. */
+    private void drawPetBox(Canvas canvas, float cx, float cy, float cz,
+                            float w, float h, float d, float scale,
+                            float originX, float originY, int color) {
+        SkinModel.Box box = SkinModel.Box.of("pet", cx, cy, cz, w, h, d);
+        paint.setShader(null);
+        for (SkinModel.Face face : SkinModel.Face.values()) {
+            if (!SkinModel.faceVisible(face, yawDeg, pitchDeg)) continue;
+            float[][] c = box.faceCorners(face);
+            for (int i = 0; i < 4; i++) {
+                projectPoint(c[i][0], c[i][1], c[i][2], scale, originX, originY);
+                corners[i * 2] = projected[0];
+                corners[i * 2 + 1] = projected[1];
+            }
+            paint.setColor(shadeFace(color, face));
+            drawQuad(canvas, corners);
+        }
+    }
+
+    private void drawPetHeadgear(Canvas canvas, CosmeticCatalog.PetSpecies species,
+                                 float px, float headBaseY, float headZ, float headSize,
+                                 float scale, float originX, float originY, int accent) {
+        float topY = headBaseY + headSize * 0.4f;
+        switch (species) {
+            case CAT:
+            case DOG:
+            case FOX:
+            case WOLF:
+                // Pointed ears: two small boxes angled by a per-species amount.
+                for (int side = -1; side <= 1; side += 2) {
+                    drawPetBox(canvas, px + side * headSize * 0.28f, topY + 1.2f, headZ,
+                            1.2f, 1.6f, 1.2f, scale, originX, originY, accent);
+                }
+                break;
+            case RABBIT:
+                for (int side = -1; side <= 1; side += 2) {
+                    drawPetBox(canvas, px + side * headSize * 0.2f, topY + 2.4f, headZ,
+                            1.0f, 4.0f, 1.0f, scale, originX, originY, accent);
+                }
+                break;
+            case BEE:
+            case BUTTERFLY:
+            case DRAGONFLY:
+                // Antennae: thin stalks with a lit tip.
+                for (int side = -1; side <= 1; side += 2) {
+                    drawPetBox(canvas, px + side * 1.0f, topY + 1.8f, headZ + 0.5f,
+                            0.6f, 2.6f, 0.6f, scale, originX, originY, accent);
+                }
+                break;
+            case DRAGON:
+                for (int side = -1; side <= 1; side += 2) {
+                    drawPetBox(canvas, px + side * headSize * 0.3f, topY + 1.6f, headZ - 0.4f,
+                            1.0f, 2.2f, 1.0f, scale, originX, originY, accent);
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void drawWings(Canvas canvas, float px, float bodyTopY, float scale,
+                           float originX, float originY, int accent, float flap,
+                           float bodyW, float bodyD) {
+        // A wing is a fan of three feather quads per side; the flap raises them about the shoulder.
+        float rise = flap * 3.2f;
+        float spread = 3.0f + flap * 1.5f;
+        for (int side = -1; side <= 1; side += 2) {
+            for (int f = 0; f < 3; f++) {
+                float t = 0.3f + f * 0.3f;
+                float[][] pts = {
+                        {px + side * bodyW * 0.3f, bodyTopY, 0f},
+                        {px + side * (bodyW * 0.3f + spread * t), bodyTopY + rise - f * 0.6f, -t * bodyD * 0.4f},
+                        {px + side * (bodyW * 0.3f + spread * (t + 0.3f)), bodyTopY + rise * 0.4f, -bodyD * 0.2f},
+                };
+                paint.setShader(null);
+                paint.setColor(shadeFace(accent, SkinModel.Face.FRONT));
+                path.reset();
+                boolean first = true;
+                for (float[] p : pts) {
+                    projectPoint(p[0], p[1], p[2], scale, originX, originY);
+                    if (first) { path.moveTo(projected[0], projected[1]); first = false; }
+                    else path.lineTo(projected[0], projected[1]);
+                }
+                path.close();
+                canvas.drawPath(path, paint);
+            }
+        }
+    }
+
+    /** A hard elytra shell for crawling flyers: no feathers, just two domed wing cases. */
+    private void drawElytra(Canvas canvas, float px, float bodyTopY, float scale,
+                            float originX, float originY, int accent, float flap) {
+        float lift = 1.5f + flap * 2.5f;
+        paint.setShader(null);
+        paint.setColor(darker(accent));
+        for (int side = -1; side <= 1; side += 2) {
+            drawPetBox(canvas, px + side * 2.2f, bodyTopY + lift, -1.5f,
+                    3.4f, 1.4f, 5.0f, scale, originX, originY, darker(accent));
+        }
+    }
+
+    /** A swim set: a snorkel mask over the eyes and a fin on each leg. */
+    private void drawSwimSet(Canvas canvas, CosmeticCatalog.PetSpecies species,
+                             float px, float headBaseY, float headZ, float headSize,
+                             float scale, float originX, float originY, int accent) {
+        // Mask band across the front of the head.
+        drawPetBox(canvas, px, headBaseY + headSize * 0.1f, headZ + headSize * 0.5f,
+                headSize * 1.05f, 1.0f, 0.6f, scale, originX, originY, accent);
+        // Snorkel tube rising from one side of the mask.
+        drawPetBox(canvas, px + headSize * 0.5f, headBaseY + headSize * 0.6f, headZ,
+                0.7f, 2.4f, 0.7f, scale, originX, originY, accent);
+        // Fins on the front legs.
+        for (int side = -1; side <= 1; side += 2) {
+            drawPetBox(canvas, px + side * 1.4f, 0.9f, 2.6f,
+                    1.4f, 1.2f, 2.4f, scale, originX, originY, accent);
+        }
+    }
+
+    /** Per-face shading for a flat-coloured box, reusing the character's light ramp. */
+    private static int shadeFace(int color, SkinModel.Face face) {
+        float factor;
+        switch (face) {
+            case FRONT: factor = 1.0f; break;
+            case TOP: factor = 1.18f; break;
+            case LEFT: factor = 0.82f; break;
+            case RIGHT: factor = 0.75f; break;
+            case BACK: factor = 0.62f; break;
+            case BOTTOM: factor = 0.5f; break;
+            default: factor = 1.0f; break;
+        }
+        return scaleRgb(color, factor);
+    }
+
+    /** Multiplies a colour's RGB by a factor, preserving alpha and clamping. */
+    private static int scaleRgb(int color, float factor) {
+        int r = Math.min(255, Math.round(((color >> 16) & 0xFF) * factor));
+        int g = Math.min(255, Math.round(((color >> 8) & 0xFF) * factor));
+        int b = Math.min(255, Math.round((color & 0xFF) * factor));
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
     private void drawGroundShadow(Canvas canvas, float originX, float originY, float scale) {
@@ -437,11 +754,17 @@ public class CapePreviewView extends View {
                     - (capeYs[i10] - capeYs[i00]) * (capeXs[i01] - capeXs[i00]);
             boolean frontFace = cross >= 0f;
             float v = r / (float) Math.max(1, rows - 2);
+            // The cloth's own weave, evaluated at the quad's centre in normalised cloth space.
+            // Sharing CapePatterns with the in-game texture painter is what keeps the menu preview
+            // and the pack the player wears showing the same pattern.
+            float u = (c + 0.5f) / Math.max(1f, cols - 1f);
+            float wv = (r + 0.5f) / Math.max(1f, rows - 1f);
+            int cloth = CapePatterns.colorAt(cape.pattern, u, wv, cape.color, cape.accentColor);
             int color;
             if (frontFace) {
-                color = lerpColor(cape.color, darker(cape.color), v * 0.45f);
+                color = lerpColor(cloth, darker(cloth), v * 0.45f);
             } else {
-                int back = darker(cape.color);
+                int back = darker(cloth);
                 color = lerpColor(back, darker(back), v * 0.55f);
             }
             paint.setColor(color);
@@ -572,8 +895,28 @@ public class CapePreviewView extends View {
      * pasted onto the chest instead of worn.
      */
     private void drawAccessoryBehind(Canvas canvas, float originX, float originY, float scale) {
-        if (accessory == null || CosmeticCatalog.NONE.equals(accessory.id)) return;
-        if (!"wings".equals(accessory.id)) return;
+        if (accessory == null || accessory.kind == CosmeticCatalog.AccessoryKind.NONE) return;
+        switch (accessory.kind) {
+            case WINGS:
+                drawWingsAccessory(canvas, originX, originY, scale);
+                break;
+            case BACKPACK:
+                drawBackpack(canvas, originX, originY, scale);
+                break;
+            case SCARF:
+                // A scarf's trailing tail hangs behind the shoulders, so its back half goes here.
+                paint.setShader(null);
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(darker(accessory.color));
+                drawBox(canvas, -2.2f, 20f, CosmeticLayering.CAPE_Z + 0.5f,
+                        1.6f, 6f, 1.2f, scale, originX, originY);
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void drawWingsAccessory(Canvas canvas, float originX, float originY, float scale) {
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(accessory.color);
@@ -602,12 +945,12 @@ public class CapePreviewView extends View {
         for (int side = -1; side <= 1; side += 2) {
             for (int f = 0; f < 3; f++) {
                 float t = 0.28f + f * 0.26f;
-                projectPoint(side * (2.6f + t * 8.4f), 22f - t * 7.5f, CosmeticLayering.WINGS_Z + 0.4f - t * 1.8f,
-                        scale, originX, originY);
+                projectPoint(side * (2.6f + t * 8.4f), 22f - t * 7.5f,
+                        CosmeticLayering.WINGS_Z + 0.4f - t * 1.8f, scale, originX, originY);
                 float sx = projected[0];
                 float sy = projected[1];
-                projectPoint(side * (2.6f + t * 9.9f), 21.6f - t * 9.0f, CosmeticLayering.WINGS_Z + 0.4f - t * 2.4f,
-                        scale, originX, originY);
+                projectPoint(side * (2.6f + t * 9.9f), 21.6f - t * 9.0f,
+                        CosmeticLayering.WINGS_Z + 0.4f - t * 2.4f, scale, originX, originY);
                 canvas.drawLine(sx, sy, projected[0], projected[1], paint);
             }
         }
@@ -615,17 +958,31 @@ public class CapePreviewView extends View {
         paint.setAlpha(255);
     }
 
+    /** A box worn on the back, with a strap over each shoulder and a pocket flap. */
+    private void drawBackpack(Canvas canvas, float originX, float originY, float scale) {
+        paint.setShader(null);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(accessory.color);
+        drawBox(canvas, 0f, 18f, CosmeticLayering.CAPE_Z - 0.2f,
+                7f, 8f, 3f, scale, originX, originY);
+        // Pocket flap in the accent colour, so the pack is not a plain cube.
+        paint.setColor(accessory.accentColor);
+        drawBox(canvas, 0f, 15.6f, CosmeticLayering.CAPE_Z - 1.2f,
+                5f, 2.2f, 1.4f, scale, originX, originY);
+        // Shoulder straps come around to the front and are finished in the foreground pass.
+    }
+
     /**
-     * Accessories in front of the character: worn on or around the head.
+     * Accessories in front of the character: worn on or around the head, face and torso.
      *
      * <p>Drawn after the model so they sit over the head instead of being hidden inside it.
      */
     private void drawAccessoryFront(Canvas canvas, float originX, float originY, float scale) {
-        if (accessory == null || CosmeticCatalog.NONE.equals(accessory.id)) return;
+        if (accessory == null || accessory.kind == CosmeticCatalog.AccessoryKind.NONE) return;
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
-        switch (accessory.id) {
-            case "headphones": {
+        switch (accessory.kind) {
+            case HEADPHONES: {
                 // Band arcing over the crown, then one cup on each side, in the same 3D space as
                 // the head box (which spans y=24..32, x=-4..4, z=-4..4). Anchoring to those actual
                 // bounds is what stops the headphones floating above the head or sinking into it.
@@ -652,7 +1009,7 @@ public class CapePreviewView extends View {
                 drawBox(canvas, 4.6f, 27.6f, 0f, 1.6f, 4.4f, 4.4f, scale, originX, originY);
                 break;
             }
-            case "halo": {
+            case HALO: {
                 paint.setStyle(Paint.Style.STROKE);
                 paint.setColor(accessory.color);
                 paint.setStrokeWidth(Math.max(2f, scale * 0.9f));
@@ -672,6 +1029,108 @@ public class CapePreviewView extends View {
                 canvas.drawPath(path, paint);
                 paint.setAlpha(255);
                 paint.setStyle(Paint.Style.FILL);
+                break;
+            }
+            case CAP: {
+                // A flat crown box with a forward brim, in the palette colour.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 33.4f, 0f, 8.6f, 2.4f, 8.6f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 32.6f, 4.8f, 6.2f, 1.0f, 3.0f, scale, originX, originY);
+                break;
+            }
+            case BEANIE: {
+                // A rounded crown with a folded band and a pom-pom on top.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 33.8f, 0f, 8.8f, 3.0f, 8.8f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 32.6f, 0f, 9.0f, 1.2f, 9.0f, scale, originX, originY);
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 35.8f, 0f, 2.0f, 2.0f, 2.0f, scale, originX, originY);
+                break;
+            }
+            case CROWN: {
+                // A band with five points, the middle one taller.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 33.0f, 0f, 8.6f, 1.6f, 8.6f, scale, originX, originY);
+                for (int i = -2; i <= 2; i++) {
+                    float h = (i == 0) ? 2.6f : 1.8f;
+                    drawBox(canvas, i * 1.7f, 34.0f + h / 2f, 0f,
+                            1.0f, h, 8.6f, scale, originX, originY);
+                }
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 33.8f, 0f, 1.2f, 1.2f, 9.0f, scale, originX, originY);
+                break;
+            }
+            case GLASSES: {
+                // Two lenses joined by a bridge, sitting proud of the face.
+                paint.setColor(accessory.color);
+                drawBox(canvas, -1.6f, 29.6f, 4.4f, 3.2f, 2.0f, 0.6f, scale, originX, originY);
+                drawBox(canvas, 1.6f, 29.6f, 4.4f, 3.2f, 2.0f, 0.6f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 29.6f, 4.4f, 1.0f, 0.6f, 0.6f, scale, originX, originY);
+                break;
+            }
+            case MASK: {
+                // A bandana covering the lower face, with a knot at one side.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 27.6f, 4.2f, 8.0f, 4.4f, 0.8f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 4.4f, 28.4f, 2.4f, 1.4f, 1.4f, 1.4f, scale, originX, originY);
+                break;
+            }
+            case SCARF: {
+                // A wrap around the neck plus the trailing tail that started in the back pass.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 22.8f, 0f, 8.4f, 2.0f, 4.4f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 21.6f, 0f, 8.6f, 0.8f, 4.6f, scale, originX, originY);
+                break;
+            }
+            case BACKPACK: {
+                // The straps come around the shoulders into the foreground.
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, -3.2f, 19f, 2.4f, 1.2f, 7.0f, 0.8f, scale, originX, originY);
+                drawBox(canvas, 3.2f, 19f, 2.4f, 1.2f, 7.0f, 0.8f, scale, originX, originY);
+                break;
+            }
+            case HORNS: {
+                // Two tapered horns rising from the crown.
+                paint.setColor(accessory.color);
+                drawBox(canvas, -2.6f, 35.2f, 0f, 1.6f, 4.0f, 1.6f, scale, originX, originY);
+                drawBox(canvas, 2.6f, 35.2f, 0f, 1.6f, 4.0f, 1.6f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, -3.2f, 37.2f, 0f, 1.0f, 1.6f, 1.0f, scale, originX, originY);
+                drawBox(canvas, 3.2f, 37.2f, 0f, 1.0f, 1.6f, 1.0f, scale, originX, originY);
+                break;
+            }
+            case FLOWER: {
+                // A small bloom tucked at one side of the head.
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 4.4f, 33.4f, 1.6f, 1.4f, 1.4f, 1.4f, scale, originX, originY);
+                paint.setColor(accessory.color);
+                drawBox(canvas, 4.4f, 34.6f, 1.6f, 2.4f, 1.2f, 2.4f, scale, originX, originY);
+                drawBox(canvas, 3.6f, 33.4f, 1.6f, 1.2f, 1.2f, 1.2f, scale, originX, originY);
+                drawBox(canvas, 5.2f, 33.4f, 1.6f, 1.2f, 1.2f, 1.2f, scale, originX, originY);
+                break;
+            }
+            case BOWTIE: {
+                // Two triangles at the collar with a centre knot.
+                paint.setColor(accessory.color);
+                drawBox(canvas, -1.4f, 22.4f, 2.6f, 2.4f, 2.0f, 1.2f, scale, originX, originY);
+                drawBox(canvas, 1.4f, 22.4f, 2.6f, 2.4f, 2.0f, 1.2f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 22.4f, 2.8f, 1.0f, 1.4f, 1.0f, scale, originX, originY);
+                break;
+            }
+            case EAR: {
+                // Animal ears on top of the head.
+                paint.setColor(accessory.color);
+                drawBox(canvas, -2.4f, 34.4f, 0f, 2.0f, 3.4f, 2.0f, scale, originX, originY);
+                drawBox(canvas, 2.4f, 34.4f, 0f, 2.0f, 3.4f, 2.0f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, -2.4f, 34.8f, 0.9f, 1.2f, 2.2f, 0.6f, scale, originX, originY);
+                drawBox(canvas, 2.4f, 34.8f, 0.9f, 1.2f, 2.2f, 0.6f, scale, originX, originY);
                 break;
             }
             default:
