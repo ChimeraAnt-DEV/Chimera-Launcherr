@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/LuauScripts-usr/Logoz/main/ShidoreAv.webp" width="150" height="150" alt="GlowberryClient">
+  <img src="https://raw.githubusercontent.com/ChimeraAnt-DEV/GlowberryClient/main/docs/public/appicon.png" width="150" height="150" alt="GlowberryClient">
 </p>
 
 
@@ -8,11 +8,11 @@
 
 **A highly advanced Android launcher for Minecraft: Bedrock Edition**
 
-[![GitHub Release](https://img.shields.io/github/v/release/ChimeraAnt-DEV/ChimeraLauncher?style=flat-square&color=blue)](https://github.com/ChimeraAnt-DEV/ChimeraLauncher/releases)
-[![License: Apache 2.0](https://img.shields.io/github/license/ChimeraAnt-DEV/ChimeraLauncher)](https://github.com/ChimeraAnt-DEV/ChimeraLauncher/blob/main/LICENSE)
-[![Issues](https://img.shields.io/github/issues/ChimeraAnt-DEV/ChimeraLauncher?style=flat-square&color=red)](https://github.com/ChimeraAnt-DEV/ChimeraLauncher/issues)
-[![Stars](https://img.shields.io/github/stars/ChimeraAnt-DEV/ChimeraLauncher?style=flat-square&color=yellow)](https://github.com/ChimeraAnt-DEV/ChimeraLauncher)
-[![Downloads](https://img.shields.io/github/downloads/ChimeraAnt-DEV/ChimeraLauncher/total.svg)](https://github.com/ChimeraAnt-DEV/ChimeraLauncher/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/ChimeraAnt-DEV/GlowberryClient?style=flat-square&color=blue)](https://github.com/ChimeraAnt-DEV/GlowberryClient/releases)
+[![License: Apache 2.0](https://img.shields.io/github/license/ChimeraAnt-DEV/GlowberryClient)](https://github.com/ChimeraAnt-DEV/GlowberryClient/blob/main/LICENSE)
+[![Issues](https://img.shields.io/github/issues/ChimeraAnt-DEV/GlowberryClient?style=flat-square&color=red)](https://github.com/ChimeraAnt-DEV/GlowberryClient/issues)
+[![Stars](https://img.shields.io/github/stars/ChimeraAnt-DEV/GlowberryClient?style=flat-square&color=yellow)](https://github.com/ChimeraAnt-DEV/GlowberryClient)
+[![Downloads](https://img.shields.io/github/downloads/ChimeraAnt-DEV/GlowberryClient/total.svg)](https://github.com/ChimeraAnt-DEV/GlowberryClient/releases)
 [![Android](https://img.shields.io/badge/Android-9.0%2B-green?style=flat-square&logo=android)](https://www.android.com/)
 
 ---
@@ -21,7 +21,7 @@
 
 GlowberryClient is a feature-rich, open-source Android launcher built specifically for legitimate players of Minecraft: Bedrock Edition (MCBE). It provides a powerful and user-friendly alternative to the standard Google Play installation, allowing you to manage multiple game versions and extend functionality with external modules.
 
-GlowberryClient enables you to import your official Minecraft APK and run it directly without requiring system installation. The launcher supports loading external native modules to enhance gameplay, provides robust multi-version management with complete isolation between installations, and includes built-in tools for managing worlds, resource packs, skin packs, accounts, controllers, and launcher settings. It also ships a modern in-game Mod Menu, a proximity voice-chat system, a cosmetics studio, and a performance/personalization layer on top of a fully custom UI. Whether you're looking to organize different game versions, test modifications, or optimize your gaming experience, GlowberryClient offers the flexibility you need. The repository also ships a full user guide (English and 简体中文), developer documentation, and Preloader API reference under `docs/`.
+GlowberryClient enables you to import your official Minecraft APK and run it directly without requiring system installation. The launcher supports loading external native modules to enhance gameplay, provides robust multi-version management with complete isolation between installations, and includes built-in tools for managing worlds, resource packs, skin packs, accounts, controllers, and launcher settings. It also ships a modern in-game Mod Menu (plus a premium VIP Mod Menu opened by an in-game bind), a proximity voice-chat system with optional internet relay, a replay recorder, a Java-to-Bedrock mod auto-porter, a cosmetics studio, and a performance/personalization layer on top of a fully custom UI. Whether you're looking to organize different game versions, test modifications, or optimize your gaming experience, GlowberryClient offers the flexibility you need. The repository also ships a full user guide (English and 简体中文), developer documentation, and Preloader API reference under `docs/`.
 
 > **Independent project:** GlowberryClient is its own project with its own architecture, branding, feature set, and maintenance. It is not a fork of any other launcher. Its native-modding layer builds on ideas and conventions from the wider open-source Bedrock modding ecosystem, but every component described here is developed and maintained as part of GlowberryClient.
 
@@ -32,21 +32,24 @@ GlowberryClient enables you to import your official Minecraft APK and run it dir
 - **Native Mod System (Preloader)** – Load external native SO modules packaged as `.chimerapack` (or a plain `.so`), with a Preloader input/output pipeline, hook installation, patches, and keyboard/gamepad input callbacks for developers (see `docs/api` and `examples/full-cpp-mod`)
 - **`.AntEgg` Mod Packaging** – A ZIP-based package format for shipping native or Lua-script mods with a validated manifest, sandboxed extraction, and atomic install. Script mods run on an embedded Lua VM and report failures in the Mods tab instead of taking the launcher down (see `examples/antegg-template`)
 - **Multi-Version & Instance Management** – Manage multiple Minecraft versions independently, with complete isolation between configurations, game data, and worlds
-- **Built-In Mod Manager & In-Game Mod Menu** – Toggle installed mods on/off, a native "mod menu" switch, and per-mod configuration from inside the launcher, plus a modern in-game Mod Menu with **General**, **HUD Editor**, and **Settings** sections and a draggable HUD overlay system
+- **Mod Menu (two screens)** – A touch Mod Menu with **General**, **HUD Editor**, **Cosmetics**, **Packs**, **Voice**, **Replay**, and **Settings** sections, plus a premium **VIP Mod Menu** opened by an in-game bind with controller and keyboard surfaces, a shared module grid, and a full draggable HUD overlay system
 - **PvP Modules** – A dedicated **PvP** section in the Mod Menu groups combat tools: Aim Settings, CPS Display, Snaplook, Armor HUD, Crystal Optimizer, Hit Registration, Select Hit, and Hitboxes. Modules that need live game data say so on screen instead of showing a fabricated reading
-- **Proximity Voice Chat** – Talk to other Chimera users in the same world over LAN multicast, with multiple channels, shareable private join codes, a live in-game mic indicator, and a dedicated Voice tab for managing channels and members
-- **Cosmetics Studio** – Preview your character with an applied skin, cape, and accessories, then apply a cape in-game through a resource pack. Scope is stated honestly: the preview animates, the in-game cape is a still texture
-- **Mod Sourcing** – Import mods from **CurseForge** (user-provided API key) and install `.mcpack`/`.mcaddon` files, or pick local files. A **Mod Hub** also browses the **Modrinth** index and scans local Downloads, but Modrinth hosts Java Edition content that this launcher cannot install, so it is browse-only and says so
+- **PvP Suite (V1.1)** – Four overlay-only visual modules in the General tab: Reach Indicator, Trajectory Prediction, Hit Prediction, and Custom Kill Effects. Each fails closed (draws nothing) when it has no data rather than guessing
+- **Proximity Voice Chat** – Talk to other players in the same world over LAN multicast, with multiple channels, shareable private join codes, a live in-game mic indicator, and a dedicated Voice tab for managing channels and members. An optional **internet relay** extends voice to players who are not on the same Wi-Fi, using Opus compression and a lightweight Go relay server
+- **Replay System** – Record, trim, favorite, rename, and export clips from a shared Replay panel available in both Mod Menu screens, backed by a single capture/library backend
+- **JavaBridge (Java Edition Mod Auto-Porter)** – Point it at a Java Edition `.jar` and it assesses portability, then (with your explicit consent and a configured LLM) decompiles and generates a Bedrock `.AntEgg` mod. It rewrites Java mods rather than running them, and says so — there is no Java Edition runtime
+- **Cosmetics Studio & Status Diagnostic** – Preview your character with an applied skin, cape, and accessories, then apply a cape in-game through a resource pack. Scope is stated honestly: the preview animates, the in-game cape is a still texture. A **Cosmetics status** diagnostic turns the cape's silent failure modes into named checks
+- **Mod Sourcing** – Import mods from **CurseForge** (user-provided API key) and install `.mcpack`/`.mcaddon` files, or pick local files. A **Mod Hub** also browses the **Modrinth** index and scans local Downloads, but Modrinth hosts Java Edition content that this launcher cannot install, so it is browse-only and says so. A `.jar` picked in the importer is routed to JavaBridge instead of being reported unsupported
 - **Mod Load Diagnostics & Safe Mode** – Failed mods are recorded with a user-readable reason and badged inline instead of crashing the process, and a crash-loop safe mode offers to disable the mods that were loaded before a crash
 - **Multiple Xbox Account Management** – Add and switch multiple Microsoft/Xbox accounts in the launcher, with in-app MSAL login and device-code flows, so the game always launches with the expected identity
-- **Controller Support & Input Mapping** – Up to 5 profiles per controller type (Xbox, DualShock 4, DualSense), with button remapping, stick dead-zone tuning, sensitivity, vibration toggle, anti-stick-drift with hysteresis, explicit calibration, and a Low Input Delay mode, applied live to gameplay
+- **Controller Support & Input Mapping** – Up to 5 profiles per controller type (Xbox, DualShock 4, DualSense), with button remapping (including remap layers), stick dead-zone tuning, sensitivity, rumble strength, anti-stick-drift with hysteresis, explicit calibration, and a Low Input Delay mode, applied live to gameplay. Controller screens use **3D illustrations** with a projection that lifts the shoulders toward the camera
 - **Content Management & Skin Packs** – Import, export, and back up worlds, resource packs, skin packs, and launcher data from one place, plus skin-pack management outside the game
 - **In-Game Pack Changer** – Optionally change an instance's resource packs from inside the running game, written to every candidate game-data root so the change is never silently ignored
 - **Custom Flat Worlds** – Craft preset or fully customized superflat worlds before the game even opens
 - **Options Editing & Quick Launch** – Edit per-version `options.txt`-style settings, and use Minecraft URI quick-launch actions to open screens, connect to servers, add servers, join Realms, load worlds, or run commands
 - **Playtime Tracking** – Per-instance playtime is recorded and shown on the home hero card and the instance list
-- **News, Updates, & Crash Reporting** – In-app news feed with notifications, a crash-reporting screen surfacing logs, and automated release-content tooling (`docs/RELEASE_CONTENT.md`)
-- **Performance & Personalization** – One-tap performance presets (Battery/Balanced/Performance), a "Reduce Network Latency" mode that tunes launcher-owned sockets and avoids polling during a game session, user-configurable accent color, glass-card/compact-mode theming, animations, empty states, and a "last played" home hero card
+- **News, Updates, & Crash Reporting** – In-app news feed with notifications, a crash-reporting screen surfacing logs, automated release-content tooling (`docs/RELEASE_CONTENT.md`), and a Discord notification action for beta releases
+- **Performance & Personalization** – One-tap performance presets (Battery/Balanced/Performance), an **FPS Optimization** coordinator that quiets the launcher and sheds speculative work under thermal/battery/memory pressure while a session runs, a "Reduce Network Latency" mode that tunes launcher-owned sockets and avoids polling during a game session, user-configurable accent color, glass-card/compact-mode theming, animations, empty states, a "last played" home hero card, and an optional blue firework touch layer
 
 ---
 
@@ -72,7 +75,7 @@ Before proceeding with GlowberryClient installation, ensure that you have the of
 
 ### Installation Steps
 
-1. Visit the [Releases Page](https://github.com/ChimeraAnt-DEV/ChimeraLauncher/releases) and download the latest Apk/Zip build (extract it)
+1. Visit the [Releases Page](https://github.com/ChimeraAnt-DEV/GlowberryClient/releases) and download the latest Apk/Zip build (extract it)
 2. Open your device Settings and navigate to Security or Applications
 3. Enable "Unknown Sources" or "Allow installation from unknown sources" to permit APK installation
 4. Locate the downloaded APK file using your file manager, and tap to install
@@ -81,7 +84,9 @@ Before proceeding with GlowberryClient installation, ensure that you have the of
 
 > **Important:** GlowberryClient requires a legitimate, licensed copy of Minecraft Bedrock Edition. Do not use this launcher with pirated or unauthorized versions of the game. Ensure your Minecraft license is valid and properly linked to your Microsoft account.
 
-> **Upgrading from an older build:** The rename to GlowberryClient changed the app's package identity, so Android will not offer an in-place update and the old app's private settings are not reachable from the new one. To carry them over, use **Settings → Backup & Restore → Export** in the old app, then **Backup & Restore → Import** in GlowberryClient. Account credentials and API keys are never included in the export.
+> **Upgrading from Chimera Client:** GlowberryClient is a display-name rebrand of Chimera Client, and the app's package id (`org.chimeramc.client`) is unchanged, so it installs as an in-place update and your settings carry over.
+
+> **Upgrading from the older "Chimera Launcher":** That earlier rename *did* change the package id, so Android will not offer an in-place update and the old app's private settings are not reachable. To carry them over, use **Settings → Backup & Restore → Export** in the old app, then **Backup & Restore → Import** in GlowberryClient. Account credentials and API keys are never included in the export.
 
 ---
 
@@ -103,7 +108,7 @@ If you want to build GlowberryClient from source or contribute to development, f
 
 
     ```bash
-    git clone --recurse-submodules https://github.com/ChimeraAnt-DEV/ChimeraLauncher.git
+    git clone --recurse-submodules https://github.com/ChimeraAnt-DEV/GlowberryClient.git
     ```
 
     If you already cloned without them, run `git submodule update --init --recursive`.
@@ -205,7 +210,7 @@ GlowberryClient is an independent project. It stands on the shoulders of the ope
 - **Open-Source Bedrock Modding Community** – For the shared knowledge, tooling conventions, and ecosystem research that inform how native modules are packaged, loaded, and kept safe
 - **Android Community** – For excellent documentation, libraries, and tools that made this launcher possible
 - **Open Source Community** – For all the libraries, frameworks, and tools that power this project
-- **Contributors** – A heartfelt thank you to all [contributors](https://github.com/ChimeraAnt-DEV/ChimeraLauncher/graphs/contributors) who have continuously improved and maintained GlowberryClient through their time and expertise
+- **Contributors** – A heartfelt thank you to all [contributors](https://github.com/ChimeraAnt-DEV/GlowberryClient/graphs/contributors) who have continuously improved and maintained GlowberryClient through their time and expertise
 
 ---
 
@@ -213,9 +218,9 @@ GlowberryClient is an independent project. It stands on the shoulders of the ope
 
 **Author / Team:** Chimera Team
 
-**Project Repository:** [https://github.com/ChimeraAnt-DEV/ChimeraLauncher](https://github.com/ChimeraAnt-DEV/ChimeraLauncher)
+**Project Repository:** [https://github.com/ChimeraAnt-DEV/GlowberryClient](https://github.com/ChimeraAnt-DEV/GlowberryClient)
 
-**Report Issues:** [GitHub Issues Page](https://github.com/ChimeraAnt-DEV/ChimeraLauncher/issues)
+**Report Issues:** [GitHub Issues Page](https://github.com/ChimeraAnt-DEV/GlowberryClient/issues)
 
 **For support and questions:** Please create an issue on the GitHub repository.
 
@@ -223,11 +228,11 @@ GlowberryClient is an independent project. It stands on the shoulders of the ope
 
 <div align="center">
 
-[![GitHub Release](https://img.shields.io/github/v/release/ChimeraAnt-DEV/ChimeraLauncher?style=flat-square&color=blue)](https://github.com/ChimeraAnt-DEV/ChimeraLauncher/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/ChimeraAnt-DEV/GlowberryClient?style=flat-square&color=blue)](https://github.com/ChimeraAnt-DEV/GlowberryClient/releases)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Issues](https://img.shields.io/github/issues/ChimeraAnt-DEV/ChimeraLauncher?style=flat-square&color=red)](https://github.com/ChimeraAnt-DEV/ChimeraLauncher/issues)
-[![Stars](https://img.shields.io/github/stars/ChimeraAnt-DEV/ChimeraLauncher?style=flat-square&color=yellow)](https://github.com/ChimeraAnt-DEV/ChimeraLauncher)
-[![Downloads](https://img.shields.io/github/downloads/ChimeraAnt-DEV/ChimeraLauncher/total.svg)](https://github.com/ChimeraAnt-DEV/ChimeraLauncher/releases)
+[![Issues](https://img.shields.io/github/issues/ChimeraAnt-DEV/GlowberryClient?style=flat-square&color=red)](https://github.com/ChimeraAnt-DEV/GlowberryClient/issues)
+[![Stars](https://img.shields.io/github/stars/ChimeraAnt-DEV/GlowberryClient?style=flat-square&color=yellow)](https://github.com/ChimeraAnt-DEV/GlowberryClient)
+[![Downloads](https://img.shields.io/github/downloads/ChimeraAnt-DEV/GlowberryClient/total.svg)](https://github.com/ChimeraAnt-DEV/GlowberryClient/releases)
 [![Android](https://img.shields.io/badge/Android-9.0%2B-green?style=flat-square&logo=android)](https://www.android.com/)
 
 **Made with ❤️ by the Chimera Team Community**
