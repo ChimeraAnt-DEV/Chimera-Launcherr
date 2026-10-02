@@ -121,16 +121,16 @@ public final class HitboxMod {
     }
 
     /**
-     * True when the module is on and a peer feed is available.
+     * True when the module is on and the peer data route exists (the voice link is running).
      *
      * <p>Different from {@link #isAwaitingGameData()}, which is about the native entity feed: the
-     * peer feed needs no native hook, so it is present whenever the voice module is running. The
-     * overlay uses this to decide between the native "waiting for game data" notice and the
-     * peer-only view, so a player who has voice on sees boxes rather than a message saying the
-     * module is not wired up.
+     * peer feed needs no native hook, so the route is present whenever the voice module is
+     * running. Note this is the route's existence, not whether anyone is currently in range -- the
+     * overlay uses it to tell "working, nobody nearby" apart from "no route at all", so it does
+     * not show the native "waiting for game data" notice while the peer route is fine.
      */
     public static boolean hasPeerFeed() {
-        return active && PeerHitboxSource.readPeers() != null;
+        return active && PeerHitboxSource.hasFeed();
     }
 
     public static boolean isKindEnabled(HitboxProjector.Kind kind) {

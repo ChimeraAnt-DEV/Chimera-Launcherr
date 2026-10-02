@@ -172,7 +172,12 @@ public final class HitboxOverlay {
                 // "waiting for game data" notice. Showing the notice while peer boxes are
                 // available would claim the module is unwired when it is working.
                 if (drawPeerBoxes(canvas)) return;
-                if (HitboxMod.isAwaitingGameData()) drawAwaitingData(canvas);
+                // Only blame the missing native feed when there is no peer route either: with the
+                // voice link running the module is working, it just has nobody in range, and the
+                // notice would be a lie.
+                if (HitboxMod.isAwaitingGameData() && !HitboxMod.hasPeerFeed()) {
+                    drawAwaitingData(canvas);
+                }
                 return;
             }
 
@@ -274,11 +279,11 @@ public final class HitboxOverlay {
 
         /** The camera for the peer view, or null when the local player feed is unavailable. */
         private HitboxProjector.Camera camera() {
-            VoiceNametagOverlay.CameraSource source = VoiceNametagOverlay.cameraSource();
-            if (source == null) return null;
+            // Read the local player's view directly, like the rest of the suite. The peer boxes
+            // must not depend on the voice nametag seam: that seam is installed by startVoiceChat,
+            // so a player with voice off would get no boxes even though the peer feed works.
             try {
-                // The camera is scaled to the draw target, so the basis and the entity boxes agree.
-                return source.camera(getWidth(), getHeight());
+                return LocalPlayerFeed.localCamera(getWidth(), getHeight());
             } catch (Throwable t) {
                 return null;
             }

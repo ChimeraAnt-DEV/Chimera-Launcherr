@@ -60,17 +60,21 @@ public final class ModIds {
 
     /**
      * True for modules that are <em>entirely</em> dependent on a per-frame data feed from the
-     * game process and have no other route to a result: durability/target reads (Armor HUD) and
-     * placement geometry (Crystal Optimizer). With no native provider installed these cannot
-     * produce anything, so the Mod Menu badges them and refuses the toggle.
+     * game process and have no other route to a result: durability/target reads (Armor HUD),
+     * placement geometry (Crystal Optimizer), the held-item read the trajectory arc needs
+     * (Trajectory Prediction) and the opponent-death feed kill credit needs (Custom Kill
+     * Effects). With no native provider installed none of them can produce anything, so the Mod
+     * Menu badges them and refuses the toggle.
      *
      * <p>The Hitboxes module is deliberately <em>not</em> here. It draws other players from the
      * proximity-voice feed, which needs no native hook at all, so it works today; only some of its
      * entity kinds need the native feed. Those are listed by {@link #outputRequiresGameData} and
-     * are disabled per-option rather than taking the whole module down.
+     * are disabled per-option rather than taking the whole module down. The Reach Indicator and
+     * Hit Prediction share that peer route and stay usable for the same reason.
      */
     public static boolean requiresGameData(String modId) {
-        return ARMOR_HUD.equals(modId) || CRYSTAL_OPTIMIZER.equals(modId);
+        return ARMOR_HUD.equals(modId) || CRYSTAL_OPTIMIZER.equals(modId)
+                || TRAJECTORY_PREDICTION.equals(modId) || KILL_EFFECTS.equals(modId);
     }
 
     /**
