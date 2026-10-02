@@ -1,6 +1,7 @@
 package org.chimeramc.client.ui.activities;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -72,24 +73,40 @@ public class ModsFullscreenActivity extends BaseActivity {
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
                     if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                        fileHandler.processIncomingFilesWithConfirmation(result.getData(), new FileHandler.FileOperationCallback() {
-                            @Override
-                            public void onSuccess(int processedFiles) {
-                                Toast.makeText(ModsFullscreenActivity.this, getString(R.string.files_processed, processedFiles), Toast.LENGTH_SHORT).show();
-                            }
-
-                            @Override
-                            public void onError(String errorMessage) {
-                                Toast.makeText(ModsFullscreenActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
-                            }
-
-                            @Override
-                            public void onProgressUpdate(int progress) {
-                            }
-                        }, true);
+                        fileHandler.processIncomingFilesWithConfirmation(result.getData(),
+                                new ImportCallback(), true);
                     }
                 }
         );
+    }
+
+    /**
+     * A Java Edition .jar cannot be imported as a Bedrock mod, so the picker hands it to the
+     * JavaBridge screen instead. The callback is attached to the existing FileOperationCallback
+     * object, which keeps the two flows from having to be told apart at the call site.
+     */
+    private final class ImportCallback implements FileHandler.FileOperationCallback,
+            FileHandler.JavaBridgeHandoff {
+        @Override
+        public void onSuccess(int processedFiles) {
+            Toast.makeText(ModsFullscreenActivity.this, getString(R.string.files_processed, processedFiles), Toast.LENGTH_SHORT).show();
+        }
+
+        @Override
+        public void onError(String errorMessage) {
+            Toast.makeText(ModsFullscreenActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+        }
+
+        @Override
+        public void onProgressUpdate(int progress) {
+        }
+
+        @Override
+        public void onJavaJarSelected(Uri jarUri) {
+            Intent intent = new Intent(ModsFullscreenActivity.this, JavaBridgeActivity.class);
+            intent.putExtra(JavaBridgeActivity.EXTRA_JAR_URI, jarUri.toString());
+            startActivity(intent);
+        }
     }
 
     private void setupViews() {
@@ -104,6 +121,11 @@ public class ModsFullscreenActivity extends BaseActivity {
         Button modHubButton = findViewById(R.id.mod_hub_fullscreen_button);
         modHubButton.setOnClickListener(v -> startActivity(new Intent(this, ModHubActivity.class)));
         DynamicAnim.applyPressScale(modHubButton);
+
+        Button javaBridgeButton = findViewById(R.id.javabridge_fullscreen_button);
+        javaBridgeButton.setOnClickListener(v ->
+                startActivity(new Intent(this, JavaBridgeActivity.class)));
+        DynamicAnim.applyPressScale(javaBridgeButton);
 
         Button modMenuButton = findViewById(R.id.mod_menu_button);
         boolean isMenuEnabled = inbuiltModManager.isModMenuEnabled();

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A skeleton placeholder bar for loading states. The launcher's loading convention is a shimmer
+    of neutral bars rather than a spinner, so the layout keeps its shape while the work runs.
+    The pulse is driven by JavaBridgeActivity (alpha animation), not a drawable animation, so it
+    respects the personalization "show animations" gate like every other motion in the app.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="6dp" />
+    <solid android:color="@color/brand_primary_13" />
+</shape>

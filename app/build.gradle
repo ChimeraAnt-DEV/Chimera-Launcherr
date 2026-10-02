@@ -146,6 +146,9 @@ dependencies {
     implementation libs.gson
     implementation libs.luaj.jse
     implementation libs.concentus
+    // JavaBridge auto-porter: CFR (MIT) decompiles Java Edition .class files so their source
+    // can be sent to an LLM for reimplementation. No Android APIs, plain jar.
+    implementation libs.cfr
     implementation libs.androidx.preference.ktx
     implementation libs.androidx.games.activity
     implementation libs.okhttp

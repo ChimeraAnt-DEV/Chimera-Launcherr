@@ -279,6 +279,14 @@
             tools:ignore="DiscouragedApi" />
 
         <activity
+            android:name=".ui.activities.JavaBridgeActivity"
+            android:theme="@style/Base.Theme.FullScreen"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="fontScale|density|smallestScreenSize|screenSize|uiMode|screenLayout|orientation|navigation|keyboardHidden|keyboard|touchscreen|locale|mnc|mcc"
+            android:exported="false"
+            tools:ignore="DiscouragedApi" />
+
+        <activity
             android:name=".ui.activities.ModrinthDetailActivity"
             android:theme="@style/Base.Theme.FullScreen"
             android:screenOrientation="sensorLandscape"
@@ -366,6 +374,11 @@
                 <data android:pathPattern="/.*\\..*\\..*\\.antegg" />
                 <data android:pathPattern="/.*\\..*\\..*\\..*\\.antegg" />
                 <data android:pathPattern="/.*\\..*\\..*\\..*\\..*\\.antegg" />
+                <data android:pathPattern="/.*\\.jar" />
+                <data android:pathPattern="/.*\\..*\\.jar" />
+                <data android:pathPattern="/.*\\..*\\..*\\.jar" />
+                <data android:pathPattern="/.*\\..*\\..*\\..*\\.jar" />
+                <data android:pathPattern="/.*\\..*\\..*\\..*\\..*\\.jar" />
                 <data android:pathPattern="/.*\\.mcworld" />
                 <data android:pathPattern="/.*\\..*\\.mcworld" />
                 <data android:pathPattern="/.*\\..*\\..*\\.mcworld" />
@@ -391,6 +404,7 @@
                 <data android:pathSuffix=".chimerapack" />
                 <data android:pathSuffix=".so" />
                 <data android:pathSuffix=".antegg" />
+                <data android:pathSuffix=".jar" />
                 <data android:pathSuffix=".mcworld" />
                 <data android:pathSuffix=".mcpack" />
                 <data android:pathSuffix=".mcaddon" />
@@ -431,6 +445,11 @@
                 <data android:pathPattern="/.*\\..*\\..*\\.antegg" />
                 <data android:pathPattern="/.*\\..*\\..*\\..*\\.antegg" />
                 <data android:pathPattern="/.*\\..*\\..*\\..*\\..*\\.antegg" />
+                <data android:pathPattern="/.*\\.jar" />
+                <data android:pathPattern="/.*\\..*\\.jar" />
+                <data android:pathPattern="/.*\\..*\\..*\\.jar" />
+                <data android:pathPattern="/.*\\..*\\..*\\..*\\.jar" />
+                <data android:pathPattern="/.*\\..*\\..*\\..*\\..*\\.jar" />
                 <data android:pathPattern="/.*\\.mcworld" />
                 <data android:pathPattern="/.*\\..*\\.mcworld" />
                 <data android:pathPattern="/.*\\..*\\..*\\.mcworld" />
@@ -456,6 +475,7 @@
                 <data android:pathSuffix=".chimerapack" />
                 <data android:pathSuffix=".so" />
                 <data android:pathSuffix=".antegg" />
+                <data android:pathSuffix=".jar" />
                 <data android:pathSuffix=".mcworld" />
                 <data android:pathSuffix=".mcpack" />
                 <data android:pathSuffix=".mcaddon" />

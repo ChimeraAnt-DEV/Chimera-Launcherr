@@ -109,6 +109,24 @@
                 android:fontFamily="@font/misans" />
 
             <Button
+                android:id="@+id/javabridge_fullscreen_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="40dp"
+                android:minWidth="0dp"
+                android:backgroundTint="@color/secondary"
+                android:text="@string/javabridge_title"
+                android:textColor="@color/on_secondary"
+                android:paddingHorizontal="16dp"
+                android:layout_marginStart="10dp"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textAllCaps="false"
+                android:gravity="center"
+                android:layout_gravity="center_vertical"
+                android:fontFamily="@font/misans" />
+
+            <Button
                 android:id="@+id/mod_hub_fullscreen_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

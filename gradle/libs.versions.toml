@@ -46,6 +46,9 @@ xcrash = "3.1.2"
 # coordinate resolves, and matches the moving coordinates this project already uses
 # (MinecraftAuth `main-SNAPSHOT`, bedrock-connection `...-SNAPSHOT`).
 concentus = "master"
+# CFR (MIT) is the Java decompiler the JavaBridge auto-porter uses. MIT, so it can be
+# bundled in an Apache-2.0 APK; it is a plain jar with no Android dependencies.
+cfr = "0.152"
 
 [libraries]
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomRuntime" }
@@ -97,6 +100,7 @@ billing = { group = "com.android.billingclient", name = "billing", version.ref =
 androidx-dynamicanimation = { module = "androidx.dynamicanimation:dynamicanimation", version.ref = "dynamicanimation" }
 xcrash = { module = "com.github.RadiantByte:xCrash", version.ref = "xcrash" }
 concentus = { module = "com.github.lostromb.concentus:Concentus", version.ref = "concentus" }
+cfr = { module = "org.benf:cfr", version.ref = "cfr" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
