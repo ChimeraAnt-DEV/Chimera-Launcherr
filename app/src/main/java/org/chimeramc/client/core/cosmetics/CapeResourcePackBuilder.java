@@ -444,83 +444,54 @@ public final class CapeResourcePackBuilder {
     }
 
     /**
-     * The cape geometry.
-     *
-     * <p>A 10x16x1 box on the player's back, using the vanilla {@code geometry.cape} bone layout
-     * (bone {@code cape}, parent {@code body}, pivot at the shoulders) and the standard cape UV
-     * unwrap at {@code [0,0]}, which is the layout {@link CapeTexturePainter} paints.
+     * The cape geometry: a chain of {@link CapeGeometry#SEGMENT_COUNT} thin bones parented in
+     * sequence, spanning the same 10x16 box the single-bone cape used. Each segment's UV row is its
+     * own slice of the cape texture, so the artwork is not stretched across the chain. See
+     * {@link CapeGeometry} for why a chain is used instead of one rigid box, and for the
+     * performance fallback.
      */
     static String capeModelJson() {
-        return "{\n"
-                + "  \"format_version\": \"1.12.0\",\n"
-                + "  \"minecraft:geometry\": [\n"
-                + "    {\n"
-                + "      \"description\": {\n"
-                + "        \"identifier\": \"" + CAPE_GEOMETRY_ID + "\",\n"
-                + "        \"texture_width\": 64,\n"
-                + "        \"texture_height\": 32,\n"
-                + "        \"visible_bounds_width\": 2,\n"
-                + "        \"visible_bounds_height\": 3,\n"
-                + "        \"visible_bounds_offset\": [0, 1, 0]\n"
-                + "      },\n"
-                + "      \"bones\": [\n"
-                + "        {\n"
-                + "          \"name\": \"body\",\n"
-                + "          \"pivot\": [0.0, 24.0, 0.0],\n"
-                + "          \"parent\": \"waist\"\n"
-                + "        },\n"
-                + "        {\n"
-                + "          \"name\": \"waist\",\n"
-                + "          \"pivot\": [0.0, 12.0, 0.0]\n"
-                + "        },\n"
-                + "        {\n"
-                + "          \"name\": \"cape\",\n"
-                + "          \"parent\": \"body\",\n"
-                + "          \"pivot\": [0.0, 24.0, 3.0],\n"
-                + "          \"bind_pose_rotation\": [0.0, 180.0, 0.0],\n"
-                + "          \"rotation\": [0.0, 180.0, 0.0],\n"
-                + "          \"cubes\": [\n"
-                + "            {\n"
-                + "              \"origin\": [-5.0, 8.0, 3.0],\n"
-                + "              \"size\": [10, 16, 1],\n"
-                + "              \"uv\": [0, 0]\n"
-                + "            }\n"
-                + "          ]\n"
-                + "        }\n"
-                + "      ]\n"
-                + "    }\n"
-                + "  ]\n"
-                + "}\n";
+        return CapeGeometry.modelJson(CAPE_GEOMETRY_ID);
     }
 
     /**
-     * The cape's cloth animation.
+     * The cape's cloth animation: one rotation triple per segment, all driven from
+     * {@link CapeAnimationCurve}.
      *
      * <p>A geometry alone renders the cape as a rigid box: the vanilla player controller plays the
      * {@code cape} animation key in third person and the paperdoll, and the pack points that key at
-     * this animation, so this is what turns a stiff plank into cloth. It drives the {@code cape}
-     * bone with the movement queries Bedrock exposes — {@code modified_move_speed},
-     * {@code is_jumping}, {@code vertical_speed} and {@code modified_distance_moved} — through the
-     * expressions {@link CapeAnimationCurve} also implements in Java, so the amplitudes have one
-     * definition rather than one per language.
+     * this animation. Each of the {@link CapeGeometry#SEGMENT_COUNT} bones gets its own rotation,
+     * scaled by {@link CapeAnimationCurve#segmentShare} and phase-lagged down the chain, so the
+     * cloth folds and ripples rather than swinging as one plank. The queries are Bedrock's
+     * {@code modified_move_speed}, {@code is_jumping}, {@code vertical_speed},
+     * {@code modified_distance_moved} and {@code body_y_rotation}, all read from the expressions
+     * {@link CapeAnimationCurve} also implements in Java, so the amplitudes have one definition.
      *
      * <p>No {@code loop} key: the default (non-looping) is what vanilla uses for this bone, and the
      * expression is a continuous function of the queries, so it tracks the player either way.
      */
     static String capeAnimationJson() {
-        return "{\n"
-                + "  \"format_version\": \"1.8.0\",\n"
-                + "  \"animations\": {\n"
-                + "    \"" + CAPE_ANIMATION_ID + "\": {\n"
-                + "      \"bones\": {\n"
-                + "        \"cape\": {\n"
-                + "          \"rotation\": [\"" + CapeAnimationCurve.leanExpression() + "\", 180.0, \""
-                + CapeAnimationCurve.swayExpression() + "\"]\n"
-                + "        }\n"
-                + "      }\n"
-                + "    }\n"
-                + "  }\n"
-                + "}\n";
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"format_version\": \"1.8.0\",\n");
+        sb.append("  \"animations\": {\n");
+        sb.append("    \"").append(CAPE_ANIMATION_ID).append("\": {\n");
+        sb.append("      \"bones\": {\n");
+        for (int i = 1; i <= CapeGeometry.SEGMENT_COUNT; i++) {
+            sb.append("        \"").append(CapeGeometry.boneName(i)).append("\": {\n");
+            sb.append("          \"rotation\": [\"")
+                    .append(CapeAnimationCurve.segmentLeanExpression(i, CapeGeometry.SEGMENT_COUNT))
+                    .append("\", 180.0, \"")
+                    .append(CapeAnimationCurve.segmentSwayExpression(i, CapeGeometry.SEGMENT_COUNT))
+                    .append("\"]\n");
+            sb.append("        }");
+            sb.append(i < CapeGeometry.SEGMENT_COUNT ? ",\n" : "\n");
+        }
+        sb.append("      }\n");
+        sb.append("    }\n");
+        sb.append("  }\n");
+        sb.append("}\n");
+        return sb.toString();
     }
 
     /**
@@ -531,33 +502,41 @@ public final class CapeResourcePackBuilder {
      * cape red, which would read as a bug rather than feedback.
      */
     static String capeRenderControllerJson() {
-        return "{\n"
-                + "  \"format_version\": \"1.8.0\",\n"
-                + "  \"render_controllers\": {\n"
-                + "    \"" + CAPE_CONTROLLER_ID + "\": {\n"
-                + "      \"geometry\": \"Geometry.chimera_cape\",\n"
-                + "      \"materials\": [\n"
-                + "        {\n"
-                + "          \"*\": \"Material.chimera_cape\"\n"
-                + "        }\n"
-                + "      ],\n"
-                + "      \"textures\": [\n"
-                + "        \"Texture.chimera_cape\"\n"
-                + "      ],\n"
-                + "      \"part_visibility\": [\n"
-                + "        {\n"
-                + "          \"cape\": \"" + capeVisibilityCondition() + "\"\n"
-                + "        }\n"
-                + "      ],\n"
-                + "      \"is_hurt_color\": {\n"
-                + "        \"r\": 0.0,\n"
-                + "        \"g\": 0.0,\n"
-                + "        \"b\": 0.0,\n"
-                + "        \"a\": 0.0\n"
-                + "      }\n"
-                + "    }\n"
-                + "  }\n"
-                + "}\n";
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"format_version\": \"1.8.0\",\n");
+        sb.append("  \"render_controllers\": {\n");
+        sb.append("    \"").append(CAPE_CONTROLLER_ID).append("\": {\n");
+        sb.append("      \"geometry\": \"Geometry.chimera_cape\",\n");
+        sb.append("      \"materials\": [\n");
+        sb.append("        {\n");
+        sb.append("          \"*\": \"Material.chimera_cape\"\n");
+        sb.append("        }\n");
+        sb.append("      ],\n");
+        sb.append("      \"textures\": [\n");
+        sb.append("        \"Texture.chimera_cape\"\n");
+        sb.append("      ],\n");
+        sb.append("      \"part_visibility\": [\n");
+        sb.append("        {\n");
+        // Every segment bone, not just the first: a part_visibility entry that names only cape_1
+        // would leave the other segments to whatever default the renderer applies.
+        for (int i = 1; i <= CapeGeometry.SEGMENT_COUNT; i++) {
+            sb.append("          \"").append(CapeGeometry.boneName(i)).append("\": \"")
+                    .append(capeVisibilityCondition()).append("\"");
+            sb.append(i < CapeGeometry.SEGMENT_COUNT ? ",\n" : "\n");
+        }
+        sb.append("        }\n");
+        sb.append("      ],\n");
+        sb.append("      \"is_hurt_color\": {\n");
+        sb.append("        \"r\": 0.0,\n");
+        sb.append("        \"g\": 0.0,\n");
+        sb.append("        \"b\": 0.0,\n");
+        sb.append("        \"a\": 0.0\n");
+        sb.append("      }\n");
+        sb.append("    }\n");
+        sb.append("  }\n");
+        sb.append("}\n");
+        return sb.toString();
     }
 
     /**

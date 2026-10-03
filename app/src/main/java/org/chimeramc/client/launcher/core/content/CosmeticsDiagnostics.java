@@ -133,8 +133,9 @@ public final class CosmeticsDiagnostics {
                 checks.add(new Check("Player entity override present", Status.OK,
                         "The player entity and its cape render controller are in the pack."));
             }
-            // The cape renders without the animation, but as a rigid box; this is the difference
-            // between a plank and cloth, so a missing animation is reported rather than ignored.
+            // The cape renders without the animation, but as a stiff chain that does not fold;
+            // this is the difference between cloth and a plank, so a missing animation is
+            // reported rather than ignored.
             if (!animation.isFile()) {
                 checks.add(new Check("Cape animation present", Status.FAIL,
                         "The pack has no cape animation, so the cape renders stiff. Re-apply the "

@@ -42,7 +42,70 @@ public final class CapeAnimationCurve {
     /** Vertical speed is clamped to this magnitude so a long fall cannot over-rotate the cape. */
     public static final double MAX_VERTICAL = 1.5;
 
+    /**
+     * Flutter phase lag per segment, in blocks of travel. Each segment runs its sine a little
+     * behind the one above it, so the fold travels down the cloth instead of the whole chain
+     * moving in lockstep. Across the full chain this is
+     * {@code SEGMENT_COUNT * SEGMENT_PHASE_LAG_BLOCKS} of travel; at a sprint that is roughly one
+     * to two frames, which is the lag the hem should visibly trail the shoulders by.
+     */
+    public static final double SEGMENT_PHASE_LAG_BLOCKS = 0.012;
+
+    /** Sideways sway contributed by turning, per unit of the bounded body-yaw term. */
+    public static final double TURN_SWAY_DEG = 4.0;
+
     private CapeAnimationCurve() {
+    }
+
+    /**
+     * The fraction of the total cape rotation that a segment carries, 1-based.
+     *
+     * <p>A linear ramp from the shoulders to the hem, normalised so the shares sum to 1. That sum
+     * is what keeps the chain honest: the total rotation across all segments equals the lean a
+     * single bone would have had, so segmenting redistributes the bend along the cloth instead of
+     * changing how far the cape leans. The hem carries the most and the shoulders the least, which
+     * is what reads as a fold.
+     */
+    public static double segmentShare(int index, int total) {
+        if (total <= 1) return 1.0;
+        if (index < 1) index = 1;
+        if (index > total) index = total;
+        return (2.0 * index) / (double) (total * (total + 1));
+    }
+
+    /**
+     * A segment's X rotation in degrees; negative leans back. The Java mirror of the per-segment
+     * animation expression, used by the tests to prove the chain folds rather than snapping.
+     */
+    public static double segmentLeanDegrees(int index, int total, double moveSpeed,
+                                            boolean jumping, double verticalSpeed,
+                                            double distanceMoved) {
+        double share = segmentShare(index, total);
+        double phase = (index - 1) * SEGMENT_PHASE_LAG_BLOCKS;
+        return share * leanDegrees(moveSpeed, jumping, verticalSpeed, distanceMoved - phase);
+    }
+
+    /**
+     * A segment's Z rotation in degrees. Uses the bounded body-yaw term so a turn ripples the
+     * cloth, and the same per-segment phase lag so the ripple travels down the chain.
+     */
+    public static double segmentSwayDegrees(int index, int total, double moveSpeed,
+                                            double distanceMoved, double bodyYawDegrees) {
+        double share = segmentShare(index, total);
+        double phase = (index - 1) * SEGMENT_PHASE_LAG_BLOCKS;
+        return share * (swayDegrees(moveSpeed, distanceMoved - phase)
+                + turnSwayDegrees(moveSpeed, bodyYawDegrees));
+    }
+
+    /**
+     * The bounded turn-sway term. The body yaw wraps, so it is fed through a sine: the result is
+     * always in {@code [-1, 1]} and cannot grow without bound as the player spins, while still
+     * changing as the player turns so a turn visibly moves the cloth.
+     */
+    public static double turnSwayDegrees(double moveSpeed, double bodyYawDegrees) {
+        double speed = clamp(moveSpeed, 0.0, MAX_MOVE_SPEED);
+        double yaw = Double.isNaN(bodyYawDegrees) ? 0.0 : bodyYawDegrees;
+        return Math.sin(Math.toRadians(yaw)) * TURN_SWAY_DEG * speed;
     }
 
     /** The cape bone's X rotation in degrees for the given movement state; negative leans back. */
@@ -71,13 +134,23 @@ public final class CapeAnimationCurve {
      * {@code [-1.5,1.5]}.
      */
     public static String leanExpression() {
+        return leanExpression(0.0);
+    }
+
+    /**
+     * The X-rotation expression with a phase offset baked into the flutter's sine argument, so a
+     * segment's fold travels slightly behind the one above it. The offset subtracts inside the
+     * sine exactly as {@link #segmentLeanDegrees} does, so the JSON and the Java agree.
+     */
+    private static String leanExpression(double phaseOffsetBlocks) {
         return "-("
                 + "math.clamp(query.modified_move_speed, 0.0, " + num(MAX_MOVE_SPEED) + ")"
                 + " * " + num(WALK_LEAN_DEG)
                 + " + (query.is_jumping ? " + num(JUMP_FLARE_DEG) + " : 0.0)"
                 + " + math.clamp(query.vertical_speed, -" + num(MAX_VERTICAL)
                 + ", " + num(MAX_VERTICAL) + ") * " + num(VERTICAL_LEAN_DEG)
-                + " + math.sin(query.modified_distance_moved * " + num(FLUTTER_FREQUENCY) + ")"
+                + " + math.sin((" + distanceWithOffset(phaseOffsetBlocks) + ") * "
+                + num(FLUTTER_FREQUENCY) + ")"
                 + " * " + num(FLUTTER_AMPLITUDE_DEG)
                 + " * math.clamp(query.modified_move_speed, 0.0, " + num(MAX_MOVE_SPEED) + ")"
                 + ")";
@@ -85,9 +158,51 @@ public final class CapeAnimationCurve {
 
     /** The Bedrock expression for the Z sway, built from the same constants. */
     public static String swayExpression() {
-        return "math.sin(query.modified_distance_moved * " + num(SWAY_FREQUENCY) + ")"
+        return swayExpression(0.0);
+    }
+
+    /** The Z-sway expression with a phase offset baked into its sine argument. */
+    private static String swayExpression(double phaseOffsetBlocks) {
+        return "math.sin((" + distanceWithOffset(phaseOffsetBlocks) + ") * " + num(SWAY_FREQUENCY) + ")"
                 + " * " + num(SWAY_AMPLITUDE_DEG)
                 + " * math.clamp(query.modified_move_speed, 0.0, " + num(MAX_MOVE_SPEED) + ")";
+    }
+
+    /**
+     * The bounded turn-sway Bedrock expression, mirroring {@link #turnSwayDegrees}. The body yaw
+     * wraps, so it is fed through a sine; the result is always in {@code [-1, 1]}.
+     */
+    public static String turnSwayExpression() {
+        return "math.sin(math.rad(query.body_y_rotation)) * " + num(TURN_SWAY_DEG)
+                + " * math.clamp(query.modified_move_speed, 0.0, " + num(MAX_MOVE_SPEED) + ")";
+    }
+
+    /**
+     * A segment's X-rotation Bedrock expression. {@code share} is the segment's fraction of the
+     * total bend and the phase lag is baked into the sine argument, both derived from the same
+     * constants {@link #segmentLeanDegrees} uses, so the JSON and the Java cannot describe a
+     * different chain.
+     */
+    public static String segmentLeanExpression(int index, int total) {
+        return "(" + num(segmentShare(index, total)) + ") * "
+                + leanExpression((index - 1) * SEGMENT_PHASE_LAG_BLOCKS);
+    }
+
+    /**
+     * A segment's Z-rotation Bedrock expression. Uses the bounded body-yaw term so a turn ripples
+     * the cloth, and the same per-segment phase lag as the lean so the ripple travels down the
+     * chain.
+     */
+    public static String segmentSwayExpression(int index, int total) {
+        return "(" + num(segmentShare(index, total)) + ") * ("
+                + swayExpression((index - 1) * SEGMENT_PHASE_LAG_BLOCKS)
+                + " + " + turnSwayExpression() + ")";
+    }
+
+    /** {@code query.modified_distance_moved} minus a phase offset, or the bare query at zero. */
+    private static String distanceWithOffset(double phaseOffsetBlocks) {
+        if (phaseOffsetBlocks == 0.0) return "query.modified_distance_moved";
+        return "query.modified_distance_moved - " + num(phaseOffsetBlocks);
     }
 
     private static double clamp(double value, double min, double max) {
