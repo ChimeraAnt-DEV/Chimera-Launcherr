@@ -17,7 +17,7 @@ package org.chimeramc.client.core.cosmetics;
  *
  * <p><b>Varied meshes, not one mesh recoloured.</b> Each {@link CosmeticCatalog.AccessoryKind}
  * builds a different set of boxes — a cap is a crown plus a brim, a crown is a band plus five
- * points, a beanie has a pom, horns taper, a halo is an octagon of thin slats. The palette then
+ * points, a beanie has a pom, horns taper, a halo is a dense ring of thin slats. The palette then
  * tints those meshes, so "Amethyst Crown" and "Ember Crown" are the same shape in different
  * colours, while "Amethyst Crown" and "Amethyst Cap" are genuinely different geometry. That is
  * what the catalogue's 100+ accessory entries mean, and {@code accessory_style_note} says so.
@@ -29,6 +29,15 @@ public final class AccessoryGeometry {
 
     /** Identifier the player client entity binds the accessory geometry to. */
     public static final String GEOMETRY_ID = "geometry.chimera_hat";
+
+    /**
+     * Halo slat count. A low count reads as a faceted polygon; 24 overlaps at this radius so the
+     * ring profile looks continuous. Kept public so the test can assert the ring is dense enough.
+     */
+    public static final int HALO_SEGMENTS = 24;
+
+    /** Halo ring radius, in entity units (the head is 8 wide, so 5 sits just clear of it). */
+    public static final float HALO_RADIUS = 5f;
 
     /** Texture atlas the geometry's UVs address. */
     public static final int TEXTURE_WIDTH = 64;
@@ -81,12 +90,14 @@ public final class AccessoryGeometry {
                 cube(cubes, 2.6f, 36f, -1f, 1f, 1.6f, 1f, true);
                 break;
             case HALO:
-                // An octagon of thin slats reads as a ring; a single flat box would read as a disc.
-                for (int i = 0; i < 8; i++) {
-                    double a = i / 8.0 * Math.PI * 2.0;
-                    float x = (float) (Math.cos(a) * 5.0);
-                    float z = (float) (Math.sin(a) * 5.0);
-                    cube(cubes, x - 0.8f, 35f, z - 0.8f, 1.6f, 0.4f, 1.6f, true);
+                // A ring needs many segments: 8 slats read as a faceted octagon, which is exactly
+                // the "blocky spaced-out circle" complaint. 24 slats at radius 5 overlap (arc
+                // spacing ~1.31 vs a 1.5-wide cube) so the profile reads as a continuous circle.
+                for (int i = 0; i < HALO_SEGMENTS; i++) {
+                    double a = i / (double) HALO_SEGMENTS * Math.PI * 2.0;
+                    float x = (float) (Math.cos(a) * HALO_RADIUS);
+                    float z = (float) (Math.sin(a) * HALO_RADIUS);
+                    cube(cubes, x - 0.75f, 35f, z - 0.75f, 1.5f, 0.4f, 1.5f, true);
                 }
                 break;
             case FLOWER:
@@ -134,6 +145,35 @@ public final class AccessoryGeometry {
                 cube(cubes, -2.6f, 21.4f, 2.4f, 2.4f, 2f, 1.2f, false);
                 cube(cubes, 0.2f, 21.4f, 2.4f, 2.4f, 2f, 1.2f, false);
                 cube(cubes, -0.6f, 21.4f, 2.6f, 1.2f, 1.4f, 1f, true);
+                break;
+            case TOPHAT:
+                // A wide brim under a tall, narrow crown — the silhouette no stacked-cap shape has.
+                cube(cubes, -5.5f, 32f, -5.5f, 11f, 1f, 11f, false);
+                cube(cubes, -4f, 33f, -4f, 8f, 6f, 8f, false);
+                cube(cubes, -4.1f, 33f, -4.1f, 8.2f, 1f, 8.2f, true);
+                break;
+            case WIZARD_HAT:
+                // A cone approximated by graduated cubes, on a wide brim: a real curve, not a box.
+                cube(cubes, -6f, 32f, -6f, 12f, 1f, 12f, false);
+                cube(cubes, -4f, 33f, -4f, 8f, 2f, 8f, false);
+                cube(cubes, -3f, 35f, -3f, 6f, 2f, 6f, false);
+                cube(cubes, -2f, 37f, -2f, 4f, 2f, 4f, false);
+                cube(cubes, -1f, 39f, -1f, 2f, 2f, 2f, false);
+                cube(cubes, -0.4f, 41f, -0.4f, 0.8f, 1f, 0.8f, true);
+                break;
+            case TIARA:
+                // A low band with a rising centre stone and two side stones, unlike the tall crown.
+                cube(cubes, -4.2f, 32f, -4.2f, 8.4f, 1f, 8.4f, false);
+                cube(cubes, -0.8f, 33f, 3.6f, 1.6f, 2f, 0.8f, true);
+                cube(cubes, -3.4f, 33f, 3.6f, 1.2f, 1.4f, 0.8f, true);
+                cube(cubes, 2.2f, 33f, 3.6f, 1.2f, 1.4f, 0.8f, true);
+                break;
+            case BEARD:
+                // A beard that narrows in graduated steps, so it rounds under the chin.
+                cube(cubes, -3.6f, 24f, 3.4f, 7.2f, 2f, 1.2f, false);
+                cube(cubes, -3f, 22.4f, 3.4f, 6f, 2f, 1.2f, false);
+                cube(cubes, -2f, 20.8f, 3.4f, 4f, 2f, 1.2f, false);
+                cube(cubes, -1f, 19.4f, 3.4f, 2f, 1.8f, 1.2f, true);
                 break;
             case WINGS:
                 // Two swept slabs behind the shoulders; a static approximation of the preview's

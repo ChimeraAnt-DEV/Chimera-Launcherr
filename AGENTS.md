@@ -1158,6 +1158,19 @@ these are the conclusions.
   whose texture is fetched per account rather than read from that fixed slot. A resource pack that
   overrides the slot therefore changes a file the renderer does not consult for the case that
   matters, which is why a cape could be "applied successfully" and still never show.
+- **A `minecraft:attachable` cannot be triggered by a cape.** Verified against the Bedrock Wiki:
+  an attachable binds to an *item/block identifier* (main hand, off hand, armour) and renders when
+  that item is equipped; there is no client-side condition to bind it to a cosmetic. The cape's
+  correct data-driven route is the vanilla `cape` animation key: `controller.animation.player.root`
+  plays `"cape"` in third person and the paperdoll, and the generated pack overrides
+  `entity/player.entity.json` to point that key at `animation.chimera_cape` plus a
+  `chimera_cape` render controller. That is the route the working community cape packs use, and it
+  is pure JSON — no native code, no hooking. Do not "convert the cape to an attachable"; there is
+  nothing for it to attach to.
+- **A skin pack is the other documented Bedrock cape path, but it cannot serve a launcher
+  cosmetic.** It pairs a cape texture with a skin in `skins.json`, so it only works while the
+  player wears that exact skin and requires a Dressing Room re-entry. The render-controller route
+  adds a cape the player did not have, on top of whatever skin they wear.
 - **`cosmetics_scope_note` describes the honest model**: all three cosmetics are drawn on the
   player's own client entity by the generated pack, so only Chimera users (via cosmetic sync) see
   them - vanilla players cannot, because Bedrock offers no app API to push a cosmetic onto another
@@ -1172,6 +1185,39 @@ these are the conclusions.
   (verified against the binary — see `preloader-android/docs/resource-pack-reload.md`), so a
   running world keeps its cached pack stack and the supported apply path relaunches the instance
   (`MinecraftSessionRestarter`). Do not promise a live recolour.
+
+## Cosmetics: equip crash, preview holes, flat look (cosmetics/fix-list)
+- **Equipping a cosmetic crashed the game because `CosmeticSyncModule.start()` did blocking
+  network I/O on the UI thread.** `start()` opened the multicast socket (`MulticastSocket`,
+  `joinGroup`), the relay socket and the manual peer's DNS resolve inline; callers reach it from the
+  UI thread (the Cosmetics panel toggling sync on, `InbuiltOverlayManager.startCosmeticSync`), so it
+  threw `NetworkOnMainThreadException` and took the session down. `start()` is now fully async: it
+  schedules `openAndStart()` on a `cosmetic-sync-start` daemon thread and returns immediately. A
+  `cancelled` flag (set first in `stop()`) makes a start that is still opening sockets abort instead
+  of coming up after a stop. On-demand `announce()` was already moved off the caller onto a
+  `cosmetic-sync-broadcast` executor; keep both — every route in `broadcast` does a blocking send.
+- **The preview's triangular holes were a painter-sort bug, not a mesh bug.** Sorting every face of
+  every box on a single centroid-depth key lets two boxes' faces interleave at yaws where their
+  centroids tie (head on torso, arm against torso), so a hidden face paints over a nearer one.
+  `QuadDepthSorter` orders by the **owning box's centroid depth first**, then the face's own depth
+  within the box — exact for a scene of disjoint convex boxes, which the player model is.
+  `CapePreviewView.drawModel` projects the box centroid per box to get the group key; the overlay
+  layer keeps its +0.5 nudge on both keys. `QuadDepthSorterTest` pins the ordering.
+- **Flat-color textures read as plastic blobs; `PaintedAtlas` replaces the flat fill.** The old
+  `FlatColorAtlas` was one solid colour per region, so no amount of geometry gave a pet or hat form
+  or material. `PaintedAtlas` keeps the same two-region UV layout but adds a vertical light
+  falloff (top brighter than bottom) and a deterministic surface grain, seeded per item so species
+  do not share a grain. `AccessoryTexturePainter` and the pack builder's pet texture route through
+  it. It is still procedural — reaching hand-painted detail needs authored assets — but it is a real
+  step up. `PaintedAtlasTest` pins the shading and texture.
+- **New accessory archetypes are added in both renderers or they drift.** `TOPHAT`, `WIZARD_HAT`,
+  `TIARA` and `BEARD` are in `CosmeticCatalog.AccessoryKind` (so each is generated across all 12
+  palettes), with geometry in `AccessoryGeometry.geometryJson` and matching boxes in
+  `CapePreviewView.drawAccessoryFront`. A kind added to only one side renders in-game but not in the
+  preview (or vice versa). `AccessoryGeometryTest.DRAWABLE` must list every drawing kind.
+- **The halo was an octagon; it is now a dense ring.** 8 slats read as a faceted polygon. It is
+  `HALO_SEGMENTS = 24` overlapping slats (`AccessoryGeometryTest.theHaloIsADenseRingNotAFacetedPolygon`
+  pins the count and that neighbouring slats overlap).
 
 ## Cosmetic sync (core.cosmetics.CosmeticSync*) - cross-player cosmetic visibility
 - **Two discovery sources, one manifest.** The advertisement is always the same

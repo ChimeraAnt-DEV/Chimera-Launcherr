@@ -56,7 +56,11 @@ public final class CosmeticCatalog {
         HORNS,
         FLOWER,
         BOWTIE,
-        EAR
+        EAR,
+        TOPHAT,
+        WIZARD_HAT,
+        TIARA,
+        BEARD
     }
 
     /** What a pet can do; a species advertises which of these it animates for. */
@@ -269,11 +273,13 @@ public final class CosmeticCatalog {
                 AccessoryKind.CAP, AccessoryKind.BEANIE, AccessoryKind.CROWN,
                 AccessoryKind.GLASSES, AccessoryKind.MASK, AccessoryKind.SCARF,
                 AccessoryKind.BACKPACK, AccessoryKind.HORNS, AccessoryKind.FLOWER,
-                AccessoryKind.BOWTIE, AccessoryKind.EAR
+                AccessoryKind.BOWTIE, AccessoryKind.EAR, AccessoryKind.TOPHAT,
+                AccessoryKind.WIZARD_HAT, AccessoryKind.TIARA, AccessoryKind.BEARD
         };
         String[] kindNames = {
                 "Cap", "Beanie", "Crown", "Glasses", "Mask", "Scarf",
-                "Backpack", "Horns", "Flower", "Bowtie", "Ear"
+                "Backpack", "Horns", "Flower", "Bowtie", "Ear", "Top Hat",
+                "Wizard Hat", "Tiara", "Beard"
         };
         for (int p = 0; p < PALETTES.length; p++) {
             int[] pal = PALETTES[p];
