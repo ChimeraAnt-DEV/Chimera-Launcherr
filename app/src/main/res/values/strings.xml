@@ -879,7 +879,8 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="cosmetics_no_cape_selected">Select a cape, accessory or pet first</string>
     <string name="cosmetics_preview_description">Preview of your character wearing the selected cape and accessory</string>
     <string name="cosmetics_skin_source">Skin: %1$s</string>
-    <string name="cosmetics_skin_fallback">Showing the default character — no skin pack is applied for this instance yet. Apply one in Customize → Skins and it will appear here.</string>
+    <string name="cosmetics_skin_default_steve">Showing Steve, the default character — import a skin in Customize → Skins and it will appear here.</string>
+    <string name="cosmetics_skin_fallback">Showing a placeholder character — the skin could not be loaded. Apply a skin pack in Customize → Skins and it will appear here.</string>
     <string name="cosmetics_skin_note">Only the base layer and the head overlay of a skin are drawn. Skins that depend on full second-layer geometry may look simplified.</string>
     <string name="cosmetics_rotate_hint">Drag to rotate your character</string>
     <string name="cosmetics_second_layer_limited">Base layer + head overlay only</string>

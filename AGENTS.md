@@ -443,6 +443,14 @@ only, like the other overlays.
 - `WorldSource` / `DataSource` / `EntitySource` are still unimplemented (see the combat-module section); capes are the one cosmetic that reaches the game, and only because a resource pack is a supported mechanism.
 - **The preview needs a recorded pack name to find the skin.** `PlayerSkinProvider.findAppliedSkinFile` reads `applied_name` from the `skins_state` prefs, so `SkinsSettingsFragment` must *write* it (via `PlayerSkinProvider.setAppliedSkinPackName`, cleared on removal) when it activates a pack. Both sides previously only read the key and nothing wrote it, so the lookup always returned null and the preview silently showed the placeholder while the real pack was active in the game. A prefs key that is read but never written is the failure mode to check first when a "real X" preview looks generic.
 - **`normalise` must not stretch to the atlas.** The atlas is a 64x32 grid, so the source is divided by a whole factor of its width and drawn top-left (`atlasDrawSize`): a 64x32 legacy skin keeps its height and occupies the top half, a 128x128 HD skin halves to 64x64. Filling 64x64 instead doubled a legacy skin vertically and put the arm/leg regions where the hat/body overlay belongs, so the character rendered its own textures in the wrong places. The sizing rule is pure and pinned by `PlayerSkinProviderTest`.
+- **The default character is Steve, not a grey placeholder.** The fallback chain is
+  imported skin → `PlayerSkinProvider.steveSkin()` → `fallbackSkin()` (grey). The grey stand-in is
+  now only reached when even the Steve atlas cannot be allocated; `SkinBitmap.isFallback` is true
+  only for that case and `isDefaultSteve` marks Steve, so the panel says "Showing Steve" rather than
+  showing the placeholder message for a player who simply has not imported a skin. The Steve atlas
+  is painted from the pure `SteveSkinLayout` table (same UV regions the renderer samples), so a
+  coordinate typo is caught by `SteveSkinLayoutTest` (paints the table into an int grid and checks
+  the texels the model samples) rather than only being visible on a device.
 
 ## Combat module empty states
 - A module that needs a native feed (Crystal Optimizer's `WorldSource`, Armor HUD's `DataSource`, Hitboxes' `EntitySource`) must distinguish **"no data source"** from **"data source says nothing is there"**. Crystal Optimizer's `isAwaitingGameData()` renders "waiting for game data"; without it the readout said "no safe spot", blaming the player's aim for a feed that does not exist. `HitboxOverlay` shows an equivalent "awaiting data" state.

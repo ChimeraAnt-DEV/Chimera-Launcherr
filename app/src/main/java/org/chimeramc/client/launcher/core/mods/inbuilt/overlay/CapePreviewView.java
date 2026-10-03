@@ -176,9 +176,14 @@ public class CapePreviewView extends View {
         return petLocomotion;
     }
 
-    /** True when the displayed skin is the built-in stand-in rather than the player's own. */
+    /** True when the displayed skin is the grey last-resort placeholder, not a real skin. */
     public boolean isShowingFallbackSkin() {
         return skin == null || skin.isFallback;
+    }
+
+    /** True when the preview is showing the built-in Steve character (no skin imported yet). */
+    public boolean isShowingDefaultSteve() {
+        return skin != null && skin.isDefaultSteve;
     }
 
     public String getSkinSourceName() {
