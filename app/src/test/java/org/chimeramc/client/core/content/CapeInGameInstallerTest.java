@@ -150,4 +150,58 @@ public class CapeInGameInstallerTest {
                 outcome != InGamePackChanger.ApplyOutcome.FAILED);
         assertTrue(CapeInGameInstaller.isInstalled(realRoot));
     }
+
+    @Test
+    public void quietInstallWritesThePackWithoutAskingTheSessionToReload() throws Exception {
+        // The launch-time path: the game is about to start, so there is nothing to refresh. It
+        // must write the pack and must NOT relaunch the running session, or equipping a cape
+        // before launching would kill the launcher out from under the player.
+        File staging = temp.newFolder("staging_quiet");
+        File root = temp.newFolder("root_quiet");
+
+        final boolean[] sessionTouched = {false};
+        InGamePackChanger.setReloader(() -> {
+            sessionTouched[0] = true;
+            return true;
+        });
+        InGamePackChanger.setRestarter(() -> {
+            sessionTouched[0] = true;
+            return true;
+        });
+        try {
+            assertTrue(CapeInGameInstaller.installQuietly(
+                    staging, Collections.singletonList(root), cape()));
+            assertTrue("the pack must be written", CapeInGameInstaller.isInstalled(root));
+            assertFalse("the quiet path must not reload or relaunch", sessionTouched[0]);
+        } finally {
+            InGamePackChanger.setReloader(null);
+            InGamePackChanger.setRestarter(null);
+        }
+    }
+
+    @Test
+    public void quietUninstallRemovesTheCapeWithoutAskingTheSessionToReload() throws Exception {
+        File staging = temp.newFolder("staging_quiet_off");
+        File root = temp.newFolder("root_quiet_off");
+        assertTrue(CapeInGameInstaller.installQuietly(
+                staging, Collections.singletonList(root), cape()));
+
+        final boolean[] sessionTouched = {false};
+        InGamePackChanger.setReloader(() -> {
+            sessionTouched[0] = true;
+            return true;
+        });
+        InGamePackChanger.setRestarter(() -> {
+            sessionTouched[0] = true;
+            return true;
+        });
+        try {
+            assertTrue(CapeInGameInstaller.uninstallQuietly(Collections.singletonList(root)));
+            assertFalse("the cape must be removed", CapeInGameInstaller.isInstalled(root));
+            assertFalse("the quiet path must not reload or relaunch", sessionTouched[0]);
+        } finally {
+            InGamePackChanger.setReloader(null);
+            InGamePackChanger.setRestarter(null);
+        }
+    }
 }

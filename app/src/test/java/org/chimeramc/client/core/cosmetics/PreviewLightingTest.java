@@ -1,0 +1,76 @@
+package org.chimeramc.client.core.cosmetics;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+
+/**
+ * The character preview's light model.
+ *
+ * <p>The property that matters is continuity: the front must be brighter than the back, the top
+ * brighter than the bottom, and no face may fall to a flat black or blow out to pure white. Those
+ * are what separate a render that reads as three-dimensional from the hard-stepped ramp this
+ * replaced.
+ */
+public class PreviewLightingTest {
+
+    @Test
+    public void theLitFrontIsBrighterThanTheShadowedBack() {
+        int front = PreviewLighting.overlayAlphaFor(SkinModel.Face.FRONT, 1f);
+        int back = PreviewLighting.overlayAlphaFor(SkinModel.Face.BACK, 1f);
+        assertTrue("the front must be less darkened than the back", front < back);
+    }
+
+    @Test
+    public void theTopIsBrighterThanTheBottom() {
+        int top = PreviewLighting.overlayAlphaFor(SkinModel.Face.TOP, 1f);
+        int bottom = PreviewLighting.overlayAlphaFor(SkinModel.Face.BOTTOM, 1f);
+        assertTrue("the top must be less darkened than the bottom", top < bottom);
+    }
+
+    @Test
+    public void noFaceGoesFullyBlackOrBlowsOut() {
+        for (SkinModel.Face face : SkinModel.Face.values()) {
+            int alpha = PreviewLighting.overlayAlphaFor(face, 1f);
+            assertTrue("overlay alpha in range for " + face,
+                    alpha >= 0 && alpha <= PreviewLighting.MAX_DARKEN_ALPHA);
+            double intensity = PreviewLighting.intensityFor(face, 1f);
+            assertTrue("intensity in range for " + face, intensity >= 0.25 && intensity <= 1.0);
+        }
+    }
+
+    @Test
+    public void theOverlayLayerIsShadedMoreGentlyThanTheBase() {
+        for (SkinModel.Face face : SkinModel.Face.values()) {
+            int base = PreviewLighting.overlayAlphaFor(face, 1f);
+            int overlay = PreviewLighting.overlayAlphaForOverlayLayer(face, 1f);
+            assertTrue("the second layer must not be dimmed as hard as the base (" + face + ")",
+                    overlay <= base);
+        }
+    }
+
+    @Test
+    public void flatQuadShadingPreservesAlphaAndDarkensTheBack() {
+        int color = 0xFF3366CC;
+        int front = PreviewLighting.shadeColor(color, SkinModel.Face.FRONT, 1f);
+        int back = PreviewLighting.shadeColor(color, SkinModel.Face.BACK, 1f);
+        assertEquals("alpha preserved", 0xFF, front >>> 24);
+        assertTrue("the back must be darker", (back >>> 16 & 0xFF) < (front >>> 16 & 0xFF));
+    }
+
+    @Test
+    public void aNearerFaceIsLitAtLeastAsMuchAsAFartherOne() {
+        int near = PreviewLighting.overlayAlphaFor(SkinModel.Face.LEFT, 1.2f);
+        int far = PreviewLighting.overlayAlphaFor(SkinModel.Face.LEFT, 0.8f);
+        assertTrue("a nearer face must not be darker than a farther one", near <= far);
+    }
+
+    @Test
+    public void aNonFinitePerspectiveDoesNotProduceANonFiniteResult() {
+        int alpha = PreviewLighting.overlayAlphaFor(SkinModel.Face.FRONT, Float.NaN);
+        assertTrue(alpha >= 0 && alpha <= PreviewLighting.MAX_DARKEN_ALPHA);
+        double intensity = PreviewLighting.intensityFor(SkinModel.Face.FRONT, Float.POSITIVE_INFINITY);
+        assertTrue(Double.isFinite(intensity));
+    }
+}

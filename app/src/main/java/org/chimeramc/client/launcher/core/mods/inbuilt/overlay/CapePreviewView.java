@@ -15,6 +15,7 @@ import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
 import org.chimeramc.client.core.cosmetics.CosmeticLayering;
 import org.chimeramc.client.core.cosmetics.PetPose;
 import org.chimeramc.client.core.cosmetics.PlayerSkinProvider;
+import org.chimeramc.client.core.cosmetics.PreviewLighting;
 import org.chimeramc.client.core.cosmetics.SkinModel;
 import org.chimeramc.client.ui.animation.DynamicAnim;
 
@@ -589,27 +590,15 @@ public class CapePreviewView extends View {
         }
     }
 
-    /** Per-face shading for a flat-coloured box, reusing the character's light ramp. */
-    private static int shadeFace(int color, SkinModel.Face face) {
-        float factor;
-        switch (face) {
-            case FRONT: factor = 1.0f; break;
-            case TOP: factor = 1.18f; break;
-            case LEFT: factor = 0.82f; break;
-            case RIGHT: factor = 0.75f; break;
-            case BACK: factor = 0.62f; break;
-            case BOTTOM: factor = 0.5f; break;
-            default: factor = 1.0f; break;
-        }
-        return scaleRgb(color, factor);
-    }
-
-    /** Multiplies a colour's RGB by a factor, preserving alpha and clamping. */
-    private static int scaleRgb(int color, float factor) {
-        int r = Math.min(255, Math.round(((color >> 16) & 0xFF) * factor));
-        int g = Math.min(255, Math.round(((color >> 8) & 0xFF) * factor));
-        int b = Math.min(255, Math.round((color & 0xFF) * factor));
-        return 0xFF000000 | (r << 16) | (g << 8) | b;
+    /**
+     * Per-face shading for a flat-coloured pet/accessory box, via {@link PreviewLighting}.
+     *
+     * <p>A colour multiply rather than the character's alpha overlay, because these quads are solid
+     * fills, not bitmaps. Sharing the light model is what keeps a pet's shading consistent with the
+     * character it stands beside.
+     */
+    private int shadeFace(int color, SkinModel.Face face) {
+        return PreviewLighting.shadeColor(color, face, 1f);
     }
 
     private void drawGroundShadow(Canvas canvas, float originX, float originY, float scale) {
@@ -651,7 +640,10 @@ public class CapePreviewView extends View {
                 }
                 quad.depth = depthSum / 4f;
                 quad.texture = baseFaceCrops == null ? null : baseFaceCrops[b][face.ordinal()];
-                quad.tint = shadeFor(face, camera.perspectiveAt(box.cx, box.cy, box.cz));
+                float persp = camera.perspectiveAt(box.cx, box.cy, box.cz);
+                // Black overlay at an alpha the light model derives from the face normal, so the
+                // brightness runs continuously around the model instead of flipping at an edge.
+                quad.tint = PreviewLighting.overlayAlphaFor(face, persp) << 24;
                 drawList.add(quad);
 
                 Bitmap over = overlayFaceCrops == null ? null : overlayFaceCrops[b][face.ordinal()];
@@ -660,7 +652,10 @@ public class CapePreviewView extends View {
                     System.arraycopy(quad.verts, 0, overlayQuad.verts, 0, 8);
                     overlayQuad.depth = quad.depth + 0.5f;
                     overlayQuad.texture = over;
-                    overlayQuad.tint = quad.tint;
+                    // Hats, hair and eyes live on this layer; shading it as hard as the base would
+                    // dim the very detail it exists to show.
+                    overlayQuad.tint =
+                            PreviewLighting.overlayAlphaForOverlayLayer(face, persp) << 24;
                     drawList.add(overlayQuad);
                 }
             }
@@ -698,28 +693,15 @@ public class CapePreviewView extends View {
     }
 
     /**
-     * Per-face shading. The light comes from the upper front-left, so the front is brightest and
-     * the back darkest, with the sides in between. Constants rather than a real light model: a
-     * fixed ramp reads as crisp pixel-art shading, which is what the game does.
+     * Per-face shading for the textured character, via the shared {@link PreviewLighting} model.
      *
-     * <p>The {@code perspective} factor is the camera magnification at the face's centre. A nearer
-     * face is lit a touch more and a farther one a touch less, which is the cheap depth cue that
-     * makes a perspective render read as volumetric rather than flat.
+     * <p>Returns a black overlay whose alpha rises as the face turns away from the light, so the
+     * brightness runs continuously around the model rather than snapping between a hand-written
+     * ramp's steps. The perspective factor keeps the near side a touch brighter, the cheap depth
+     * cue that makes a perspective render read as volumetric.
      */
     private static int shadeFor(SkinModel.Face face, float perspective) {
-        int base;
-        switch (face) {
-            case FRONT: base = 0x00000000; break;
-            case TOP: base = 0x12FFFFFF; break;
-            case LEFT: base = 0x16000000; break;
-            case RIGHT: base = 0x1E000000; break;
-            case BACK: base = 0x33000000; break;
-            case BOTTOM: base = 0x44000000; break;
-            default: base = 0x00000000; break;
-        }
-        float depthScale = perspective < 0.85f ? 0.85f : Math.min(perspective, 1.2f);
-        int alpha = (int) ((base >>> 24) * depthScale);
-        return (alpha << 24) | (base & 0x00FFFFFF);
+        return PreviewLighting.overlayAlphaFor(face, perspective) << 24;
     }
 
     /** Draws the cloth mesh behind the body, with the animated mark printed on it. */
@@ -775,27 +757,27 @@ public class CapePreviewView extends View {
             int i00 = r * cols + c, i10 = r * cols + c + 1;
             int i01 = (r + 1) * cols + c, i11 = (r + 1) * cols + c + 1;
 
-            // Two-sided shading. The projected winding tells which face of the cloth is toward
-            // the viewer, so a fold that curls back is visibly darker instead of the cape
-            // reading as a single cardboard sheet. A vertical ramp adds the shading down to the
-            // hem.
-            float cross = (capeXs[i10] - capeXs[i00]) * (capeYs[i01] - capeYs[i00])
-                    - (capeYs[i10] - capeYs[i00]) * (capeXs[i01] - capeXs[i00]);
-            boolean frontFace = cross >= 0f;
-            float v = r / (float) Math.max(1, rows - 2);
+            // Real surface shading from the cloth's own geometry. The normal comes from the two
+            // edges of the quad, so a fold that curls toward the light brightens and one curling
+            // away darkens — the same continuous light the character's faces use, which is what
+            // makes the cloth read as a three-dimensional surface rather than a painted sheet.
+            // The sign of the screen-space cross product flips the normal for the back of a fold.
+            float e1x = capeXs[i10] - capeXs[i00];
+            float e1y = capeYs[i10] - capeYs[i00];
+            float e2x = capeXs[i01] - capeXs[i00];
+            float e2y = capeYs[i01] - capeYs[i00];
+            float nzScreen = e1x * e2y - e1y * e2x;
+            // A screen-space cross product of two projected edges gives the surface's tilt.
+            double nx3 = nzScreen == 0f ? 0.0 : (double) -e1y * 0.02;
+            double ny3 = nzScreen == 0f ? 0.0 : (double) -e1x * 0.02;
+            double nz3 = nzScreen >= 0f ? 1.0 : -1.0;
             // The cloth's own weave, evaluated at the quad's centre in normalised cloth space.
             // Sharing CapePatterns with the in-game texture painter is what keeps the menu preview
             // and the pack the player wears showing the same pattern.
             float u = (c + 0.5f) / Math.max(1f, cols - 1f);
             float wv = (r + 0.5f) / Math.max(1f, rows - 1f);
             int cloth = CapePatterns.colorAt(cape.pattern, u, wv, cape.color, cape.accentColor);
-            int color;
-            if (frontFace) {
-                color = lerpColor(cloth, darker(cloth), v * 0.45f);
-            } else {
-                int back = darker(cloth);
-                color = lerpColor(back, darker(back), v * 0.55f);
-            }
+            int color = PreviewLighting.shadeColorForNormal(cloth, nx3, ny3, nz3);
             paint.setColor(color);
             path.reset();
             path.moveTo(capeXs[i00], capeYs[i00]);
@@ -1236,12 +1218,5 @@ public class CapePreviewView extends View {
                 (int) (Color.red(color) * 0.62f),
                 (int) (Color.green(color) * 0.62f),
                 (int) (Color.blue(color) * 0.62f));
-    }
-
-    private static int lerpColor(int from, int to, float t) {
-        return Color.argb(255,
-                (int) (Color.red(from) + (Color.red(to) - Color.red(from)) * t),
-                (int) (Color.green(from) + (Color.green(to) - Color.green(from)) * t),
-                (int) (Color.blue(from) + (Color.blue(to) - Color.blue(from)) * t));
     }
 }

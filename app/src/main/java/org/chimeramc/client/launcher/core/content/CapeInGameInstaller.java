@@ -54,17 +54,68 @@ public final class CapeInGameInstaller {
      */
     public static InGamePackChanger.ApplyOutcome install(File stagingRoot, List<File> gameDataDirs,
                                                          CosmeticCatalog.Cape cape) {
-        if (stagingRoot == null) return InGamePackChanger.ApplyOutcome.FAILED;
-        if (gameDataDirs == null || gameDataDirs.isEmpty()) {
+        if (!writePack(stagingRoot, gameDataDirs, cape)) {
             return InGamePackChanger.ApplyOutcome.FAILED;
         }
+
+        // The files are written to the global list and every running world's own list; now ask the
+        // live session to pick them up. reload -> restart -> next load, exactly like the pack
+        // changer, so the player does not have to leave the world for the cape to appear.
+        if (InGamePackChanger.requestReload()) return InGamePackChanger.ApplyOutcome.RELOADED;
+        if (InGamePackChanger.requestRestart()) return InGamePackChanger.ApplyOutcome.RESTARTING;
+        return InGamePackChanger.ApplyOutcome.NEXT_LOAD;
+    }
+
+    /** Backwards-compatible single-root install. */
+    public static InGamePackChanger.ApplyOutcome install(File stagingRoot, File gameDataDir,
+                                                         CosmeticCatalog.Cape cape) {
+        if (gameDataDir == null) return InGamePackChanger.ApplyOutcome.FAILED;
+        return install(stagingRoot, java.util.Collections.singletonList(gameDataDir), cape);
+    }
+
+    /**
+     * Writes (or removes) the cape pack without asking any session to reload.
+     *
+     * <p>This is the launch-time path: the game is about to start, so there is nothing to refresh
+     * and nothing to relaunch. It is what removes the friction of applying a cape mid-session —
+     * the equipped cape is written to the pack list before every launch, so the next time the
+     * player enters a world the cape is simply already on them, with no restart in between.
+     *
+     * @return true when the pack list was written as requested
+     */
+    public static boolean installQuietly(File stagingRoot, List<File> gameDataDirs,
+                                         CosmeticCatalog.Cape cape) {
+        return writePack(stagingRoot, gameDataDirs, cape);
+    }
+
+    /** Removes the cape pack from every candidate root without asking a session to reload. */
+    public static boolean uninstallQuietly(List<File> gameDataDirs) {
+        if (gameDataDirs == null || gameDataDirs.isEmpty()) return false;
+        boolean removed = false;
+        for (File gameDataDir : gameDataDirs) {
+            if (gameDataDir == null) continue;
+            SkinPackActivator.Result result =
+                    SkinPackActivator.unapply(gameDataDir, CapeResourcePackBuilder.PACK_UUID);
+            if (result.success) {
+                InGamePackChanger.setActive(gameDataDir, CapeResourcePackBuilder.PACK_UUID,
+                        CapeResourcePackBuilder.PACK_VERSION, false);
+                removed = true;
+            }
+        }
+        return removed;
+    }
+
+    /** Builds the pack and writes it into every candidate root; no session interaction. */
+    private static boolean writePack(File stagingRoot, List<File> gameDataDirs,
+                                     CosmeticCatalog.Cape cape) {
+        if (stagingRoot == null || gameDataDirs == null || gameDataDirs.isEmpty()) return false;
 
         File packDir = new File(stagingRoot, STAGING_DIR);
         try {
             deleteRecursively(packDir);
             CapeResourcePackBuilder.build(packDir, cape);
         } catch (IOException e) {
-            return InGamePackChanger.ApplyOutcome.FAILED;
+            return false;
         }
 
         boolean wrote = false;
@@ -80,21 +131,7 @@ public final class CapeInGameInstaller {
                     CapeResourcePackBuilder.PACK_VERSION, true);
             wrote = true;
         }
-        if (!wrote) return InGamePackChanger.ApplyOutcome.FAILED;
-
-        // The files are written to the global list and every running world's own list; now ask the
-        // live session to pick them up. reload -> restart -> next load, exactly like the pack
-        // changer, so the player does not have to leave the world for the cape to appear.
-        if (InGamePackChanger.requestReload()) return InGamePackChanger.ApplyOutcome.RELOADED;
-        if (InGamePackChanger.requestRestart()) return InGamePackChanger.ApplyOutcome.RESTARTING;
-        return InGamePackChanger.ApplyOutcome.NEXT_LOAD;
-    }
-
-    /** Backwards-compatible single-root install. */
-    public static InGamePackChanger.ApplyOutcome install(File stagingRoot, File gameDataDir,
-                                                         CosmeticCatalog.Cape cape) {
-        if (gameDataDir == null) return InGamePackChanger.ApplyOutcome.FAILED;
-        return install(stagingRoot, java.util.Collections.singletonList(gameDataDir), cape);
+        return wrote;
     }
 
     /** Removes the cape pack from every candidate root, leaving the player's own packs alone. */
