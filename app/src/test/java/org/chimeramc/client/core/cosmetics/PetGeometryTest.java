@@ -5,6 +5,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -67,6 +68,76 @@ public class PetGeometryTest {
         // CAT uses the default body (legs 3 tall, 8 deep), so the body sits at [6, 3, 9].
         assertTrue("pet body is placed in front (positive z)", json.contains("\"origin\": [6, 3, 9"));
         assertTrue("pet legs reach the ground (y=0)", json.contains(", 0, "));
+    }
+
+    /**
+     * The species-defining parts must be anchored to the body, not authored at absolute z=0. The
+     * old code placed every shell, wing, stripe and tail at world z~0 while the body sat at z~9,
+     * so the parts floated detached behind the animal and it did not read as that species on
+     * device. Legs are excluded (their y-origin is 0) because they legitimately sit under the body.
+     */
+    @Test
+    public void speciesPartsAreAnchoredToTheBodyNotFloatingBehindIt() {
+        CosmeticCatalog.PetSpecies[] checked = {
+                CosmeticCatalog.PetSpecies.TURTLE, CosmeticCatalog.PetSpecies.BEETLE,
+                CosmeticCatalog.PetSpecies.SPIDER, CosmeticCatalog.PetSpecies.BUTTERFLY,
+                CosmeticCatalog.PetSpecies.DRAGONFLY, CosmeticCatalog.PetSpecies.DRAGON,
+                CosmeticCatalog.PetSpecies.PARROT, CosmeticCatalog.PetSpecies.BEE,
+                CosmeticCatalog.PetSpecies.CAT, CosmeticCatalog.PetSpecies.DOG,
+                CosmeticCatalog.PetSpecies.FOX, CosmeticCatalog.PetSpecies.WOLF,
+                CosmeticCatalog.PetSpecies.RABBIT, CosmeticCatalog.PetSpecies.LIZARD,
+                CosmeticCatalog.PetSpecies.AXOLOTL, CosmeticCatalog.PetSpecies.FROG,
+        };
+        for (CosmeticCatalog.PetSpecies species : checked) {
+            JsonArray cubes = cubes(species);
+            // The body is the largest-volume cube.
+            double[] bodyZ = null;
+            double bestVolume = -1;
+            for (int i = 0; i < cubes.size(); i++) {
+                JsonObject c = cubes.get(i).getAsJsonObject();
+                double vol = volume(c);
+                if (vol > bestVolume) {
+                    bestVolume = vol;
+                    bodyZ = zRange(c);
+                }
+            }
+            boolean attached = false;
+            for (int i = 0; i < cubes.size(); i++) {
+                JsonObject c = cubes.get(i).getAsJsonObject();
+                if (volume(c) == bestVolume) continue;
+                if (origin(c)[1] == 0) continue; // a leg, legitimately under the body
+                double[] z = zRange(c);
+                if (z[0] < bodyZ[1] && z[1] > bodyZ[0]) {
+                    attached = true;
+                    break;
+                }
+            }
+            assertTrue(species + " has no defining part anchored to its body", attached);
+        }
+    }
+
+    private static JsonArray cubes(CosmeticCatalog.PetSpecies species) {
+        return JsonParser.parseString(PetGeometry.geometryJson(pet(species)))
+                .getAsJsonObject()
+                .getAsJsonArray("minecraft:geometry")
+                .get(0).getAsJsonObject()
+                .getAsJsonArray("bones").get(0).getAsJsonObject()
+                .getAsJsonArray("cubes");
+    }
+
+    private static double[] origin(JsonObject cube) {
+        JsonArray o = cube.getAsJsonArray("origin");
+        return new double[]{o.get(0).getAsDouble(), o.get(1).getAsDouble(), o.get(2).getAsDouble()};
+    }
+
+    private static double[] zRange(JsonObject cube) {
+        double z0 = origin(cube)[2];
+        return new double[]{z0, z0 + cube.getAsJsonArray("size").get(2).getAsDouble()};
+    }
+
+    private static double volume(JsonObject cube) {
+        JsonArray s = cube.getAsJsonArray("size");
+        return s.get(0).getAsDouble() * s.get(1).getAsDouble() * s.get(2).getAsDouble();
     }
 
     /** Scale trait resizes the pet, so a small variant is genuinely smaller. */
