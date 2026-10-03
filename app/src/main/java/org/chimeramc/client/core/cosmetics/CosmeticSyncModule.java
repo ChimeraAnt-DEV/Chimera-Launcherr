@@ -13,6 +13,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
 import java.net.SocketTimeoutException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -66,11 +67,29 @@ public final class CosmeticSyncModule {
     private final CosmeticSyncConfig config;
     private final CosmeticSyncRegistry registry = new CosmeticSyncRegistry();
 
-    private MulticastSocket socket;
+    private volatile MulticastSocket socket;
     private WifiManager.MulticastLock multicastLock;
     private Thread receiveThread;
     private ScheduledExecutorService announcer;
     private final AtomicBoolean running = new AtomicBoolean(false);
+
+    /** Opens the blocking transports off the caller thread; see {@link #start()}. */
+    private Thread starterThread;
+
+    /** Set by {@link #stop()} so a start that is still opening sockets aborts instead of running. */
+    private final AtomicBoolean cancelled = new AtomicBoolean(false);
+
+    /**
+     * Runs on-demand advertisements off the UI thread.
+     *
+     * <p>{@link #announce()} is called straight from a Spinner's {@code onItemSelected}, i.e. the
+     * main thread, and every route in {@link #broadcastNow(byte[])} does blocking socket I/O. A
+     * blocking send on the main thread throws {@link
+     * android.os.NetworkOnMainThreadException} and took the whole game down on every equip. The
+     * timer-driven announces already ran on the {@link #announcer} thread; this executor is the
+     * same escape hatch for the on-demand path.
+     */
+    private ExecutorService broadcaster;
 
     // Relay route: a unicast UDP session with the Go relay. The manifest rides inside a v4
     // COSMETIC_MANIFEST frame; the relay assigns the client id and fans the frame out.
@@ -133,12 +152,31 @@ public final class CosmeticSyncModule {
     }
 
     /**
-     * Opens the transports and starts announcing; returns false when the LAN socket (the always-on
-     * route) cannot be opened at all. A relay or manual failure is not fatal: multicast still runs.
+     * Opens the transports and starts announcing.
+     *
+     * <p><b>Fully asynchronous.</b> Every step here — the multicast {@code joinGroup}, the relay
+     * socket, the manual peer's DNS resolve — is blocking network I/O, and callers reach this from
+     * the UI thread (the Cosmetics panel toggling sync on, the overlay manager starting a session).
+     * Doing that inline threw {@link android.os.NetworkOnMainThreadException} and killed the game
+     * the moment a cosmetic was equipped. The whole startup therefore runs on a background thread
+     * and this method returns immediately.
+     *
+     * @return true if the module is enabled (startup has been scheduled); false if it is disabled.
+     *         A socket failure is logged and leaves the module stopped rather than thrown.
      */
     public boolean start() {
         if (running.get()) return true;
         if (!config.enabled) return false;
+        if (starterThread != null && starterThread.isAlive()) return true;
+        cancelled.set(false);
+        starterThread = new Thread(this::openAndStart, "cosmetic-sync-start");
+        starterThread.setDaemon(true);
+        starterThread.start();
+        return true;
+    }
+
+    /** The blocking half of {@link #start()}; runs on the {@code cosmetic-sync-start} thread. */
+    private void openAndStart() {
         try {
             InetAddress group = InetAddress.getByName(GROUP);
             MulticastSocket multicastSocket = new MulticastSocket(PORT);
@@ -148,12 +186,19 @@ public final class CosmeticSyncModule {
             socket = multicastSocket;
         } catch (IOException e) {
             Log.w(TAG, "Could not open the cosmetic sync socket", e);
-            return false;
+            return;
         }
-
-        acquireMulticastLock();
+        // stop() may have run while the socket was being opened; if so, close and bail.
+        if (cancelled.get()) {
+            MulticastSocket opened = socket;
+            socket = null;
+            if (opened != null) opened.close();
+            return;
+        }
         running.set(true);
         instance = this;
+
+        acquireMulticastLock();
 
         receiveThread = new Thread(this::receiveLoop, "cosmetic-sync-receive");
         receiveThread.setDaemon(true);
@@ -171,15 +216,29 @@ public final class CosmeticSyncModule {
         });
         announcer.scheduleWithFixedDelay(this::announce, 0, ANNOUNCE_INTERVAL_MS,
                 TimeUnit.MILLISECONDS);
-        return true;
+
+        // On-demand announces (an equip in the Cosmetics panel, a relay HELLO_ACK, a peer's
+        // request) are queued here so no caller ever blocks on a socket from the UI thread.
+        broadcaster = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "cosmetic-sync-broadcast");
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     public void stop() {
+        // Mark cancelled first, so a start still opening sockets aborts rather than coming up
+        // after this stop (which would leave the module running with no way to reach it).
+        cancelled.set(true);
         if (!running.getAndSet(false)) return;
         if (instance == this) instance = null;
         if (announcer != null) {
             announcer.shutdownNow();
             announcer = null;
+        }
+        if (broadcaster != null) {
+            broadcaster.shutdownNow();
+            broadcaster = null;
         }
         MulticastSocket target = socket;
         socket = null;
@@ -204,8 +263,26 @@ public final class CosmeticSyncModule {
         return registry;
     }
 
-    /** Sends the current equipped set immediately, e.g. right after the player changes a cosmetic. */
+    /**
+     * Queues an immediate advertisement of the current equipped set.
+     *
+     * <p>Safe to call from any thread — including the UI thread straight from a Spinner's
+     * selection callback — because the actual socket I/O runs on the {@link #broadcaster} thread.
+     * That is the fix for the {@code NetworkOnMainThreadException} that crashed the game on every
+     * equip. A no-op before {@link #start()} or after {@link #stop()}.
+     */
     public void announce() {
+        ExecutorService executor = broadcaster;
+        if (executor == null || executor.isShutdown()) return;
+        try {
+            executor.execute(this::broadcastNow);
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            // Raced with stop(); the module is shutting down and there is nothing to send.
+        }
+    }
+
+    /** Reads the equipped set and sends one advertisement; runs on the broadcaster thread. */
+    private void broadcastNow() {
         byte[] data = CosmeticSyncProtocol.encode(peerId, displayName,
                 store.getEquippedCapeId(), store.getEquippedAccessoryId(),
                 store.getEquippedPetId());

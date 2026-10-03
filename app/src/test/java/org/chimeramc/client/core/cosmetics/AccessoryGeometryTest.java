@@ -35,7 +35,11 @@ public class AccessoryGeometryTest {
             CosmeticCatalog.AccessoryKind.SCARF,
             CosmeticCatalog.AccessoryKind.BACKPACK,
             CosmeticCatalog.AccessoryKind.BOWTIE,
-            CosmeticCatalog.AccessoryKind.WINGS
+            CosmeticCatalog.AccessoryKind.WINGS,
+            CosmeticCatalog.AccessoryKind.TOPHAT,
+            CosmeticCatalog.AccessoryKind.WIZARD_HAT,
+            CosmeticCatalog.AccessoryKind.TIARA,
+            CosmeticCatalog.AccessoryKind.BEARD
     };
 
     @Test
@@ -99,6 +103,29 @@ public class AccessoryGeometryTest {
         String json = AccessoryGeometry.geometryJson(CosmeticCatalog.AccessoryKind.CROWN);
         assertTrue("crown centre point is taller", json.contains("\"size\": [1, 2.6, 1]"));
         assertTrue("crown side points are shorter", json.contains("\"size\": [1, 1.8, 1]"));
+    }
+
+    /**
+     * A halo made of too few slats reads as a faceted polygon, not a ring. Pin a dense count so a
+     * future edit cannot quietly drop it back to an octagon.
+     */
+    @Test
+    public void theHaloIsADenseRingNotAFacetedPolygon() {
+        assertTrue("a halo needs many slats to read as a circle",
+                AccessoryGeometry.HALO_SEGMENTS >= 16);
+        String json = AccessoryGeometry.geometryJson(CosmeticCatalog.AccessoryKind.HALO);
+        JsonObject geometry = JsonParser.parseString(json)
+                .getAsJsonObject()
+                .getAsJsonArray("minecraft:geometry")
+                .get(0)
+                .getAsJsonObject();
+        int cubes = geometry.getAsJsonArray("bones").get(0).getAsJsonObject()
+                .getAsJsonArray("cubes").size();
+        assertEquals(AccessoryGeometry.HALO_SEGMENTS, cubes);
+
+        // Neighbouring slats must overlap, or the ring shows gaps between them.
+        double arc = 2.0 * Math.PI * AccessoryGeometry.HALO_RADIUS / AccessoryGeometry.HALO_SEGMENTS;
+        assertTrue("halo slats overlap (arc " + arc + " <= cube width 1.5)", arc <= 1.5);
     }
 
     @Test

@@ -16,6 +16,7 @@ import org.chimeramc.client.core.cosmetics.CosmeticLayering;
 import org.chimeramc.client.core.cosmetics.PetPose;
 import org.chimeramc.client.core.cosmetics.PlayerSkinProvider;
 import org.chimeramc.client.core.cosmetics.PreviewLighting;
+import org.chimeramc.client.core.cosmetics.QuadDepthSorter;
 import org.chimeramc.client.core.cosmetics.SkinModel;
 import org.chimeramc.client.ui.animation.DynamicAnim;
 
@@ -33,10 +34,13 @@ import java.util.List;
  * dropped by a normal test that uses the same transform as the projection, so a face is drawn
  * exactly when it points at the camera.
  *
- * <p>Faces are painter-sorted back to front by centroid depth. For a body whose boxes never
- * interpenetrate that is sufficient, and it avoids maintaining a depth buffer for a 30-quad
- * scene. Textured faces are drawn anti-aliased with bilinear filtering, so the skin reads smoothly
- * rather than as hard pixel blocks.
+ * <p>Faces are painter-sorted back to front. A single centroid-depth key over every face of every
+ * box is not enough: two faces of different boxes can tie at some yaw, and a humanoid is full of
+ * such pairs (head on torso, arm against torso), so the sort interleaves them and a hidden face
+ * paints over a nearer one — the triangular holes the preview used to show. {@link QuadDepthSorter}
+ * orders by the owning box first, which is exact for disjoint convex boxes, and uses the face's own
+ * depth only to break ties within a box. Textured faces are drawn anti-aliased with bilinear
+ * filtering, so the skin reads smoothly rather than as hard pixel blocks.
  *
  * <p>The cape is a {@link CapeSimulator} cloth mesh, drawn behind the body, with the animated
  * Chimera mark crawling across it. The frame callback only runs while there is motion to show,
@@ -107,6 +111,9 @@ public class CapePreviewView extends View {
     private static final class FaceQuad {
         Bitmap texture;
         final float[] verts = new float[8];
+        /** The owning box's centroid depth; the primary painter's key (see QuadDepthSorter). */
+        float groupDepth;
+        /** This face's own centroid depth; the tie-breaker within one box. */
         float depth;
         int tint;
 
@@ -644,6 +651,11 @@ public class CapePreviewView extends View {
                     depthSum += projected[2];
                 }
                 quad.depth = depthSum / 4f;
+                // The box's own centroid depth orders whole boxes before their faces, so two
+                // boxes' faces can never interleave — that interleave is what tore holes at the
+                // head/torso and arm/torso seams.
+                projectPoint(box.cx, box.cy, box.cz, scale, originX, originY);
+                quad.groupDepth = projected[2];
                 quad.texture = baseFaceCrops == null ? null : baseFaceCrops[b][face.ordinal()];
                 float persp = camera.perspectiveAt(box.cx, box.cy, box.cz);
                 // Black overlay at an alpha the light model derives from the face normal, so the
@@ -655,6 +667,9 @@ public class CapePreviewView extends View {
                 if (over != null) {
                     FaceQuad overlayQuad = new FaceQuad();
                     System.arraycopy(quad.verts, 0, overlayQuad.verts, 0, 8);
+                    // Nudged a hair toward the viewer so the overlay layer paints after its base
+                    // face without ever changing which box is in front.
+                    overlayQuad.groupDepth = quad.groupDepth + 0.5f;
                     overlayQuad.depth = quad.depth + 0.5f;
                     overlayQuad.texture = over;
                     // Hats, hair and eyes live on this layer; shading it as hard as the base would
@@ -666,8 +681,9 @@ public class CapePreviewView extends View {
             }
         }
 
-        // Painter's algorithm: farthest centroid first, so a nearer face covers a farther one.
-        drawList.sort((a, bq) -> Float.compare(a.depth, bq.depth));
+        // Painter's algorithm: farthest box first, then farthest face within it.
+        drawList.sort((a, bq) -> QuadDepthSorter.compare(
+                a.groupDepth, a.depth, bq.groupDepth, bq.depth));
 
         // Textured faces get a smooth, anti-aliased bilinear sample — the difference between a
         // blocky proof-of-concept and a render. The pixel paint is reserved for flat accessory
@@ -1118,6 +1134,47 @@ public class CapePreviewView extends View {
                 paint.setColor(accessory.accentColor);
                 drawBox(canvas, -3.2f, 37.2f, 0f, 1.0f, 1.6f, 1.0f, scale, originX, originY);
                 drawBox(canvas, 3.2f, 37.2f, 0f, 1.0f, 1.6f, 1.0f, scale, originX, originY);
+                break;
+            }
+            case TOPHAT: {
+                // A wide brim under a tall narrow crown, with a contrasting band.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 32.5f, 0f, 11.0f, 1.0f, 11.0f, scale, originX, originY);
+                drawBox(canvas, 0f, 36.0f, 0f, 8.0f, 6.0f, 8.0f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 33.5f, 0f, 8.2f, 1.0f, 8.2f, scale, originX, originY);
+                break;
+            }
+            case WIZARD_HAT: {
+                // A cone of graduated boxes on a wide brim, tapering to a tilted tip.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 32.5f, 0f, 12.0f, 1.0f, 12.0f, scale, originX, originY);
+                drawBox(canvas, 0f, 34.0f, 0f, 8.0f, 2.0f, 8.0f, scale, originX, originY);
+                drawBox(canvas, 0f, 36.0f, 0f, 6.0f, 2.0f, 6.0f, scale, originX, originY);
+                drawBox(canvas, 0f, 38.0f, 0f, 4.0f, 2.0f, 4.0f, scale, originX, originY);
+                drawBox(canvas, 0f, 40.0f, 0f, 2.0f, 2.0f, 2.0f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 41.5f, 0f, 0.8f, 1.0f, 0.8f, scale, originX, originY);
+                break;
+            }
+            case TIARA: {
+                // A low band with a rising centre stone, in the accent colour.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 32.5f, 0f, 8.4f, 1.0f, 8.4f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 34.0f, 3.6f, 1.6f, 2.0f, 0.8f, scale, originX, originY);
+                drawBox(canvas, -2.8f, 33.7f, 3.6f, 1.2f, 1.4f, 0.8f, scale, originX, originY);
+                drawBox(canvas, 2.8f, 33.7f, 3.6f, 1.2f, 1.4f, 0.8f, scale, originX, originY);
+                break;
+            }
+            case BEARD: {
+                // Graduated rows narrowing under the chin, so it reads as a beard not a slab.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 24f, 3.4f, 7.2f, 2.0f, 1.2f, scale, originX, originY);
+                drawBox(canvas, 0f, 22.4f, 3.4f, 6.0f, 2.0f, 1.2f, scale, originX, originY);
+                drawBox(canvas, 0f, 20.8f, 3.4f, 4.0f, 2.0f, 1.2f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 19.4f, 3.4f, 2.0f, 1.8f, 1.2f, scale, originX, originY);
                 break;
             }
             case FLOWER: {

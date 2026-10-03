@@ -30,10 +30,18 @@ import java.nio.charset.StandardCharsets;
  * reverse engineering — a plain resource pack.
  *
  * <p><b>On attachables.</b> A {@code minecraft:attachable} is bound to an <em>item</em> slot
- * (main hand, off hand, armour). A cape is not an item the player holds, so there is no item for an
- * attachable to bind to; the client-entity render controller is the supported data-driven route for
- * a cape, and it is the one the working community cape packs use. The pack is still pure JSON
- * content, no native code.
+ * (main hand, off hand, armour) by matching the item/block identifier; it cannot be triggered by
+ * equipping a cape or by any client-side condition, so there is no item for a cape attachable to
+ * bind to. This is the supported data-driven route for a cape instead: the vanilla player already
+ * plays a {@code cape} animation from {@code controller.animation.player.root}, and this pack
+ * swaps that key for our own animated cape geometry. It is the route the working community cape
+ * packs use, and it is pure JSON content — no native code, no hooking, no reverse engineering.
+ *
+ * <p><b>Why not a skin pack.</b> A Bedrock skin pack can pair a cape texture with a skin, but it
+ * requires the player to wear that exact skin and to re-enter the Dressing Room; it cannot change
+ * the cape for the skin the player is already wearing, which is the whole point of a launcher
+ * cosmetic. The render-controller route adds a cape the player did not have, on top of whatever
+ * skin they wear.
  *
  * <p><b>Why {@code min_engine_version} stays low.</b> A player client-entity file whose
  * {@code min_engine_version} is above 1.13.0 disables the Character Creator (Persona skins and
@@ -191,9 +199,10 @@ public final class CapeResourcePackBuilder {
                         ? FlatColorAtlas.paint(0x00000000, 0x00000000,
                                 PetGeometry.TEXTURE_WIDTH, PetGeometry.TEXTURE_HEIGHT,
                                 PetGeometry.UV_ACCENT_Y)
-                        : FlatColorAtlas.paint(pet.color, pet.accentColor,
+                        : PaintedAtlas.paint(pet.color, pet.accentColor,
                                 PetGeometry.TEXTURE_WIDTH, PetGeometry.TEXTURE_HEIGHT,
-                                PetGeometry.UV_ACCENT_Y));
+                                PetGeometry.UV_ACCENT_Y,
+                                pet.color ^ (pet.species.ordinal() * 131)));
         // The animation is always written so the entity's reference to it always resolves.
         writeAt(targetDir, PET_ANIMATION_PATH,
                 petAnimationJson().getBytes(StandardCharsets.UTF_8));
