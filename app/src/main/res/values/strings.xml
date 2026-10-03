@@ -857,6 +857,7 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="cosmetics_none">None</string>
     <string name="cosmetics_equipped">Equipped %1$s</string>
     <string name="cosmetics_scope_note">Capes, accessories and pets are launcher-side looks. The preview shows your own skin wearing the equipped cape, accessory and pet, and pets animate their walk, run, crouch, fly and swim gaits here. The cape and the worn accessory can reach the running game: Apply in game installs a resource pack that adds a cape and hat model to the player entity for the selected instance, so only you see them and only while that pack is applied. Pets are preview-only — Bedrock gives a launcher no way to spawn a client-side companion. Cape movement is drawn in the preview; in-game the pack supplies a still model, so the cape itself does not animate.</string>
+    <string name="accessory_style_note">Each style is a real, different mesh — a cap, a beanie, a crown, horns, a halo and so on are separate geometry. Every palette then tints those meshes, so "Amethyst Crown" and "Ember Crown" are the same shape in different colours while "Amethyst Crown" and "Amethyst Cap" are different shapes.</string>
     <string name="cosmetics_in_game">On your character in-game</string>
     <string name="cosmetics_apply_in_game">Apply in game</string>
     <string name="cosmetics_remove_in_game">Remove</string>

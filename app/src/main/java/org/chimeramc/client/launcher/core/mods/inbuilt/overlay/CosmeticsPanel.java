@@ -122,6 +122,15 @@ final class CosmeticsPanel {
         column.addView(sectionTitle(R.string.cosmetics_accessories));
         column.addView(dropdown(accessoryOptions(), store.getEquippedAccessoryId()));
 
+        // Honest about what the accessory styles are: distinct meshes tinted by palette, so the
+        // 100+ entries are not mistaken for 100+ hand-sculpted models.
+        TextView accessoryNote = new TextView(activity);
+        accessoryNote.setText(R.string.accessory_style_note);
+        accessoryNote.setTextSize(compact ? 9f : 10f);
+        accessoryNote.setTextColor(0xFF8F979F);
+        accessoryNote.setPadding(0, dp(4), 0, dp(6));
+        column.addView(accessoryNote);
+
         column.addView(sectionTitle(R.string.cosmetics_pets));
         column.addView(dropdown(petOptions(), store.getEquippedPetId()));
         column.addView(petGaitRow());
