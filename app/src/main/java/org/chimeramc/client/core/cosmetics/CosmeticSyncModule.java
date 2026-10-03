@@ -4,10 +4,15 @@ import android.content.Context;
 import android.net.wifi.WifiManager;
 import android.util.Log;
 
+import org.chimeramc.client.core.voice.VoiceProtocol;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
+import java.net.SocketTimeoutException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -15,13 +20,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Advertises the local player's equipped cosmetics to other Chimera users in the same world and
- * collects theirs, over a LAN multicast socket.
+ * collects theirs.
  *
- * <p><b>Why multicast, and why a second socket.</b> Two devices in the same Bedrock world are on
- * the same LAN segment, which is exactly the population that can see each other's capes, and
- * multicast reaches all of them with no server and no account — the same reasoning as proximity
- * voice. It is a <em>separate</em> socket on a separate group and port from voice, so the two
- * features cannot interfere and the voice wire format is untouched.
+ * <p><b>Two discovery sources, one manifest.</b> The advertisement is the same {@link
+ * CosmeticSyncProtocol} datagram either way; only the transport changes. LAN multicast reaches
+ * everyone on the same segment with no server, and is always on. When the player has configured
+ * the same Go relay Proximity Voice Chat uses, the manifest is additionally carried as a {@link
+ * VoiceProtocol#TYPE_COSMETIC_MANIFEST} frame the relay fans out to the peers in the sender's
+ * session — so a cape is visible to a Chimera user who is <em>not</em> on the same Wi-Fi. When no
+ * relay is configured, the player can paste a {@code host:port} and the manifest is unicast
+ * straight to it. See {@link CosmeticSyncConfig} for the routing rule.
  *
  * <p><b>What this is.</b> It is not a game hook: it makes the equipped cape, accessory and pet
  * visible to <em>other Chimera users</em> who are in the same world, by telling them what to draw.
@@ -30,28 +38,32 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * account — and the in-app note says so.
  *
  * <p><b>Announce, don't poll.</b> The advertisement is re-sent on a slow timer (and immediately
- * when the equipped set changes, via {@link #announce()}), because multicast is lossy and a peer
- * that joined after us must still learn what we wear. A slow timer keeps airtime near zero while
- * guaranteeing convergence.
+ * when the equipped set changes, via {@link #announce()}), because both transports are lossy and a
+ * peer that joined after us must still learn what we wear. A slow timer keeps airtime near zero
+ * while guaranteeing convergence.
  */
 public final class CosmeticSyncModule {
 
     private static final String TAG = "CosmeticSync";
 
-    /**
-     * Its own multicast group and port, distinct from voice's, so neither module receives the
-     * other's datagrams and the voice protocol needs no change.
-     */
-    public static final String GROUP = "239.255.42.100";
-    public static final int PORT = 47902;
+    /** Its own multicast group and port, distinct from voice's, so neither module hears the other. */
+    public static final String GROUP = CosmeticSyncConfig.GROUP;
+    public static final int PORT = CosmeticSyncConfig.PORT;
 
-    /** How often the advertisement is re-sent. Slow: multicast is for convergence, not streaming. */
+    /** How often the advertisement is re-sent. Slow: this is for convergence, not streaming. */
     static final long ANNOUNCE_INTERVAL_MS = 3000;
+
+    /** Relay keepalive period, matching the voice relay's own default. */
+    private static final int RELAY_KEEPALIVE_MS = 3000;
+
+    /** How long the relay read loop blocks before re-checking whether it should still run. */
+    private static final int RELAY_READ_TIMEOUT_MS = 500;
 
     private final Context context;
     private final CosmeticStore store;
     private final String peerId;
     private final String displayName;
+    private final CosmeticSyncConfig config;
     private final CosmeticSyncRegistry registry = new CosmeticSyncRegistry();
 
     private MulticastSocket socket;
@@ -59,6 +71,16 @@ public final class CosmeticSyncModule {
     private Thread receiveThread;
     private ScheduledExecutorService announcer;
     private final AtomicBoolean running = new AtomicBoolean(false);
+
+    // Relay route: a unicast UDP session with the Go relay. The manifest rides inside a v4
+    // COSMETIC_MANIFEST frame; the relay assigns the client id and fans the frame out.
+    private DatagramSocket relaySocket;
+    private InetSocketAddress relayServer;
+    private volatile long relayClientId;
+    private Thread relayThread;
+
+    // Manual route: unicast straight to a pasted host:port, no server.
+    private InetSocketAddress manualPeer;
 
     /**
      * The running module, or null.
@@ -70,10 +92,25 @@ public final class CosmeticSyncModule {
     private static volatile CosmeticSyncModule instance;
 
     public CosmeticSyncModule(Context context, String peerId, String displayName) {
+        this(context, peerId, displayName, CosmeticSyncConfig.resolve(true, false, "", "",
+                "world", ""));
+    }
+
+    /**
+     * The full constructor, taking the resolved routing config.
+     *
+     * <p>Kept separate from the preference read so the module can be driven in a test with an
+     * explicit config rather than a Context.
+     */
+    public CosmeticSyncModule(Context context, String peerId, String displayName,
+                              CosmeticSyncConfig config) {
         this.context = context.getApplicationContext();
         this.store = new CosmeticStore(context);
         this.peerId = peerId == null ? "" : peerId;
         this.displayName = displayName == null ? "" : displayName;
+        this.config = config == null
+                ? CosmeticSyncConfig.resolve(true, false, "", "", "world", "")
+                : config;
     }
 
     /** The running module, or null. */
@@ -90,9 +127,18 @@ public final class CosmeticSyncModule {
         if (module != null) module.announce();
     }
 
-    /** Opens the socket and starts announcing; returns false when the network refuses. */
+    /** The route currently carrying advertisements: "lan", "relay" or "manual". */
+    public String routeLabel() {
+        return config.routeLabel();
+    }
+
+    /**
+     * Opens the transports and starts announcing; returns false when the LAN socket (the always-on
+     * route) cannot be opened at all. A relay or manual failure is not fatal: multicast still runs.
+     */
     public boolean start() {
         if (running.get()) return true;
+        if (!config.enabled) return false;
         try {
             InetAddress group = InetAddress.getByName(GROUP);
             MulticastSocket multicastSocket = new MulticastSocket(PORT);
@@ -108,9 +154,15 @@ public final class CosmeticSyncModule {
         acquireMulticastLock();
         running.set(true);
         instance = this;
+
         receiveThread = new Thread(this::receiveLoop, "cosmetic-sync-receive");
         receiveThread.setDaemon(true);
         receiveThread.start();
+
+        // The relay/manual routes are opened after the LAN one and independently: a failure here
+        // must not stop the LAN path that already works.
+        if (config.relayEnabled) startRelay();
+        else if (config.hasManualPeer()) resolveManualPeer();
 
         announcer = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "cosmetic-sync-announce");
@@ -139,6 +191,7 @@ public final class CosmeticSyncModule {
             }
             target.close();
         }
+        stopRelay();
         releaseMulticastLock();
         registry.clear();
     }
@@ -153,17 +206,37 @@ public final class CosmeticSyncModule {
 
     /** Sends the current equipped set immediately, e.g. right after the player changes a cosmetic. */
     public void announce() {
+        byte[] data = CosmeticSyncProtocol.encode(peerId, displayName,
+                store.getEquippedCapeId(), store.getEquippedAccessoryId(),
+                store.getEquippedPetId());
+        if (data.length == 0) return;
+        broadcast(data);
+    }
+
+    /** Sends a datagram on every configured route. A lost one is recovered by the next tick. */
+    private void broadcast(byte[] data) {
+        // LAN multicast.
         MulticastSocket target = socket;
-        if (target == null || !running.get()) return;
-        try {
-            byte[] data = CosmeticSyncProtocol.encode(peerId, displayName,
-                    store.getEquippedCapeId(), store.getEquippedAccessoryId(),
-                    store.getEquippedPetId());
-            if (data.length == 0) return;
-            target.send(new DatagramPacket(data, data.length,
-                    InetAddress.getByName(GROUP), PORT));
-        } catch (IOException e) {
-            // A lost advertisement is recovered by the next timer tick; never fatal.
+        if (target != null && running.get()) {
+            try {
+                target.send(new DatagramPacket(data, data.length,
+                        InetAddress.getByName(GROUP), PORT));
+            } catch (IOException e) {
+                // Recovered by the next timer tick; never fatal.
+            }
+        }
+        // Relay: wrap the manifest in a v4 frame the relay fans out.
+        sendRelay(data);
+        // Manual unicast peer.
+        DatagramSocket manual = relaySocket; // reuse the same unicast socket when present
+        if (manualPeer != null) {
+            try {
+                if (manual != null && !manual.isClosed()) {
+                    manual.send(new DatagramPacket(data, data.length, manualPeer));
+                }
+            } catch (IOException e) {
+                // The peer may be offline; the next tick retries.
+            }
         }
     }
 
@@ -177,44 +250,212 @@ public final class CosmeticSyncModule {
                 target.receive(packet);
                 byte[] data = new byte[packet.getLength()];
                 System.arraycopy(packet.getData(), packet.getOffset(), data, 0, packet.getLength());
-                CosmeticSyncProtocol.Advert advert = CosmeticSyncProtocol.decode(data);
-                // Our own multicast echo comes back to us; the peer id filters it.
-                if (advert == null || advert.peerId.isEmpty() || advert.peerId.equals(peerId)) {
-                    continue;
-                }
-                if (advert.isRequest()) {
-                    // A peer asked everyone to state their set now, so answer immediately rather
-                    // than making them wait for the slow timer. This is what makes cosmetics
-                    // appear promptly when someone joins the world.
-                    announce();
-                    continue;
-                }
-                // The first time we hear a peer, ask them (and the group) to re-state their set,
-                // so a player who joined after us is not invisible until their next timer tick.
-                boolean firstSight = !registry.contains(advert.peerId);
-                registry.put(advert);
-                if (firstSight) requestAll();
+                handleIncoming(data);
             } catch (IOException e) {
                 if (!running.get()) break; // the socket was closed by stop()
             }
         }
     }
 
+    /** Decodes and records one manifest, answering a request and prompting a first-sighted peer. */
+    private void handleIncoming(byte[] data) {
+        CosmeticSyncProtocol.Advert advert = CosmeticSyncProtocol.decode(data);
+        // Our own multicast echo comes back to us; the peer id filters it.
+        if (advert == null || advert.peerId.isEmpty() || advert.peerId.equals(peerId)) {
+            return;
+        }
+        if (advert.isRequest()) {
+            // A peer asked everyone to state their set now, so answer immediately rather than
+            // making them wait for the slow timer. This is what makes cosmetics appear promptly
+            // when someone joins the world.
+            announce();
+            return;
+        }
+        // The first time we hear a peer, ask them (and the group) to re-state their set, so a
+        // player who joined after us is not invisible until their next timer tick.
+        boolean firstSight = !registry.contains(advert.peerId);
+        registry.put(advert);
+        if (firstSight) requestAll();
+    }
+
     /** Asks every listener to re-advertise immediately; used when a new peer is first heard. */
     private void requestAll() {
-        MulticastSocket target = socket;
-        if (target == null || !running.get()) return;
+        byte[] data = CosmeticSyncProtocol.encodeRequest(peerId, displayName);
+        if (data.length == 0) return;
+        broadcast(data);
+    }
+
+    // --- Relay route ------------------------------------------------------------------------
+
+    private void startRelay() {
         try {
-            byte[] data = CosmeticSyncProtocol.encodeRequest(peerId, displayName);
-            if (data.length == 0) return;
-            target.send(new DatagramPacket(data, data.length,
-                    InetAddress.getByName(GROUP), PORT));
+            relayServer = new InetSocketAddress(
+                    InetAddress.getByName(config.relayHost), config.relayPort);
+            DatagramSocket unicast = new DatagramSocket();
+            unicast.setSoTimeout(RELAY_READ_TIMEOUT_MS);
+            relaySocket = unicast;
         } catch (IOException e) {
-            // The peer's own timer will eventually reach us; a lost request is not fatal.
+            Log.w(TAG, "Could not open the cosmetic relay socket", e);
+            relaySocket = null;
+            relayServer = null;
+            return;
+        }
+        relayThread = new Thread(this::relayLoop, "cosmetic-sync-relay");
+        relayThread.setDaemon(true);
+        relayThread.start();
+    }
+
+    private void stopRelay() {
+        DatagramSocket target = relaySocket;
+        relaySocket = null;
+        relayServer = null;
+        relayClientId = 0L;
+        if (target != null) target.close();
+        Thread thread = relayThread;
+        relayThread = null;
+        if (thread != null) {
+            try {
+                thread.join(300);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    /**
+     * The relay session: HELLO once, then keep the NAT mapping open and read fan-out frames. The
+     * handshake is idempotent server-side, so a re-HELLO replaces the session rather than
+     * accumulating one; that is what lets a plain retry recover from a dropped packet.
+     */
+    private void relayLoop() {
+        sendRelayHello();
+        long lastKeepalive = System.currentTimeMillis();
+        byte[] buffer = new byte[VoiceProtocol.MAX_PAYLOAD + 512];
+        while (running.get()) {
+            DatagramSocket target = relaySocket;
+            InetSocketAddress server = relayServer;
+            if (target == null || server == null || target.isClosed()) break;
+            try {
+                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                target.receive(packet);
+                byte[] data = new byte[packet.getLength()];
+                System.arraycopy(packet.getData(), packet.getOffset(), data, 0, packet.getLength());
+                handleRelayFrame(data);
+            } catch (SocketTimeoutException timeout) {
+                // Expected: fall through to the keepalive below.
+            } catch (IOException e) {
+                if (!running.get()) break;
+            }
+            long now = System.currentTimeMillis();
+            if (now - lastKeepalive >= RELAY_KEEPALIVE_MS) {
+                lastKeepalive = now;
+                sendRelayPong();
+            }
+        }
+    }
+
+    private void sendRelayHello() {
+        DatagramSocket target = relaySocket;
+        InetSocketAddress server = relayServer;
+        if (target == null || server == null || target.isClosed()) return;
+        try {
+            byte[] credential = config.relayPassword.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            byte[] hello = VoiceProtocol.encodeHello(displayName, config.channel, credential);
+            target.send(new DatagramPacket(hello, hello.length, server));
+        } catch (IOException e) {
+            // The loop retries; a failed hello is not fatal.
+        }
+    }
+
+    private void sendRelayPong() {
+        DatagramSocket target = relaySocket;
+        InetSocketAddress server = relayServer;
+        if (target == null || server == null || target.isClosed()) return;
+        try {
+            byte[] pong = VoiceProtocol.encodePong(relayClientId);
+            target.send(new DatagramPacket(pong, pong.length, server));
+        } catch (IOException e) {
+            // Keepalive is best-effort.
+        }
+    }
+
+    /** Sends a manifest over the relay, wrapped in a v4 COSMETIC_MANIFEST frame. */
+    private void sendRelay(byte[] manifest) {
+        DatagramSocket target = relaySocket;
+        InetSocketAddress server = relayServer;
+        if (target == null || server == null || target.isClosed()) return;
+        try {
+            byte[] frame = VoiceProtocol.encodeCosmeticManifest(relayClientId, peerId, displayName,
+                    config.channel, manifest);
+            if (frame.length == 0) return;
+            target.send(new DatagramPacket(frame, frame.length, server));
+        } catch (IOException e) {
+            // The next announce tick retries.
+        }
+    }
+
+    /**
+     * Handles a frame from the relay. Only a HELLO_ACK (to learn our assigned id) and a
+     * COSMETIC_MANIFEST (a peer's cosmetics) are interesting; everything else is ignored.
+     */
+    private void handleRelayFrame(byte[] data) {
+        VoiceProtocol.Packet packet = VoiceProtocol.decode(data);
+        if (packet == null) return;
+        if (packet.type == VoiceProtocol.TYPE_HELLO_ACK) {
+            relayClientId = packet.clientId;
+            // Re-announce now that we have an id, so peers learn our set without waiting a tick.
+            announce();
+            return;
+        }
+        if (packet.type == VoiceProtocol.TYPE_COSMETIC_MANIFEST && packet.payload != null) {
+            handleIncoming(packet.payload);
+        }
+    }
+
+    // --- Manual route -----------------------------------------------------------------------
+
+    private void resolveManualPeer() {
+        try {
+            org.chimeramc.client.core.voice.VoiceRelayAddress parsed =
+                    org.chimeramc.client.core.voice.VoiceRelayAddress.parse(config.manualPeer);
+            if (parsed == null) return;
+            manualPeer = new InetSocketAddress(InetAddress.getByName(parsed.host), parsed.port);
+            // A unicast socket is needed for the manual send; reuse the relay socket slot so the
+            // two routes share one socket when only one is active.
+            if (relaySocket == null) {
+                DatagramSocket unicast = new DatagramSocket();
+                unicast.setSoTimeout(RELAY_READ_TIMEOUT_MS);
+                relaySocket = unicast;
+                relayThread = new Thread(this::manualReceiveLoop, "cosmetic-sync-manual");
+                relayThread.setDaemon(true);
+                relayThread.start();
+            }
+        } catch (IOException e) {
+            manualPeer = null;
+        }
+    }
+
+    private void manualReceiveLoop() {
+        byte[] buffer = new byte[CosmeticSyncProtocol.MAX_PAYLOAD];
+        while (running.get()) {
+            DatagramSocket target = relaySocket;
+            if (target == null || target.isClosed()) break;
+            try {
+                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                target.receive(packet);
+                byte[] data = new byte[packet.getLength()];
+                System.arraycopy(packet.getData(), packet.getOffset(), data, 0, packet.getLength());
+                handleIncoming(data);
+            } catch (SocketTimeoutException timeout) {
+                // Expected; loop to re-check running.
+            } catch (IOException e) {
+                if (!running.get()) break;
+            }
         }
     }
 
     private void acquireMulticastLock() {
+
         try {
             WifiManager wifi = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
             if (wifi == null) return;

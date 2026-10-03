@@ -102,6 +102,7 @@ public class InbuiltModManager {
     private static final String KEY_VOICE_DEVICE_ID = "voice_device_id";
     /** Whether the equipped cape/accessory/pet is advertised to other Chimera users in the world. */
     private static final String KEY_COSMETIC_SYNC_ENABLED = "cosmetic_sync_enabled";
+    private static final String KEY_COSMETIC_MANUAL_PEER = "cosmetic_sync_manual_peer";
     private static final int DEFAULT_AIM_SMOOTHING = 40;
     private static final int DEFAULT_AIM_SENSITIVITY = 100;
     private static final int DEFAULT_AIM_CROSSHAIR_COLOR = 0xFF3DDC84;
@@ -888,6 +889,23 @@ public class InbuiltModManager {
 
     public void setCosmeticSyncEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_COSMETIC_SYNC_ENABLED, enabled).apply();
+    }
+
+    /**
+     * The manual unicast peer for cosmetic sync, as {@code host:port}, or "" when none is set.
+     *
+     * <p>This is the fallback route when no relay is configured: a direct peer address cannot be
+     * discovered automatically, so the player pastes one. It is ignored while a relay is
+     * configured, because the relay is the better route (it reconnects and reaches a whole
+     * session).
+     */
+    public String getCosmeticManualPeer() {
+        return prefs.getString(KEY_COSMETIC_MANUAL_PEER, "");
+    }
+
+    public void setCosmeticManualPeer(String peer) {
+        prefs.edit().putString(KEY_COSMETIC_MANUAL_PEER,
+                peer == null ? "" : peer.trim()).apply();
     }
 
     /** Resets the channel to the open one, used by the panel's "World" button. */

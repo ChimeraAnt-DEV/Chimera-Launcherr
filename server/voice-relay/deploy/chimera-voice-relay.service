@@ -1,0 +1,33 @@
+[Unit]
+Description=Chimera Voice Relay
+Documentation=https://github.com/ChimeraAnt-DEV/ChimeraLauncher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Create a dedicated unprivileged user:
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin voice-relay
+User=voice-relay
+Group=voice-relay
+WorkingDirectory=/opt/chimera-voice
+ExecStart=/opt/chimera-voice/voice-relay -config /etc/chimera-voice/relay.json
+Restart=always
+RestartSec=2
+# The service only needs to bind UDP + the metrics port and read its config.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+LockPersonality=true
+MemoryDenyWriteExecute=true
+# Logs go to the journal, where `journalctl -u chimera-voice-relay -f` reads them.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
