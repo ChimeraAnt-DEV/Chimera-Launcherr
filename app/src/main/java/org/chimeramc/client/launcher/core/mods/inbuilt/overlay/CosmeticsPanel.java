@@ -8,6 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -67,6 +68,8 @@ final class CosmeticsPanel {
     private TextView gameStatus;
     private TextView syncStatus;
     private TextView syncToggle;
+    private LinearLayout manualPeerRow;
+    private EditText manualPeerInput;
 
     /** True while the panel is programmatically setting a spinner, so its callback is ignored. */
     private boolean suppressSelection;
@@ -103,6 +106,8 @@ final class CosmeticsPanel {
         skinLine.setPadding(0, dp(4), 0, 0);
         if (preview.isShowingFallbackSkin()) {
             skinLine.setText(R.string.cosmetics_skin_fallback);
+        } else if (preview.isShowingDefaultSteve()) {
+            skinLine.setText(R.string.cosmetics_skin_default_steve);
         } else {
             skinLine.setText(activity.getString(R.string.cosmetics_skin_source,
                     preview.getSkinSourceName()));
@@ -168,6 +173,29 @@ final class CosmeticsPanel {
         });
         column.addView(syncToggle);
 
+        // The manual peer fallback: when no Go relay is configured, a player can paste a direct
+        // host:port so a peer not on the same Wi-Fi still sees the cosmetics. It is hidden while a
+        // relay is configured, because the relay is the better route and the manual address is
+        // ignored then.
+        InbuiltModManager manager = InbuiltModManager.getInstance(activity);
+        manualPeerRow = new LinearLayout(activity);
+        manualPeerRow.setOrientation(LinearLayout.HORIZONTAL);
+        manualPeerRow.setPadding(0, dp(4), 0, 0);
+        manualPeerInput = new EditText(activity);
+        manualPeerInput.setHint(R.string.cosmetics_sync_manual_hint);
+        manualPeerInput.setSingleLine(true);
+        manualPeerInput.setTextSize(compact ? 10f : 11f);
+        manualPeerInput.setText(manager.getCosmeticManualPeer());
+        manualPeerRow.addView(manualPeerInput, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        manualPeerRow.addView(gameButton(R.string.cosmetics_sync_manual_save, false, v -> {
+            manager.setCosmeticManualPeer(manualPeerInput.getText().toString());
+            toast(R.string.cosmetics_sync_manual_saved);
+            CosmeticSyncModule.requestAnnounce();
+            refreshSyncStatus();
+        }));
+        column.addView(manualPeerRow);
+
         LinearLayout actions = new LinearLayout(activity);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setPadding(0, dp(6), 0, 0);
@@ -196,6 +224,12 @@ final class CosmeticsPanel {
                     ? R.string.cosmetics_sync_toggle_off
                     : R.string.cosmetics_sync_toggle_on);
         }
+        // The manual address only matters when there is no relay; hide the row while a relay is
+        // configured so the UI does not offer a control whose value is ignored.
+        if (manualPeerRow != null) {
+            manualPeerRow.setVisibility(manager.isVoiceRelayEnabled()
+                    ? View.GONE : View.VISIBLE);
+        }
         if (!enabled) {
             syncStatus.setText(R.string.cosmetics_sync_off);
             return;
@@ -207,7 +241,9 @@ final class CosmeticsPanel {
             syncStatus.setText(R.string.cosmetics_sync_with_game);
             return;
         }
-        syncStatus.setText(activity.getString(R.string.cosmetics_sync_seen, module.registry().size()));
+        String route = module.routeLabel();
+        syncStatus.setText(activity.getString(R.string.cosmetics_sync_seen,
+                module.registry().size(), route));
     }
 
     // ---- Dropdowns -----------------------------------------------------------------------

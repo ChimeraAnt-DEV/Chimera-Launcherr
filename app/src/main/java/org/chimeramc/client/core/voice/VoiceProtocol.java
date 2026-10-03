@@ -93,6 +93,17 @@ public final class VoiceProtocol {
     /** Relay only: the server refused something; the reason is in {@link Packet#sequence}. */
     public static final byte TYPE_NOTICE = 8;
 
+    /**
+     * A cosmetic manifest, relayed between peers in the same session.
+     *
+     * <p>The relay fans this out with the same rule as audio (same channel, or the open world
+     * channel either way) but never decodes the payload: {@link
+     * org.chimeramc.client.core.cosmetics.CosmeticSyncProtocol} owns the bytes, so a new cosmetic
+     * is a client-side catalogue entry and the server needs no change. It is its own type rather
+     * than a flag on a beacon so an older server drops it cleanly instead of mis-reading a frame.
+     */
+    public static final byte TYPE_COSMETIC_MANIFEST = 9;
+
     /** Audio codec: raw 16-bit little-endian mono PCM, the LAN default. */
     public static final byte CODEC_PCM = 0;
     /** Audio codec: Opus, what the relay transport prefers for its bandwidth saving. */
@@ -440,6 +451,21 @@ public final class VoiceProtocol {
                 VISIBILITY_PUBLIC, "", CAPACITY_NONE, 0f, false, 0f, 0f, 0f, 0, CODEC_PCM, null);
     }
 
+    /**
+     * A v4 cosmetic manifest for the relay: a {@code CosmeticSyncProtocol} datagram carried as the
+     * opaque payload, so the relay fans it out without knowing what a cape is.
+     *
+     * <p>The channel is what makes the relay's fan-out rule apply: a manifest is delivered to the
+     * peers that can hear the sender's channel, exactly like audio, which is the "same session"
+     * scope the feature promises.
+     */
+    public static byte[] encodeCosmeticManifest(long clientId, String peerId, String name,
+                                                String channel, byte[] manifest) {
+        return encode(VERSION_RELAY, clientId, TYPE_COSMETIC_MANIFEST, peerId, name, "", channel,
+                VISIBILITY_PUBLIC, "", CAPACITY_NONE, 0f, false, 0f, 0f, 0f, 0, CODEC_PCM,
+                manifest);
+    }
+
     /** Decodes a datagram, or returns null when it is not one of ours or is malformed. */
     public static Packet decode(byte[] data) {
         if (data == null || data.length < MAGIC.length + 2) return null;
@@ -517,6 +543,7 @@ public final class VoiceProtocol {
             case TYPE_PING:
             case TYPE_PONG:
             case TYPE_NOTICE:
+            case TYPE_COSMETIC_MANIFEST:
                 return true;
             default:
                 return false;

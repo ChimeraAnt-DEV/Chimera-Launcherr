@@ -948,8 +948,19 @@ public class InbuiltOverlayManager {
         try {
             if (!manager.isCosmeticSyncEnabled()) return;
             if (cosmeticSyncModule == null) {
+                // Reuse the voice relay config so a player who already set up the relay gets
+                // cross-network cosmetics with no extra setup; fall back to a manual host:port
+                // when no relay is configured. Multicast always runs alongside either.
+                org.chimeramc.client.core.cosmetics.CosmeticSyncConfig config =
+                        org.chimeramc.client.core.cosmetics.CosmeticSyncConfig.resolve(
+                                true,
+                                manager.isVoiceRelayEnabled(),
+                                manager.getVoiceRelayAddress(),
+                                manager.getVoiceRelayPassword(),
+                                manager.getVoiceChannel(),
+                                manager.getCosmeticManualPeer());
                 cosmeticSyncModule = new org.chimeramc.client.core.cosmetics.CosmeticSyncModule(
-                        activity, manager.getVoiceDeviceId(), deviceName());
+                        activity, manager.getVoiceDeviceId(), deviceName(), config);
             }
             cosmeticSyncModule.start();
         } catch (Throwable t) {
