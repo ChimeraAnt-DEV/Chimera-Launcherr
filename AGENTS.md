@@ -1209,5 +1209,7 @@ these are the conclusions.
   path), and the panel can toggle it via `InbuiltModManager.isCosmeticSyncEnabled`. Changing a
   cosmetic calls `CosmeticSyncModule.requestAnnounce()` so a swap is advertised immediately.
 - The Cosmetics panel's sync line is honest about state: off / "starts with the game" (no session) /
-  "N peers can see you".
+  "N peers can see you (route)". The route label (`lan`/`relay`/`manual`) tells the player which
+  transport is actually carrying advertisements. The panel's manual-peer row is hidden while a
+  relay is configured, because the relay is the better route and the manual value is ignored then.
 
