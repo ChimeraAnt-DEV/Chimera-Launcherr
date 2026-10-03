@@ -126,5 +126,17 @@ public final class PeerHitboxSource {
             return Collections.emptyList();
         }
     }
+
+    /**
+     * True when the peer route exists at all (the voice module is running), independent of
+     * whether anyone is currently audible.
+     *
+     * <p>This distinguishes "the module is working but nobody is in range" from "the module has
+     * no data route", so the overlay can stay quiet in the first case instead of showing the
+     * native "waiting for game data" notice as if the peer route were broken.
+     */
+    public static boolean hasFeed() {
+        return VoiceChatModule.peek() != null;
+    }
 }
 

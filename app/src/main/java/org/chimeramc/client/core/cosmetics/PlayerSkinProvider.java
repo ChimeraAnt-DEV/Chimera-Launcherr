@@ -255,9 +255,15 @@ public final class PlayerSkinProvider {
     /**
      * A recognisable default character, drawn rather than shipped as an asset.
      *
-     * Using the brand violet as the shirt makes it obvious at a glance that this is our
-     * placeholder and not the player's skin, which is what stops a failed lookup from looking
-     * like it silently worked.
+     * <p>The placeholder is deliberately greyscale. It is what the preview shows before the player
+     * imports a skin or applies a skin pack, and a coloured stand-in (the brand-violet shirt it
+     * used to wear) read as an actual skin — the blue/white result users saw was this placeholder
+     * wearing brand colours, not a rendering fault. A neutral grey, correctly shaded character is
+     * unmistakably a placeholder while still looking like a Minecraft model.
+     *
+     * <p>Painted from the same UV table the renderer samples, so the stand-in cannot drift from
+     * the model. A hardcoded region list previously used the wrong columns for the left arm and
+     * leg, so the placeholder rendered with mismatched limbs.
      */
     public static Bitmap fallbackSkin() {
         Bitmap bmp = Bitmap.createBitmap(SkinModel.ATLAS_SIZE, SkinModel.ATLAS_SIZE,
@@ -266,72 +272,85 @@ public final class PlayerSkinProvider {
         Paint paint = new Paint();
         paint.setFilterBitmap(false);
 
+        // Palette: a single grey ramp, no chroma, so this can never be mistaken for a real skin.
+        final int skinTone = 0xFF9AA0A6;
+        final int hair = 0xFF5E646B;
+        final int shirt = 0xFF7C838B;
+        final int shirtShade = 0xFF6A7078;
+        final int hand = 0xFFB4B9BF;
+        final int trousers = 0xFF545A61;
+        final int shoes = 0xFF3A3E44;
+        final int eyeWhite = 0xFFE6E9EC;
+        final int eyePupil = 0xFF2B2F36;
+
         // Fill the whole atlas with the skin tone, then paint each region over it.
-        canvas.drawColor(0xFFE8B98F);
+        canvas.drawColor(skinTone);
 
-        // Head: hair on top and back, face on the front, eyes drawn in.
-        fill(canvas, paint, 8, 0, 8, 8, 0xFF3A2A22);
-        fill(canvas, paint, 16, 0, 8, 8, 0xFF3A2A22);
-        fill(canvas, paint, 0, 8, 8, 8, 0xFF3A2A22);
-        fill(canvas, paint, 24, 8, 8, 8, 0xFF3A2A22);
-        fill(canvas, paint, 8, 8, 8, 8, 0xFFE8B98F);
-        fill(canvas, paint, 16, 8, 8, 8, 0xFF3A2A22);
-        // Eyes.
-        fill(canvas, paint, 10, 12, 2, 2, 0xFFFFFFFF);
-        fill(canvas, paint, 12, 12, 1, 2, 0xFF2B4C7E);
-        fill(canvas, paint, 14, 12, 1, 2, 0xFF2B4C7E);
-        fill(canvas, paint, 15, 12, 1, 2, 0xFFFFFFFF);
+        // Head: hair on the top and back, face on the front.
+        fill(canvas, paint, 8, 0, 8, 8, hair);
+        fill(canvas, paint, 16, 0, 8, 8, hair);
+        fill(canvas, paint, 0, 8, 8, 8, hair);
+        fill(canvas, paint, 24, 8, 8, 8, hair);
+        fill(canvas, paint, 8, 8, 8, 8, skinTone);
+        fill(canvas, paint, 16, 8, 8, 8, hair);
+        // A brow and two eyes so the face reads as a face at preview size.
+        fill(canvas, paint, 9, 11, 6, 1, hair);
+        fill(canvas, paint, 10, 12, 2, 2, eyeWhite);
+        fill(canvas, paint, 12, 12, 1, 2, eyePupil);
+        fill(canvas, paint, 14, 12, 1, 2, eyePupil);
+        fill(canvas, paint, 15, 12, 1, 2, eyeWhite);
 
-        // Body: brand-violet shirt.
-        fill(canvas, paint, 20, 20, 8, 12, 0xFF6236E8);
-        fill(canvas, paint, 16, 20, 4, 12, 0xFF5429C9);
-        fill(canvas, paint, 28, 20, 4, 12, 0xFF5429C9);
-        fill(canvas, paint, 32, 20, 8, 12, 0xFF4A22B5);
-        fill(canvas, paint, 20, 16, 8, 4, 0xFF6236E8);
-        fill(canvas, paint, 28, 16, 8, 4, 0xFF4A22B5);
+        // Hair volume on the second layer: top, back and both sides, leaving the front open so
+        // the face shows through. The renderer drops an all-transparent overlay crop, so the
+        // unpainted front simply costs nothing.
+        fill(canvas, paint, 40, 0, 8, 8, hair);
+        fill(canvas, paint, 48, 0, 8, 8, hair);
+        fill(canvas, paint, 32, 8, 8, 8, hair);
+        fill(canvas, paint, 48, 8, 8, 8, hair);
+        fill(canvas, paint, 56, 8, 8, 8, hair);
+
+        // Torso: a grey shirt with the side and back strips shaded a step darker.
+        fill(canvas, paint, 20, 20, 8, 12, shirt);
+        fill(canvas, paint, 16, 20, 4, 12, shirtShade);
+        fill(canvas, paint, 28, 20, 4, 12, shirtShade);
+        fill(canvas, paint, 32, 20, 8, 12, shirtShade);
+        fill(canvas, paint, 20, 16, 8, 4, shirt);
+        fill(canvas, paint, 28, 16, 8, 4, shirtShade);
 
         // Limbs: painted from the same UV table the renderer samples, so the stand-in cannot
-        // drift from the model. A hardcoded region list previously used the wrong columns for
-        // the left arm and leg, so the placeholder rendered with mismatched limbs.
+        // drift from the model.
         for (SkinModel.Box box : SkinModel.boxes()) {
             boolean arm = box.id.startsWith("arm");
             boolean leg = box.id.startsWith("leg");
             if (!arm && !leg) continue;
-            int sleeve = arm ? (box.id.equals("arm_r") ? 0xFF6236E8 : 0xFF5429C9)
-                    : 0xFF2A2E38;
-            int sleeveSide = arm ? sleeve : 0xFF24272F;
-            // Hands and shoes sit at the bottom of the limb's side strips.
-            int end = arm ? 0xFFE8B98F : 0xFF1B1E24;
+            int limb = arm ? shirt : trousers;
+            int limbShade = arm ? shirtShade : 0xFF474D54;
+            int end = arm ? hand : shoes;
             for (SkinModel.Face face : SkinModel.Face.values()) {
                 SkinModel.Uv uv = box.baseUv(face);
                 if (uv == null) continue;
                 int color;
                 switch (face) {
                     case FRONT:
-                        color = sleeve;
-                        break;
-                    case LEFT:
-                    case RIGHT:
-                    case BACK:
-                        color = sleeveSide;
+                    case TOP:
+                    case BOTTOM:
+                        color = limb;
                         break;
                     default:
-                        color = sleeve;
+                        color = limbShade;
                         break;
                 }
                 fill(canvas, paint, uv.u, uv.v, uv.w, uv.h, color);
             }
             // The lower quarter of the front and side strips is the exposed hand/shoe.
-            SkinModel.Uv front = box.baseUv(SkinModel.Face.FRONT);
-            SkinModel.Uv left = box.baseUv(SkinModel.Face.LEFT);
-            SkinModel.Uv right = box.baseUv(SkinModel.Face.RIGHT);
-            SkinModel.Uv back = box.baseUv(SkinModel.Face.BACK);
-            for (SkinModel.Uv uv : new SkinModel.Uv[]{front, left, right, back}) {
+            for (SkinModel.Face f : new SkinModel.Face[]{
+                    SkinModel.Face.FRONT, SkinModel.Face.LEFT,
+                    SkinModel.Face.RIGHT, SkinModel.Face.BACK}) {
+                SkinModel.Uv uv = box.baseUv(f);
+                if (uv == null) continue;
                 fill(canvas, paint, uv.u, uv.v + uv.h - 4, uv.w, 4, end);
             }
         }
-
-        // Legs: dark trousers with shoes at the bottom are covered by the loop above.
 
         return bmp;
     }

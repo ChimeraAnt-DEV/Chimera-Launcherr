@@ -24,6 +24,11 @@ public class PvpSuiteModulesTest {
             ModIds.HIT_PREDICTION, ModIds.KILL_EFFECTS
     };
 
+    /** The two whose output comes only from the voice peer feed and the local view. */
+    private static final String[] PEER_ROUTE = {
+            ModIds.REACH_INDICATOR, ModIds.HIT_PREDICTION
+    };
+
     @Test
     public void theSuiteIsNotClassifiedAsPvp() {
         // If they were, the menu would draw a second PvP section and the spec's "no new PvP
@@ -41,13 +46,26 @@ public class PvpSuiteModulesTest {
     }
 
     @Test
-    public void theSuiteStaysUsableAndClickable() {
-        // None of the four needs the native entity feed: the peer route and the local view are
-        // enough. Greying them out would make the working half unreachable.
-        for (String id : SUITE) {
+    public void thePeerRouteModulesStayUsableAndClickable() {
+        // Reach Indicator and Hit Prediction read peers from the voice feed and the local view;
+        // neither needs the native entity feed, so both work today.
+        for (String id : PEER_ROUTE) {
             assertFalse(id + " must stay usable", ModAvailability.isUnavailable(id));
             assertTrue(id + " must stay clickable", ModAvailability.isInteractive(id));
             assertNull(id + " must carry no badged reason", ModAvailability.unavailableReason(id));
+        }
+    }
+
+    @Test
+    public void theGameDataModulesAreGreyedOutRatherThanSilentlyDoingNothing() {
+        // Trajectory Prediction needs the held item and Custom Kill Effects needs the opponent
+        // death feed. No provider is installed for either, so an enabled switch would change
+        // nothing on screen -- which reads as a broken module. They are badged instead.
+        for (String id : new String[]{ModIds.TRAJECTORY_PREDICTION, ModIds.KILL_EFFECTS}) {
+            assertTrue(id + " must be badged", ModAvailability.isUnavailable(id));
+            assertFalse(id + " must not be clickable", ModAvailability.isInteractive(id));
+            assertEquals(ModAvailability.REASON_NO_GAME_DATA,
+                    ModAvailability.unavailableReason(id));
         }
     }
 

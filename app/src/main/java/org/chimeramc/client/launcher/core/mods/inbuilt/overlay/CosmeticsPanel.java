@@ -6,46 +6,65 @@ import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.FrameLayout;
-import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import org.chimeramc.client.R;
-import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
-import org.chimeramc.client.core.cosmetics.CosmeticStore;
 import org.chimeramc.client.core.content.CapeInGameInstaller;
 import org.chimeramc.client.core.content.SkinPackActivator;
+import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
+import org.chimeramc.client.core.cosmetics.CosmeticStore;
 import org.chimeramc.client.core.versions.GameVersion;
 import org.chimeramc.client.core.versions.VersionManager;
-import org.chimeramc.client.util.LauncherStorage;
 import org.chimeramc.client.ui.animation.DynamicAnim;
+import org.chimeramc.client.util.LauncherStorage;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * The Cosmetics section of the in-game Mod Menu: the player's character wearing the equipped
- * cape and accessory, and a chip row per cosmetic group to change them.
+ * cape, accessory and pet, with a dropdown per cosmetic family to change them.
  *
- * Built in code rather than XML because the cape preview is an animated custom view and the
- * chips are data-driven from {@link CosmeticCatalog}. The equipped selection persists through
- * {@link CosmeticStore}, so it survives closing the menu and relaunching the game.
+ * <p>Built in code rather than XML because the preview is an animated custom view and the options
+ * are data-driven from {@link CosmeticCatalog}. Each family has over a hundred styles, so a chip
+ * row would be unusable; a dropdown keeps the whole catalogue reachable without a wall of buttons.
+ * The equipped selection persists through {@link CosmeticStore}, so it survives closing the menu
+ * and relaunching the game.
  *
- * Selecting a cape also offers to put it on the character in-game, which is done by installing a
- * resource pack that overrides the player's cape texture. See {@link CapeInGameInstaller}.
+ * <p>Selecting a cape also offers to put it on the character in-game, which is done by installing
+ * a resource pack that overrides the player's cape texture. See {@link CapeInGameInstaller}.
  */
 final class CosmeticsPanel {
+
+    /** One dropdown row: a stable id, the label shown, and what picking it does. */
+    private static final class Option {
+        final String id;
+        final String label;
+        final Runnable apply;
+
+        Option(String id, String label, Runnable apply) {
+            this.id = id;
+            this.label = label;
+            this.apply = apply;
+        }
+    }
 
     private final Activity activity;
     private final CosmeticStore store;
     private final LinearLayout root;
     private final CapePreviewView preview;
-    private final LinearLayout capeRow;
-    private final LinearLayout accessoryRow;
     private TextView gameStatus;
+
+    /** True while the panel is programmatically setting a spinner, so its callback is ignored. */
+    private boolean suppressSelection;
 
     CosmeticsPanel(Activity activity, boolean compact) {
         this.activity = activity;
@@ -59,6 +78,7 @@ final class CosmeticsPanel {
         preview = new CapePreviewView(activity);
         preview.setCape(store.getEquippedCape());
         preview.setAccessory(store.getEquippedAccessory());
+        preview.setPet(store.getEquippedPet());
         preview.setContentDescription(activity.getString(R.string.cosmetics_preview_description));
 
         // The preview gets its own column so the caption can state which skin is on screen.
@@ -96,20 +116,14 @@ final class CosmeticsPanel {
         root.addView(scroller, scrollerParams);
 
         column.addView(sectionTitle(R.string.cosmetics_capes));
-        HorizontalScrollView capeScroll = new HorizontalScrollView(activity);
-        capeScroll.setHorizontalScrollBarEnabled(false);
-        capeRow = new LinearLayout(activity);
-        capeRow.setOrientation(LinearLayout.HORIZONTAL);
-        capeScroll.addView(capeRow);
-        column.addView(capeScroll);
+        column.addView(dropdown(capeOptions(), store.getEquippedCapeId()));
 
         column.addView(sectionTitle(R.string.cosmetics_accessories));
-        HorizontalScrollView accessoryScroll = new HorizontalScrollView(activity);
-        accessoryScroll.setHorizontalScrollBarEnabled(false);
-        accessoryRow = new LinearLayout(activity);
-        accessoryRow.setOrientation(LinearLayout.HORIZONTAL);
-        accessoryScroll.addView(accessoryRow);
-        column.addView(accessoryScroll);
+        column.addView(dropdown(accessoryOptions(), store.getEquippedAccessoryId()));
+
+        column.addView(sectionTitle(R.string.cosmetics_pets));
+        column.addView(dropdown(petOptions(), store.getEquippedPetId()));
+        column.addView(petGaitRow());
 
         TextView note = new TextView(activity);
         note.setText(R.string.cosmetics_scope_note);
@@ -131,9 +145,181 @@ final class CosmeticsPanel {
         actions.addView(gameButton(R.string.cosmetics_remove_in_game, false, v -> removeInGame()));
         column.addView(actions);
         refreshGameStatus();
-
-        rebuildChips();
     }
+
+    // ---- Dropdowns -----------------------------------------------------------------------
+
+    private List<Option> capeOptions() {
+        List<Option> options = new ArrayList<>();
+        options.add(new Option(CosmeticCatalog.NONE,
+                activity.getString(R.string.cosmetics_none), () -> {
+            store.setEquippedCape(CosmeticCatalog.NONE);
+            preview.setCape(null);
+            refreshGameStatus();
+        }));
+        for (final CosmeticCatalog.Cape cape : CosmeticCatalog.capes()) {
+            options.add(new Option(cape.id, cape.name, () -> {
+                store.setEquippedCape(cape.id);
+                preview.setCape(cape);
+                refreshGameStatus();
+            }));
+        }
+        return options;
+    }
+
+    private List<Option> accessoryOptions() {
+        List<Option> options = new ArrayList<>();
+        options.add(new Option(CosmeticCatalog.NONE,
+                activity.getString(R.string.cosmetics_none), () -> {
+            store.setEquippedAccessory(CosmeticCatalog.NONE);
+            preview.setAccessory(null);
+        }));
+        for (final CosmeticCatalog.Accessory accessory : CosmeticCatalog.accessories()) {
+            if (CosmeticCatalog.NONE.equals(accessory.id)) continue;
+            options.add(new Option(accessory.id, accessory.name, () -> {
+                store.setEquippedAccessory(accessory.id);
+                preview.setAccessory(accessory);
+            }));
+        }
+        return options;
+    }
+
+    private List<Option> petOptions() {
+        List<Option> options = new ArrayList<>();
+        options.add(new Option(CosmeticCatalog.NONE,
+                activity.getString(R.string.cosmetics_none), () -> {
+            store.setEquippedPet(CosmeticCatalog.NONE);
+            preview.setPet(null);
+        }));
+        for (final CosmeticCatalog.Pet pet : CosmeticCatalog.pets()) {
+            options.add(new Option(pet.id, pet.name, () -> {
+                store.setEquippedPet(pet.id);
+                preview.setPet(pet);
+            }));
+        }
+        return options;
+    }
+
+    /**
+     * A labelled dropdown over one family.
+     *
+     * <p>Options are matched by id, never by position arithmetic, so a catalogue edit cannot make
+     * the spinner point at the wrong entry. The callback is suppressed while the initial selection
+     * is set, so opening the panel does not re-apply the equipped item.
+     */
+    private Spinner dropdown(List<Option> options, String selectedId) {
+        List<String> labels = new ArrayList<>(options.size());
+        for (Option o : options) labels.add(o.label);
+
+        Spinner spinner = new Spinner(activity, Spinner.MODE_DROPDOWN);
+        spinner.setAdapter(new ArrayAdapter<>(activity,
+                android.R.layout.simple_spinner_dropdown_item, labels));
+
+        for (int i = 0; i < options.size(); i++) {
+            if (options.get(i).id.equals(selectedId)) {
+                suppressSelection = true;
+                spinner.setSelection(i, false);
+                suppressSelection = false;
+                break;
+            }
+        }
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (suppressSelection) return;
+                options.get(position).apply.run();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, 0, 0, dp(6));
+        spinner.setLayoutParams(lp);
+        spinner.setBackground(dropdownBackground());
+        return spinner;
+    }
+
+    /**
+     * The gait selector for the equipped pet.
+     *
+     * <p>A pet only animates the gaits its species supports, so this offers exactly those. Walking
+     * is the default; flying and swimming are the two the request called out, and a swimmer gets a
+     * dedicated swim set while a crawler gets an elytra when it flies.
+     */
+    private View petGaitRow() {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, 0, 0, dp(4));
+
+        TextView label = new TextView(activity);
+        label.setText(R.string.cosmetics_pet_gait);
+        label.setTextSize(11f);
+        label.setTextColor(0xFF8F979F);
+        label.setPadding(0, 0, dp(8), 0);
+        row.addView(label);
+
+        final List<CosmeticCatalog.PetLocomotion> gaits = availableGaits();
+        List<String> labels = new ArrayList<>();
+        for (CosmeticCatalog.PetLocomotion g : gaits) labels.add(gaitName(g));
+
+        Spinner spinner = new Spinner(activity, Spinner.MODE_DROPDOWN);
+        spinner.setAdapter(new ArrayAdapter<>(activity,
+                android.R.layout.simple_spinner_dropdown_item, labels));
+        int current = gaits.indexOf(preview.getPetLocomotion());
+        if (current > 0) spinner.setSelection(current, false);
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (suppressSelection) return;
+                preview.setPetLocomotion(gaits.get(position));
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+        row.addView(spinner, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return row;
+    }
+
+    private List<CosmeticCatalog.PetLocomotion> availableGaits() {
+        List<CosmeticCatalog.PetLocomotion> gaits = new ArrayList<>();
+        CosmeticCatalog.Pet pet = store.getEquippedPet();
+        CosmeticCatalog.PetSpecies species = pet == null ? null : pet.species;
+        for (CosmeticCatalog.PetLocomotion g : CosmeticCatalog.PetLocomotion.values()) {
+            if (species == null || species.supports(g)) gaits.add(g);
+        }
+        if (gaits.isEmpty()) gaits.add(CosmeticCatalog.PetLocomotion.WALK);
+        return gaits;
+    }
+
+    private String gaitName(CosmeticCatalog.PetLocomotion gait) {
+        switch (gait) {
+            case RUN: return activity.getString(R.string.cosmetics_gait_run);
+            case CROUCH: return activity.getString(R.string.cosmetics_gait_crouch);
+            case FLY: return activity.getString(R.string.cosmetics_gait_fly);
+            case SWIM: return activity.getString(R.string.cosmetics_gait_swim);
+            case WALK:
+            default: return activity.getString(R.string.cosmetics_gait_walk);
+        }
+    }
+
+    private GradientDrawable dropdownBackground() {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.RECTANGLE);
+        bg.setCornerRadius(dp(12));
+        bg.setColor(0xFF23272B);
+        bg.setStroke(dp(1), 0xFF3A4048);
+        return bg;
+    }
+
+    // ---- In-game application -------------------------------------------------------------
 
     /**
      * Installs the equipped cape as a resource pack on the selected instance.
@@ -246,88 +432,6 @@ final class CosmeticsPanel {
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setPadding(0, dp(4), 0, dp(6));
         return title;
-    }
-
-    private void rebuildChips() {
-        capeRow.removeAllViews();
-        accessoryRow.removeAllViews();
-
-        String equippedCape = store.getEquippedCapeId();
-        List<CosmeticCatalog.Cape> capes = CosmeticCatalog.capes();
-        for (CosmeticCatalog.Cape c : capes) {
-            boolean selected = c.id.equals(equippedCape);
-            TextView chip = chip(c.name, selected, c.color, c.trimColor);
-            chip.setOnClickListener(v -> {
-                String next = CosmeticCatalog.toggleCape(store.getEquippedCapeId(), c.id);
-                store.setEquippedCape(next);
-                preview.setCape(store.getEquippedCape());
-                rebuildChips();
-            });
-            capeRow.addView(chip);
-        }
-        TextView noCape = chip(activity.getString(R.string.cosmetics_none), equippedCape == null
-                || CosmeticCatalog.NONE.equals(equippedCape), 0xFF2B2F36, 0xFF6C757D);
-        noCape.setOnClickListener(v -> {
-            store.setEquippedCape(CosmeticCatalog.NONE);
-            preview.setCape(null);
-            rebuildChips();
-        });
-        capeRow.addView(noCape);
-
-        String equippedAccessory = store.getEquippedAccessoryId();
-        List<CosmeticCatalog.Accessory> accessories = CosmeticCatalog.accessories();
-        for (CosmeticCatalog.Accessory a : accessories) {
-            if (CosmeticCatalog.NONE.equals(a.id)) continue;
-            boolean selected = a.id.equals(equippedAccessory);
-            TextView chip = chip(a.name, selected, a.color, null);
-            chip.setOnClickListener(v -> {
-                String next = CosmeticCatalog.toggleAccessory(store.getEquippedAccessoryId(), a.id);
-                store.setEquippedAccessory(next);
-                preview.setAccessory(store.getEquippedAccessory());
-                rebuildChips();
-                if (next != null && !CosmeticCatalog.NONE.equals(next)) {
-                    Toast.makeText(activity, activity.getString(R.string.cosmetics_equipped, a.name),
-                            Toast.LENGTH_SHORT).show();
-                }
-            });
-            accessoryRow.addView(chip);
-        }
-    }
-
-    private TextView chip(String label, boolean selected, int fill, Integer trim) {
-        TextView chip = new TextView(activity);
-        chip.setText(label);
-        chip.setTextSize(12f);
-        chip.setSingleLine(true);
-        chip.setGravity(Gravity.CENTER);
-        chip.setPadding(dp(14), dp(8), dp(14), dp(8));
-        chip.setTextColor(selected ? Color.WHITE : 0xFFD6DCE2);
-
-        GradientDrawable bg = new GradientDrawable();
-        bg.setShape(GradientDrawable.RECTANGLE);
-        bg.setCornerRadius(dp(16));
-        bg.setColor(selected ? blend(fill) : 0xFF23272B);
-        if (selected && trim != null) {
-            bg.setStroke(dp(2), trim);
-        } else if (selected) {
-            bg.setStroke(dp(2), getAccent());
-        }
-        chip.setBackground(bg);
-
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.setMarginEnd(dp(8));
-        chip.setLayoutParams(lp);
-        DynamicAnim.applyPressScale(chip);
-        return chip;
-    }
-
-    /** A slightly lightened fill so a dark cape colour still reads as a filled chip. */
-    private static int blend(int color) {
-        int r = Math.min(255, Color.red(color) + 48);
-        int g = Math.min(255, Color.green(color) + 48);
-        int b = Math.min(255, Color.blue(color) + 48);
-        return Color.argb(255, r, g, b);
     }
 
     private int getAccent() {

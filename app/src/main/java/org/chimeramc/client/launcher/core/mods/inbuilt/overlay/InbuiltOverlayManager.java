@@ -91,6 +91,10 @@ public class InbuiltOverlayManager {
         org.chimeramc.client.core.content.InGamePackChanger.setReloader(
                 org.chimeramc.client.preloader.PreloaderInput::reloadResourcePacks);
 
+        // A fresh session: clear the Replay highlight trigger state so a streak or death from a
+        // previous session cannot carry over into this one.
+        ReplayTriggerFeed.reset();
+
         if (hudOverlay == null) {
             hudOverlay = new HudOverlay(activity);
         }
@@ -1436,6 +1440,11 @@ public class InbuiltOverlayManager {
         // death feed. Both are no-ops when their module is off.
         HitPredictionMod.tick(frameNow);
         KillEffectsMod.tick(frameNow);
+        // The Replay highlight triggers read the same local signals (health for death, the landed
+        // hit for a combo, the credited kill for a streak) on the game's own frame tick. Without
+        // this the trigger system was built but never called, so clips only saved on a manual
+        // record.
+        ReplayTriggerFeed.tick(frameNow);
         InbuiltModManager manager = InbuiltModManager.getInstance(activity);
         boolean isPauseOnly = manager.isPauseMenuOnly();
         boolean isPauseOpen = org.chimeramc.client.preloader.PreloaderInput.isPauseMenuOpen();

@@ -15,6 +15,7 @@ public final class CosmeticStore {
     private static final String PREFS_NAME = "cosmetics_state";
     private static final String KEY_CAPE = "equipped_cape";
     private static final String KEY_ACCESSORY = "equipped_accessory";
+    private static final String KEY_PET = "equipped_pet";
 
     private final SharedPreferences prefs;
 
@@ -47,5 +48,17 @@ public final class CosmeticStore {
     public void setEquippedAccessory(String accessoryId) {
         prefs.edit().putString(KEY_ACCESSORY,
                 accessoryId == null ? CosmeticCatalog.NONE : accessoryId).apply();
+    }
+
+    public String getEquippedPetId() {
+        return prefs.getString(KEY_PET, CosmeticCatalog.NONE);
+    }
+
+    public CosmeticCatalog.Pet getEquippedPet() {
+        return CosmeticCatalog.equippedPet(getEquippedPetId());
+    }
+
+    public void setEquippedPet(String petId) {
+        prefs.edit().putString(KEY_PET, petId == null ? CosmeticCatalog.NONE : petId).apply();
     }
 }

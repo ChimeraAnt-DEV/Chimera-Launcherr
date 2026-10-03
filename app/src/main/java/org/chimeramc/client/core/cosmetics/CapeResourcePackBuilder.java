@@ -88,7 +88,8 @@ public final class CapeResourcePackBuilder {
         if (cape == null) {
             texture = CapeTexturePainter.paint(0x00000000, 0x00000000, false);
         } else {
-            texture = CapeTexturePainter.paint(cape.color, cape.trimColor, cape.branded);
+            texture = CapeTexturePainter.paint(cape.color, cape.trimColor, cape.accentColor,
+                    cape.pattern, cape.branded);
         }
 
         writeAt(targetDir, CAPE_TEXTURE_PATH, texture);

@@ -79,6 +79,26 @@ public final class InGamePackChanger {
         reloader = value;
     }
 
+    /**
+     * A hook a running session installs so a pack change can be applied by relaunching the game.
+     *
+     * <p>Some builds cannot refresh their pack stack in place — the preloader exposes no
+     * implementation of the reload call yet, so {@link #requestReload()} returns false. Without a
+     * restart the player would have to leave the world and launch it again by hand, which is the
+     * exact friction the in-game changer exists to remove. This hook lets the session relaunch
+     * the same instance for the player; the write has already happened by the time it is called.
+     */
+    public interface Restarter {
+        /** Relaunches the current instance. Returns true when a relaunch was started. */
+        boolean restart();
+    }
+
+    private static volatile Restarter restarter;
+
+    public static void setRestarter(Restarter value) {
+        restarter = value;
+    }
+
     private InGamePackChanger() {
     }
 
@@ -262,6 +282,61 @@ public final class InGamePackChanger {
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    /**
+     * Asks the running session to relaunch the instance so the new pack list takes effect.
+     *
+     * @return true when a relaunch was started; false when no session is running, in which case the
+     *         change applies on the next world load.
+     */
+    public static boolean requestRestart() {
+        Restarter current = restarter;
+        if (current == null) return false;
+        try {
+            return current.restart();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** True when a running session can apply a pack change now (live reload or relaunch). */
+    public static boolean hasLiveSession() {
+        return reloader != null || restarter != null;
+    }
+
+    /** What happened when a pack change was applied, so the panel can say it honestly. */
+    public enum ApplyOutcome {
+        /** Written and the game refreshed in place. */
+        RELOADED,
+        /** Written and the running instance is relaunching so the change takes effect. */
+        RESTARTING,
+        /** Written; it applies the next time the world is loaded. */
+        NEXT_LOAD,
+        /** Nothing was written; the caller must not flip the switch. */
+        FAILED
+    }
+
+    /**
+     * Applies a pack change across every candidate game-data root and reports the outcome.
+     *
+     * <p>All roots are written because the game picks its storage from isolation and
+     * internal/external, and a write to only the wrong guess is silently ignored. The live paths
+     * are then attempted in order: an in-place reload if the session supports it, otherwise a
+     * relaunch, otherwise the change is honestly reported as applying on the next load.
+     */
+    public static ApplyOutcome apply(List<File> gameDataDirs, String uuid, String version,
+                                     boolean active) {
+        boolean wrote = false;
+        if (gameDataDirs != null) {
+            for (File dir : gameDataDirs) {
+                wrote |= setActive(dir, uuid, version, active);
+            }
+        }
+        if (!wrote) return ApplyOutcome.FAILED;
+        if (requestReload()) return ApplyOutcome.RELOADED;
+        if (requestRestart()) return ApplyOutcome.RESTARTING;
+        return ApplyOutcome.NEXT_LOAD;
     }
 
     /** Every world's own resource-list file under {@code minecraftWorlds/}. */

@@ -20,6 +20,11 @@ public class ModAvailabilityTest {
     public void modulesNeedingGameDataAreUnavailable() {
         assertTrue(ModAvailability.isUnavailable(ModIds.ARMOR_HUD));
         assertTrue(ModAvailability.isUnavailable(ModIds.CRYSTAL_OPTIMIZER));
+        // Trajectory Prediction needs the held item and Custom Kill Effects needs the opponent
+        // death feed; neither has a provider, so both must read as not working rather than
+        // toggling to no effect.
+        assertTrue(ModAvailability.isUnavailable(ModIds.TRAJECTORY_PREDICTION));
+        assertTrue(ModAvailability.isUnavailable(ModIds.KILL_EFFECTS));
     }
 
     @Test
@@ -82,7 +87,8 @@ public class ModAvailabilityTest {
     @Test
     public void unavailableModulesAllCarryTheNoGameDataReason() {
         for (String id : new String[]{
-                ModIds.ARMOR_HUD, ModIds.CRYSTAL_OPTIMIZER}) {
+                ModIds.ARMOR_HUD, ModIds.CRYSTAL_OPTIMIZER,
+                ModIds.TRAJECTORY_PREDICTION, ModIds.KILL_EFFECTS}) {
             assertEquals(ModAvailability.REASON_NO_GAME_DATA, ModAvailability.unavailableReason(id));
             assertFalse(id + " must not be clickable", ModAvailability.isInteractive(id));
         }
@@ -102,7 +108,8 @@ public class ModAvailabilityTest {
         // The two must agree by construction: availability is derived from the game-data need,
         // so a module cannot be greyed out for one reason and excused for another.
         for (String id : new String[]{
-                ModIds.ARMOR_HUD, ModIds.CRYSTAL_OPTIMIZER, ModIds.HITBOX,
+                ModIds.ARMOR_HUD, ModIds.CRYSTAL_OPTIMIZER,
+                ModIds.TRAJECTORY_PREDICTION, ModIds.KILL_EFFECTS, ModIds.HITBOX,
                 ModIds.AUTO_SPRINT, ModIds.ZOOM, ModIds.HIT_REGISTRATION}) {
             assertEquals(ModIds.requiresGameData(id), ModAvailability.isUnavailable(id));
         }

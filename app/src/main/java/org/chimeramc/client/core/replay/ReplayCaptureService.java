@@ -137,6 +137,14 @@ public class ReplayCaptureService extends Service {
 
     private void beginCapture(int resultCode, Intent resultData) {
         if (recording) return;
+        if (ReplayPlaybackGate.isPlaybackActive()) {
+            // The device is already decoding a clip in the embedded player; starting an encode now
+            // would put two media sessions on the same hardware. Refuse rather than stutter both.
+            Log.w(TAG, "Not starting capture while replay playback is active");
+            { ReplayManager m = ReplayManager.get(); if (m != null) m.onRecordingFailed(); }
+            stopSelf();
+            return;
+        }
         try {
             ReplaySettings settings = ReplaySettings.get(this);
             ReplayQuality.Profile profile = ReplayQuality.select(
