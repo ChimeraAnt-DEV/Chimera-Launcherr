@@ -43,13 +43,20 @@ public final class PlayerSkinProvider {
     /** The result of a lookup: the atlas plus where it came from. */
     public static final class SkinBitmap {
         public final Bitmap bitmap;
-        /** True when this is the built-in placeholder rather than the player's own skin. */
+        /**
+         * True only for the grey placeholder — the last resort reached when even the built-in
+         * Steve texture could not be produced. The preview shows the placeholder message only in
+         * this case, so an un-imported skin reads as "Steve", not as an error.
+         */
         public final boolean isFallback;
+        /** True when this is the built-in Steve character rather than the player's own skin. */
+        public final boolean isDefaultSteve;
         public final String sourceName;
 
-        SkinBitmap(Bitmap bitmap, boolean isFallback, String sourceName) {
+        SkinBitmap(Bitmap bitmap, boolean isFallback, boolean isDefaultSteve, String sourceName) {
             this.bitmap = bitmap;
             this.isFallback = isFallback;
+            this.isDefaultSteve = isDefaultSteve;
             this.sourceName = sourceName;
         }
     }
@@ -89,9 +96,10 @@ public final class PlayerSkinProvider {
     }
 
     /**
-     * Resolves the player's skin.
+     * Resolves the player's skin, in the fallback chain the preview promises:
+     * imported skin → Steve (default) → grey placeholder (only if the Steve asset fails).
      *
-     * <p>Never throws and never returns null: a decode failure degrades to the fallback, because
+     * <p>Never throws and never returns null: a decode failure degrades to the next rung, because
      * a cosmetics screen that crashes is worse than one showing a generic character.
      */
     public static SkinBitmap resolve(Context context) {
@@ -99,7 +107,7 @@ public final class PlayerSkinProvider {
         if (custom != null && !custom.isEmpty()) {
             Bitmap decoded = decodeFile(new File(custom));
             if (decoded != null) {
-                return new SkinBitmap(normalise(decoded), false, new File(custom).getName());
+                return new SkinBitmap(normalise(decoded), false, false, new File(custom).getName());
             }
         }
 
@@ -107,11 +115,17 @@ public final class PlayerSkinProvider {
         if (applied != null) {
             Bitmap decoded = decodeFile(applied);
             if (decoded != null) {
-                return new SkinBitmap(normalise(decoded), false, applied.getName());
+                return new SkinBitmap(normalise(decoded), false, false, applied.getName());
             }
         }
 
-        return new SkinBitmap(fallbackSkin(), true, "Chimera default");
+        // No imported skin: show Steve, the standard character, rather than a grey stand-in. The
+        // grey placeholder is now only reached if the Steve atlas cannot be produced at all.
+        Bitmap steve = steveSkin();
+        if (steve != null) {
+            return new SkinBitmap(steve, false, true, "Steve");
+        }
+        return new SkinBitmap(fallbackSkin(), true, false, "Chimera default");
     }
 
     private static SharedPreferences prefs(Context context) {
@@ -253,12 +267,39 @@ public final class PlayerSkinProvider {
     }
 
     /**
+     * The standard Steve character, painted rather than shipped as an asset.
+     *
+     * <p>This is the preview's default when the player has not imported a skin, so an un-configured
+     * preview shows a recognisable character instead of a grey stand-in. It is painted from the
+     * pure {@link SteveSkinLayout} table, which samples the same UV regions the renderer does, so
+     * the default cannot drift from the model.
+     *
+     * <p>Returns null only if the bitmap cannot be allocated, which lets {@link #resolve} fall
+     * through to the grey placeholder — the one case the placeholder is still for.
+     */
+    public static Bitmap steveSkin() {
+        try {
+            Bitmap bmp = Bitmap.createBitmap(SkinModel.ATLAS_SIZE, SkinModel.ATLAS_SIZE,
+                    Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bmp);
+            Paint paint = new Paint();
+            paint.setFilterBitmap(false);
+            paint.setAntiAlias(false);
+            for (SteveSkinLayout.Region region : SteveSkinLayout.regions()) {
+                fill(canvas, paint, region.u, region.v, region.w, region.h, region.color);
+            }
+            return bmp;
+        } catch (Throwable t) {
+            // An allocation failure is the only way this can fail; the caller falls back to grey.
+            return null;
+        }
+    }
+
+    /**
      * A recognisable default character, drawn rather than shipped as an asset.
      *
-     * <p>The placeholder is deliberately greyscale. It is what the preview shows before the player
-     * imports a skin or applies a skin pack, and a coloured stand-in (the brand-violet shirt it
-     * used to wear) read as an actual skin — the blue/white result users saw was this placeholder
-     * wearing brand colours, not a rendering fault. A neutral grey, correctly shaded character is
+     * <p>The grey placeholder is the <em>last</em> resort: it is only shown when even the built-in
+     * Steve atlas could not be produced. A neutral grey, correctly shaded character is
      * unmistakably a placeholder while still looking like a Minecraft model.
      *
      * <p>Painted from the same UV table the renderer samples, so the stand-in cannot drift from

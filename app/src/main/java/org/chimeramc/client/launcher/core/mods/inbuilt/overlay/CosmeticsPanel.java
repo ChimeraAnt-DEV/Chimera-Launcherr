@@ -103,6 +103,8 @@ final class CosmeticsPanel {
         skinLine.setPadding(0, dp(4), 0, 0);
         if (preview.isShowingFallbackSkin()) {
             skinLine.setText(R.string.cosmetics_skin_fallback);
+        } else if (preview.isShowingDefaultSteve()) {
+            skinLine.setText(R.string.cosmetics_skin_default_steve);
         } else {
             skinLine.setText(activity.getString(R.string.cosmetics_skin_source,
                     preview.getSkinSourceName()));
