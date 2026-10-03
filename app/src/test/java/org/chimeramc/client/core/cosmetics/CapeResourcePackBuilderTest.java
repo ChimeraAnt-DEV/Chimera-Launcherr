@@ -151,7 +151,11 @@ public class CapeResourcePackBuilderTest {
         assertTrue("module uuid", manifest.contains(CapeResourcePackBuilder.moduleUuid()));
         // A pack with no resources module imports but applies nothing.
         assertTrue("resources module", manifest.contains("\"type\": \"resources\""));
-        assertTrue("header version", manifest.contains("\"version\": [1, 0, 0]"));
+        // Derived from the constant so a version bump does not need this test edited, while a
+        // version that stopped matching the code would still fail here.
+        assertTrue("header version",
+                manifest.contains("\"version\": [" + CapeResourcePackBuilder.PACK_VERSION
+                        .replace(".", ", ") + "]"));
         assertTrue("uuid differs from the pack uuid",
                 !CapeResourcePackBuilder.PACK_UUID.equals(CapeResourcePackBuilder.moduleUuid()));
     }
@@ -366,6 +370,65 @@ public class CapeResourcePackBuilderTest {
     private static int readInt(byte[] data, int offset) {
         return ((data[offset] & 0xFF) << 24) | ((data[offset + 1] & 0xFF) << 16)
                 | ((data[offset + 2] & 0xFF) << 8) | (data[offset + 3] & 0xFF);
+    }
+
+    /**
+     * A worn accessory must reach the game through the same first-party route as the cape: a
+     * render controller on the player, not a texture override. An accessory-less pack writes no
+     * hat model, but the entity still names the controller so the two cases share one entity file.
+     */
+    @Test
+    public void theWornAccessoryIsDrawnByARenderController() {
+        String entity = CapeResourcePackBuilder.playerEntityJson();
+        assertTrue("hat geometry shortname",
+                entity.contains("\"chimera_hat\": \"" + AccessoryGeometry.GEOMETRY_ID + "\""));
+        assertTrue("hat texture shortname",
+                entity.contains("\"chimera_hat\": \"" + CapeResourcePackBuilder.HAT_TEXTURE_PATH + "\""));
+        assertTrue("hat controller wired",
+                entity.contains(CapeResourcePackBuilder.HAT_CONTROLLER_ID));
+
+        JsonObject controller = JsonParser.parseString(
+                        CapeResourcePackBuilder.hatRenderControllerJson())
+                .getAsJsonObject()
+                .getAsJsonObject("render_controllers")
+                .getAsJsonObject(CapeResourcePackBuilder.HAT_CONTROLLER_ID);
+        assertEquals("Geometry.chimera_hat", controller.get("geometry").getAsString());
+        assertTrue("controller samples the hat texture",
+                controller.toString().contains("Texture.chimera_hat"));
+        assertTrue("controller uses the hat material",
+                controller.toString().contains("Material.chimera_hat"));
+    }
+
+    /** A pack built with an accessory writes the hat model, controller and texture. */
+    @Test
+    public void packWritesTheAccessoryFilesWhenOneIsEquipped() throws Exception {
+        File dir = Files.createTempDirectory("hat-pack").toFile();
+        try {
+            CosmeticCatalog.Accessory accessory = CosmeticCatalog.accessory("amethyst_crown");
+            CapeResourcePackBuilder.build(dir, null, accessory);
+
+            assertTrue("hat geometry",
+                    new File(dir, CapeResourcePackBuilder.HAT_MODEL_PATH).isFile());
+            assertTrue("hat render controller",
+                    new File(dir, CapeResourcePackBuilder.HAT_RENDER_CONTROLLER_PATH).isFile());
+            assertTrue("hat texture",
+                    new File(dir, CapeResourcePackBuilder.HAT_TEXTURE_PATH).isFile());
+        } finally {
+            deleteRecursively(dir);
+        }
+    }
+
+    /** With no accessory the pack writes no hat model, so an accessory-less apply stays a cape. */
+    @Test
+    public void packWritesNoAccessoryFilesWithoutOne() throws Exception {
+        File dir = Files.createTempDirectory("no-hat-pack").toFile();
+        try {
+            CapeResourcePackBuilder.build(dir, CosmeticCatalog.cape("chimera"), null);
+            assertTrue("no hat geometry",
+                    !new File(dir, CapeResourcePackBuilder.HAT_MODEL_PATH).exists());
+        } finally {
+            deleteRecursively(dir);
+        }
     }
 
     private static void deleteRecursively(File file) {

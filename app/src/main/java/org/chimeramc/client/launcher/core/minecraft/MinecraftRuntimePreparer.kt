@@ -148,25 +148,27 @@ val modsDir = modManager.currentVersion?.modsDir?.absolutePath
             throw RuntimeException("Failed to prepare bundled native-mod packs", error)
         }
 
-        // The equipped cape is written to the pack list before every launch, so entering a world
-        // shows it immediately. Applying it mid-session needs the game to refresh or relaunch, so
-        // syncing here is what lets the player equip a cape and just play. A failure is logged,
-        // never fatal: the cape is a cosmetic and must not block the launch.
+        // The equipped cape and worn accessory are written to the pack list before every launch,
+        // so entering a world shows them immediately. Applying them mid-session needs the game to
+        // refresh or relaunch, so syncing here is what lets the player equip a cosmetic and just
+        // play. A failure is logged, never fatal: a cosmetic must not block the launch.
         try {
             val profileId = MinecraftLauncher.getStorageProfileId(version)
             val candidateRoots = LauncherStorage.getCandidateGameDataDirs(
                 context, profileId, version.versionIsolation
             )
-            val cape = CosmeticStore(context).equippedCape
+            val store = CosmeticStore(context)
+            val cape = store.equippedCape
+            val accessory = store.equippedAccessory
             val stagingRoot = File(context.filesDir, "cape")
-            if (cape != null) {
-                CapeInGameInstaller.installQuietly(stagingRoot, candidateRoots, cape)
-                fileListener.onLog("Prepared in-game cape: ${cape.name}")
+            if (cape != null || accessory != null) {
+                CapeInGameInstaller.installQuietly(stagingRoot, candidateRoots, cape, accessory)
+                fileListener.onLog("Prepared in-game cosmetics")
             } else {
                 CapeInGameInstaller.uninstallQuietly(candidateRoots)
             }
         } catch (error: Exception) {
-            trace.error("Cape pack synchronization failed", error.message ?: error.javaClass.simpleName)
+            trace.error("Cosmetic pack synchronization failed", error.message ?: error.javaClass.simpleName)
         }
 
         fileListener.onProgress(100,"Runtime ready", "Entering Minecraft")

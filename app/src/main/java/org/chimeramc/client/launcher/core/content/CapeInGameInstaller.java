@@ -54,7 +54,20 @@ public final class CapeInGameInstaller {
      */
     public static InGamePackChanger.ApplyOutcome install(File stagingRoot, List<File> gameDataDirs,
                                                          CosmeticCatalog.Cape cape) {
-        if (!writePack(stagingRoot, gameDataDirs, cape)) {
+        return install(stagingRoot, gameDataDirs, cape, null);
+    }
+
+    /**
+     * Builds the cape + accessory pack and makes it active for an instance, then pushes the change
+     * to any running session.
+     *
+     * @param cape      the cape to show, or {@code null} for none
+     * @param accessory the worn hat/accessory to show, or {@code null} for none
+     */
+    public static InGamePackChanger.ApplyOutcome install(File stagingRoot, List<File> gameDataDirs,
+                                                         CosmeticCatalog.Cape cape,
+                                                         CosmeticCatalog.Accessory accessory) {
+        if (!writePack(stagingRoot, gameDataDirs, cape, accessory)) {
             return InGamePackChanger.ApplyOutcome.FAILED;
         }
 
@@ -70,22 +83,28 @@ public final class CapeInGameInstaller {
     public static InGamePackChanger.ApplyOutcome install(File stagingRoot, File gameDataDir,
                                                          CosmeticCatalog.Cape cape) {
         if (gameDataDir == null) return InGamePackChanger.ApplyOutcome.FAILED;
-        return install(stagingRoot, java.util.Collections.singletonList(gameDataDir), cape);
+        return install(stagingRoot, java.util.Collections.singletonList(gameDataDir), cape, null);
     }
 
     /**
-     * Writes (or removes) the cape pack without asking any session to reload.
+     * Writes (or removes) the cape + accessory pack without asking any session to reload.
      *
      * <p>This is the launch-time path: the game is about to start, so there is nothing to refresh
-     * and nothing to relaunch. It is what removes the friction of applying a cape mid-session —
-     * the equipped cape is written to the pack list before every launch, so the next time the
-     * player enters a world the cape is simply already on them, with no restart in between.
+     * and nothing to relaunch. It is what removes the friction of applying a cosmetic mid-session —
+     * the equipped pieces are written to the pack list before every launch, so the next time the
+     * player enters a world they are simply already on them, with no restart in between.
      *
      * @return true when the pack list was written as requested
      */
     public static boolean installQuietly(File stagingRoot, List<File> gameDataDirs,
                                          CosmeticCatalog.Cape cape) {
-        return writePack(stagingRoot, gameDataDirs, cape);
+        return installQuietly(stagingRoot, gameDataDirs, cape, null);
+    }
+
+    public static boolean installQuietly(File stagingRoot, List<File> gameDataDirs,
+                                         CosmeticCatalog.Cape cape,
+                                         CosmeticCatalog.Accessory accessory) {
+        return writePack(stagingRoot, gameDataDirs, cape, accessory);
     }
 
     /** Removes the cape pack from every candidate root without asking a session to reload. */
@@ -107,13 +126,14 @@ public final class CapeInGameInstaller {
 
     /** Builds the pack and writes it into every candidate root; no session interaction. */
     private static boolean writePack(File stagingRoot, List<File> gameDataDirs,
-                                     CosmeticCatalog.Cape cape) {
+                                     CosmeticCatalog.Cape cape,
+                                     CosmeticCatalog.Accessory accessory) {
         if (stagingRoot == null || gameDataDirs == null || gameDataDirs.isEmpty()) return false;
 
         File packDir = new File(stagingRoot, STAGING_DIR);
         try {
             deleteRecursively(packDir);
-            CapeResourcePackBuilder.build(packDir, cape);
+            CapeResourcePackBuilder.build(packDir, cape, accessory);
         } catch (IOException e) {
             return false;
         }
