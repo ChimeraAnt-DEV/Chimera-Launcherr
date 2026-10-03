@@ -58,6 +58,10 @@ public final class CapeResourcePackBuilder {
     public static final String CAPE_ANIMATION_ID = "animation.chimera_cape";
     /** Render controller that draws the worn accessory (hat/headwear). */
     public static final String HAT_CONTROLLER_ID = "controller.render.chimera_hat";
+    /** Render controller that draws the equipped pet. */
+    public static final String PET_CONTROLLER_ID = "controller.render.chimera_pet";
+    /** The animation that bobs the pet; played by the {@code pet} key. */
+    public static final String PET_ANIMATION_ID = "animation.chimera_pet";
 
     /** Paths the pack writes. Public so diagnostics and tests can verify the pack layout. */
     public static final String PLAYER_ENTITY_PATH = "entity/player.entity.json";
@@ -70,6 +74,11 @@ public final class CapeResourcePackBuilder {
     public static final String HAT_RENDER_CONTROLLER_PATH =
             "render_controllers/chimera_hat.render_controllers.json";
     public static final String HAT_TEXTURE_PATH = "textures/entity/chimera_hat.png";
+    public static final String PET_MODEL_PATH = "models/entity/chimera_pet.geo.json";
+    public static final String PET_RENDER_CONTROLLER_PATH =
+            "render_controllers/chimera_pet.render_controllers.json";
+    public static final String PET_ANIMATION_PATH = "animations/chimera_pet.animation.json";
+    public static final String PET_TEXTURE_PATH = "textures/entity/chimera_pet.png";
     static final String PACK_ICON_PATH = "pack_icon.png";
 
     /**
@@ -103,19 +112,27 @@ public final class CapeResourcePackBuilder {
      * @throws IOException when a file cannot be written
      */
     public static BuiltPack build(File targetDir, CosmeticCatalog.Cape cape) throws IOException {
-        return build(targetDir, cape, null);
+        return build(targetDir, cape, null, null);
+    }
+
+    /** Writes a cape + accessory pack, with no pet. */
+    public static BuiltPack build(File targetDir, CosmeticCatalog.Cape cape,
+                                  CosmeticCatalog.Accessory accessory) throws IOException {
+        return build(targetDir, cape, accessory, null);
     }
 
     /**
-     * Writes a cape (and optionally a worn accessory) resource pack into {@code targetDir}.
+     * Writes a cape + accessory + pet resource pack into {@code targetDir}.
      *
      * @param targetDir   directory to create the pack in; must not already exist as a file
-     * @param cape        the cape to render, or {@code null} for a blank/no-cape pack
+     * @param cape        the cape to render, or {@code null} for none
      * @param accessory   the worn hat/accessory to render, or {@code null} for none
+     * @param pet         the pet to render on the player, or {@code null} for none
      * @throws IOException when a file cannot be written
      */
     public static BuiltPack build(File targetDir, CosmeticCatalog.Cape cape,
-                                  CosmeticCatalog.Accessory accessory) throws IOException {
+                                  CosmeticCatalog.Accessory accessory,
+                                  CosmeticCatalog.Pet pet) throws IOException {
         if (targetDir == null) throw new IOException("no target directory");
         if (!targetDir.exists() && !targetDir.mkdirs()) {
             throw new IOException("cannot create " + targetDir);
@@ -147,15 +164,39 @@ public final class CapeResourcePackBuilder {
         writeAt(targetDir, PACK_ICON_PATH, texture);
 
         // The accessory is written whenever one is equipped. Its geometry is per-kind, so a hat
-        // and a backpack are genuinely different meshes rather than one recoloured box.
+        // and a backpack are genuinely different meshes rather than one recoloured box. With none
+        // equipped a resolving-but-empty geometry is written instead, because the entity always
+        // names it and a missing identifier can fail the whole client entity.
         String hatModel = AccessoryGeometry.geometryJson(accessoryKind(accessory));
-        if (hatModel != null) {
-            writeAt(targetDir, HAT_MODEL_PATH, hatModel.getBytes(StandardCharsets.UTF_8));
-            writeAt(targetDir, HAT_RENDER_CONTROLLER_PATH,
-                    hatRenderControllerJson().getBytes(StandardCharsets.UTF_8));
-            writeAt(targetDir, HAT_TEXTURE_PATH,
-                    AccessoryTexturePainter.paint(accessory.color, accessory.accentColor));
-        }
+        if (hatModel == null) hatModel = AccessoryGeometry.emptyGeometryJson();
+        writeAt(targetDir, HAT_MODEL_PATH, hatModel.getBytes(StandardCharsets.UTF_8));
+        writeAt(targetDir, HAT_RENDER_CONTROLLER_PATH,
+                hatRenderControllerJson().getBytes(StandardCharsets.UTF_8));
+        writeAt(targetDir, HAT_TEXTURE_PATH,
+                accessory == null
+                        ? FlatColorAtlas.paint(0x00000000, 0x00000000,
+                                AccessoryGeometry.TEXTURE_WIDTH, AccessoryGeometry.TEXTURE_HEIGHT,
+                                AccessoryGeometry.UV_ACCENT_Y)
+                        : AccessoryTexturePainter.paint(accessory.color, accessory.accentColor));
+
+        // The pet is written whenever one is equipped; its geometry is per-species. As with the
+        // hat, an empty geometry is written when none is equipped so the reference resolves.
+        String petModel = PetGeometry.geometryJson(pet);
+        if (petModel == null) petModel = PetGeometry.emptyGeometryJson();
+        writeAt(targetDir, PET_MODEL_PATH, petModel.getBytes(StandardCharsets.UTF_8));
+        writeAt(targetDir, PET_RENDER_CONTROLLER_PATH,
+                petRenderControllerJson().getBytes(StandardCharsets.UTF_8));
+        writeAt(targetDir, PET_TEXTURE_PATH,
+                pet == null
+                        ? FlatColorAtlas.paint(0x00000000, 0x00000000,
+                                PetGeometry.TEXTURE_WIDTH, PetGeometry.TEXTURE_HEIGHT,
+                                PetGeometry.UV_ACCENT_Y)
+                        : FlatColorAtlas.paint(pet.color, pet.accentColor,
+                                PetGeometry.TEXTURE_WIDTH, PetGeometry.TEXTURE_HEIGHT,
+                                PetGeometry.UV_ACCENT_Y));
+        // The animation is always written so the entity's reference to it always resolves.
+        writeAt(targetDir, PET_ANIMATION_PATH,
+                petAnimationJson().getBytes(StandardCharsets.UTF_8));
 
         return new BuiltPack(targetDir, PACK_UUID, PACK_VERSION);
     }
@@ -226,19 +267,22 @@ public final class CapeResourcePackBuilder {
                 + "        \"animated\": \"player_animated\",\n"
                 + "        \"spectator\": \"player_spectator\",\n"
                 + "        \"chimera_cape\": \"entity_alphatest\",\n"
-                + "        \"chimera_hat\": \"entity_alphatest\"\n"
+                + "        \"chimera_hat\": \"entity_alphatest\",\n"
+                + "        \"chimera_pet\": \"entity_alphatest\"\n"
                 + "      },\n"
                 + "      \"textures\": {\n"
                 + "        \"default\": \"textures/entity/steve\",\n"
                 + "        \"cape\": \"textures/entity/cape_invisible\",\n"
                 + "        \"chimera_cape\": \"" + CAPE_TEXTURE_PATH + "\",\n"
-                + "        \"chimera_hat\": \"" + HAT_TEXTURE_PATH + "\"\n"
+                + "        \"chimera_hat\": \"" + HAT_TEXTURE_PATH + "\",\n"
+                + "        \"chimera_pet\": \"" + PET_TEXTURE_PATH + "\"\n"
                 + "      },\n"
                 + "      \"geometry\": {\n"
                 + "        \"default\": \"geometry.humanoid.custom\",\n"
                 + "        \"cape\": \"geometry.cape\",\n"
                 + "        \"chimera_cape\": \"" + CAPE_GEOMETRY_ID + "\",\n"
-                + "        \"chimera_hat\": \"" + AccessoryGeometry.GEOMETRY_ID + "\"\n"
+                + "        \"chimera_hat\": \"" + AccessoryGeometry.GEOMETRY_ID + "\",\n"
+                + "        \"chimera_pet\": \"" + PetGeometry.GEOMETRY_ID + "\"\n"
                 + "      },\n"
                 + "      \"scripts\": {\n"
                 + "        \"scale\": \"0.9375\",\n"
@@ -262,7 +306,8 @@ public final class CapeResourcePackBuilder {
                 + "          \"variable.riding_y_offset = query.is_riding_any_entity_of_type('minecraft:minecart', 'minecraft:boat', 'minecraft:chest_boat', 'minecraft:strider') ? -3.0 : 0.0;\"\n"
                 + "        ],\n"
                 + "        \"animate\": [\n"
-                + "          \"root\"\n"
+                + "          \"root\",\n"
+                + "          \"" + PET_ANIMATION_ID + "\"\n"
                 + "        ],\n"
                 + "        \"variables\": {\n"
                 + "          \"variable.fp_melee_spear_use_attachable_rotation_z\": \"public\",\n"
@@ -358,6 +403,9 @@ public final class CapeResourcePackBuilder {
                 + "        },\n"
                 + "        {\n"
                 + "          \"" + HAT_CONTROLLER_ID + "\": \"" + hatVisibilityCondition() + "\"\n"
+                + "        },\n"
+                + "        {\n"
+                + "          \"" + PET_CONTROLLER_ID + "\": \"" + petVisibilityCondition() + "\"\n"
                 + "        }\n"
                 + "      ],\n"
                 + "      \"enable_attachables\": true\n"
@@ -384,6 +432,15 @@ public final class CapeResourcePackBuilder {
     static String hatVisibilityCondition() {
         return "(!variable.is_first_person || variable.is_paperdoll)"
                 + " && !variable.map_face_icon && !query.is_spectator";
+    }
+
+    /**
+     * When the equipped pet draws. Unlike the cape and hat, the pet is <em>not</em> part of the
+     * player's body, so it stays visible in first person too — a companion at your feet is exactly
+     * what you want to see while playing. It is hidden only on the map icon and for a spectator.
+     */
+    static String petVisibilityCondition() {
+        return "!variable.map_face_icon && !query.is_spectator";
     }
 
     /**
@@ -536,6 +593,63 @@ public final class CapeResourcePackBuilder {
                 + "        \"g\": 0.0,\n"
                 + "        \"b\": 0.0,\n"
                 + "        \"a\": 0.0\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "}\n";
+    }
+
+    /**
+     * The equipped pet render controller. Same shape as the cape and hat controllers: the pet
+     * geometry with its own texture and material, gated by {@link #petVisibilityCondition()}.
+     */
+    static String petRenderControllerJson() {
+        return "{\n"
+                + "  \"format_version\": \"1.8.0\",\n"
+                + "  \"render_controllers\": {\n"
+                + "    \"" + PET_CONTROLLER_ID + "\": {\n"
+                + "      \"geometry\": \"Geometry.chimera_pet\",\n"
+                + "      \"materials\": [\n"
+                + "        {\n"
+                + "          \"*\": \"Material.chimera_pet\"\n"
+                + "        }\n"
+                + "      ],\n"
+                + "      \"textures\": [\n"
+                + "        \"Texture.chimera_pet\"\n"
+                + "      ],\n"
+                + "      \"part_visibility\": [\n"
+                + "        {\n"
+                + "          \"pet\": \"" + petVisibilityCondition() + "\"\n"
+                + "        }\n"
+                + "      ],\n"
+                + "      \"is_hurt_color\": {\n"
+                + "        \"r\": 0.0,\n"
+                + "        \"g\": 0.0,\n"
+                + "        \"b\": 0.0,\n"
+                + "        \"a\": 0.0\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "}\n";
+    }
+
+    /**
+     * The pet animation: a gentle idle bob on the {@code pet} bone, so a stationary pet is not a
+     * statue. It is played from the player entity's {@code animate} list, which runs in every
+     * frame — unlike the cape, whose animation is played by the vanilla controller only in third
+     * person, the pet is visible in first person too and so cannot rely on that controller.
+     */
+    static String petAnimationJson() {
+        return "{\n"
+                + "  \"format_version\": \"1.8.0\",\n"
+                + "  \"animations\": {\n"
+                + "    \"" + PET_ANIMATION_ID + "\": {\n"
+                + "      \"loop\": true,\n"
+                + "      \"animation_length\": 2.0,\n"
+                + "      \"bones\": {\n"
+                + "        \"pet\": {\n"
+                + "          \"position\": [0.0, \"Math.sin(query.anim_time * 180.0) * 0.4\", 0.0]\n"
+                + "        }\n"
                 + "      }\n"
                 + "    }\n"
                 + "  }\n"

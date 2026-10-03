@@ -25,16 +25,7 @@ public final class AccessoryTexturePainter {
      * @param accentColor the two-tone colour for brims, straps and trim, 0xAARRGGBB
      */
     public static byte[] paint(int baseColor, int accentColor) {
-        int[] argb = new int[TEXTURE_WIDTH * TEXTURE_HEIGHT];
-        int base = baseColor | 0xFF000000;
-        int accent = accentColor | 0xFF000000;
-        for (int y = 0; y < TEXTURE_HEIGHT; y++) {
-            int row = y * TEXTURE_WIDTH;
-            int color = y < AccessoryGeometry.UV_ACCENT_Y ? base : accent;
-            for (int x = 0; x < TEXTURE_WIDTH; x++) {
-                argb[row + x] = color;
-            }
-        }
-        return PngWriter.encode(TEXTURE_WIDTH, TEXTURE_HEIGHT, argb);
+        return FlatColorAtlas.paint(baseColor, accentColor,
+                TEXTURE_WIDTH, TEXTURE_HEIGHT, AccessoryGeometry.UV_ACCENT_Y);
     }
 }

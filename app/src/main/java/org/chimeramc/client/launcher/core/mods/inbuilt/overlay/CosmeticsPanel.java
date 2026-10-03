@@ -346,12 +346,13 @@ final class CosmeticsPanel {
         }
         CosmeticCatalog.Cape cape = store.getEquippedCape();
         CosmeticCatalog.Accessory accessory = store.getEquippedAccessory();
-        if (cape == null && accessory == null) {
+        CosmeticCatalog.Pet pet = store.getEquippedPet();
+        if (cape == null && accessory == null && pet == null) {
             toast(R.string.cosmetics_no_cape_selected);
             return;
         }
         InGamePackChanger.ApplyOutcome outcome = CapeInGameInstaller.install(
-                new File(activity.getFilesDir(), "cape"), gameDataDirs, cape, accessory);
+                new File(activity.getFilesDir(), "cape"), gameDataDirs, cape, accessory, pet);
         switch (outcome) {
             case RELOADED:
                 toast(R.string.cosmetics_applied_live);

@@ -169,6 +169,36 @@ public final class AccessoryGeometry {
                 + "}\n";
     }
 
+    /**
+     * A geometry that resolves but draws nothing.
+     *
+     * <p>Written when no accessory is equipped. The player entity always names the hat geometry, so
+     * the identifier must always resolve — a client entity that references a missing geometry can
+     * fail to load entirely, which would take the cape down with it. An empty bone list keeps the
+     * reference valid and draws nothing.
+     */
+    public static String emptyGeometryJson() {
+        return "{\n"
+                + "  \"format_version\": \"1.12.0\",\n"
+                + "  \"minecraft:geometry\": [\n"
+                + "    {\n"
+                + "      \"description\": {\n"
+                + "        \"identifier\": \"" + GEOMETRY_ID + "\",\n"
+                + "        \"texture_width\": " + TEXTURE_WIDTH + ",\n"
+                + "        \"texture_height\": " + TEXTURE_HEIGHT + "\n"
+                + "      },\n"
+                + "      \"bones\": [\n"
+                + "        {\n"
+                + "          \"name\": \"acc\",\n"
+                + "          \"pivot\": [0.0, 24.0, 0.0],\n"
+                + "          \"cubes\": []\n"
+                + "        }\n"
+                + "      ]\n"
+                + "    }\n"
+                + "  ]\n"
+                + "}\n";
+    }
+
     private static void cube(StringBuilder out, float x, float y, float z,
                              float sx, float sy, float sz, boolean accent) {
         if (out.length() > 0) out.append(",");

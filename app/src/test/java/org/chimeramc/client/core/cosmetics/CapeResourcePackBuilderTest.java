@@ -90,6 +90,9 @@ public class CapeResourcePackBuilderTest {
             assertTrue("cape texture",
                     new File(dir, CapeResourcePackBuilder.CAPE_TEXTURE_PATH).isFile());
             assertTrue("pack icon", new File(dir, CapeResourcePackBuilder.PACK_ICON_PATH).isFile());
+            // Written even with no pet, so the entity's reference to it always resolves.
+            assertTrue("pet animation",
+                    new File(dir, CapeResourcePackBuilder.PET_ANIMATION_PATH).isFile());
 
             assertNotNull(built);
             assertEquals(CapeResourcePackBuilder.PACK_UUID, built.uuid);
@@ -202,6 +205,23 @@ public class CapeResourcePackBuilderTest {
                 .getAsJsonObject(CapeResourcePackBuilder.CAPE_ANIMATION_ID);
         assertTrue("animation drives the cape bone",
                 animation.getAsJsonObject("bones").has("cape"));
+
+        // The hat and pet controllers and the pet animation must parse too, for the same reason.
+        JsonObject hatController = JsonParser.parseString(
+                        CapeResourcePackBuilder.hatRenderControllerJson())
+                .getAsJsonObject()
+                .getAsJsonObject("render_controllers")
+                .getAsJsonObject(CapeResourcePackBuilder.HAT_CONTROLLER_ID);
+        assertEquals("Geometry.chimera_hat", hatController.get("geometry").getAsString());
+
+        JsonObject petController = JsonParser.parseString(
+                        CapeResourcePackBuilder.petRenderControllerJson())
+                .getAsJsonObject()
+                .getAsJsonObject("render_controllers")
+                .getAsJsonObject(CapeResourcePackBuilder.PET_CONTROLLER_ID);
+        assertEquals("Geometry.chimera_pet", petController.get("geometry").getAsString());
+
+        JsonParser.parseString(CapeResourcePackBuilder.petAnimationJson()).getAsJsonObject();
     }
 
     /**
@@ -418,14 +438,76 @@ public class CapeResourcePackBuilderTest {
         }
     }
 
-    /** With no accessory the pack writes no hat model, so an accessory-less apply stays a cape. */
+    /**
+     * With no accessory the pack still writes a hat geometry, but an empty one: the player entity
+     * always names the geometry, and a reference that does not resolve can fail the whole client
+     * entity (taking the cape with it). An empty bone draws nothing.
+     */
     @Test
-    public void packWritesNoAccessoryFilesWithoutOne() throws Exception {
+    public void packWritesAResolvingButEmptyAccessoryGeometryWithoutOne() throws Exception {
         File dir = Files.createTempDirectory("no-hat-pack").toFile();
         try {
             CapeResourcePackBuilder.build(dir, CosmeticCatalog.cape("chimera"), null);
-            assertTrue("no hat geometry",
-                    !new File(dir, CapeResourcePackBuilder.HAT_MODEL_PATH).exists());
+            File hat = new File(dir, CapeResourcePackBuilder.HAT_MODEL_PATH);
+            assertTrue("hat geometry is always written so the reference resolves", hat.isFile());
+
+            JsonObject geometry = JsonParser.parseString(
+                            new String(Files.readAllBytes(hat.toPath()), StandardCharsets.UTF_8))
+                    .getAsJsonObject()
+                    .getAsJsonArray("minecraft:geometry")
+                    .get(0)
+                    .getAsJsonObject();
+            int cubes = geometry.getAsJsonArray("bones").get(0).getAsJsonObject()
+                    .getAsJsonArray("cubes").size();
+            assertEquals("empty geometry draws nothing", 0, cubes);
+        } finally {
+            deleteRecursively(dir);
+        }
+    }
+
+    /**
+     * The pet reaches the game the same first-party way as the cape and hat: a render controller
+     * on the player, with the pet animation always present so the entity's reference resolves.
+     */
+    @Test
+    public void thePetIsDrawnByARenderController() {
+        String entity = CapeResourcePackBuilder.playerEntityJson();
+        assertTrue("pet geometry shortname",
+                entity.contains("\"chimera_pet\": \"" + PetGeometry.GEOMETRY_ID + "\""));
+        assertTrue("pet texture shortname",
+                entity.contains("\"chimera_pet\": \"" + CapeResourcePackBuilder.PET_TEXTURE_PATH + "\""));
+        assertTrue("pet controller wired",
+                entity.contains(CapeResourcePackBuilder.PET_CONTROLLER_ID));
+        assertTrue("pet animation always referenced",
+                entity.contains("\"" + CapeResourcePackBuilder.PET_ANIMATION_ID + "\""));
+
+        JsonObject controller = JsonParser.parseString(
+                        CapeResourcePackBuilder.petRenderControllerJson())
+                .getAsJsonObject()
+                .getAsJsonObject("render_controllers")
+                .getAsJsonObject(CapeResourcePackBuilder.PET_CONTROLLER_ID);
+        assertEquals("Geometry.chimera_pet", controller.get("geometry").getAsString());
+        assertTrue("controller samples the pet texture",
+                controller.toString().contains("Texture.chimera_pet"));
+    }
+
+    /** A pack built with a pet writes the pet model, controller, texture and animation. */
+    @Test
+    public void packWritesThePetFilesWhenOneIsEquipped() throws Exception {
+        File dir = Files.createTempDirectory("pet-pack").toFile();
+        try {
+            CapeResourcePackBuilder.build(dir, null, null,
+                    new CosmeticCatalog.Pet("test", "Test",
+                            CosmeticCatalog.PetSpecies.CAT, 0xFF6236E8, 0xFFA88CFF, 1f));
+
+            assertTrue("pet geometry",
+                    new File(dir, CapeResourcePackBuilder.PET_MODEL_PATH).isFile());
+            assertTrue("pet render controller",
+                    new File(dir, CapeResourcePackBuilder.PET_RENDER_CONTROLLER_PATH).isFile());
+            assertTrue("pet texture",
+                    new File(dir, CapeResourcePackBuilder.PET_TEXTURE_PATH).isFile());
+            assertTrue("pet animation",
+                    new File(dir, CapeResourcePackBuilder.PET_ANIMATION_PATH).isFile());
         } finally {
             deleteRecursively(dir);
         }

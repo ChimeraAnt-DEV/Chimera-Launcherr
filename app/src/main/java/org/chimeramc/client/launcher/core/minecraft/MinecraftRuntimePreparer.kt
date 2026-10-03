@@ -160,9 +160,10 @@ val modsDir = modManager.currentVersion?.modsDir?.absolutePath
             val store = CosmeticStore(context)
             val cape = store.equippedCape
             val accessory = store.equippedAccessory
+            val pet = store.equippedPet
             val stagingRoot = File(context.filesDir, "cape")
-            if (cape != null || accessory != null) {
-                CapeInGameInstaller.installQuietly(stagingRoot, candidateRoots, cape, accessory)
+            if (cape != null || accessory != null || pet != null) {
+                CapeInGameInstaller.installQuietly(stagingRoot, candidateRoots, cape, accessory, pet)
                 fileListener.onLog("Prepared in-game cosmetics")
             } else {
                 CapeInGameInstaller.uninstallQuietly(candidateRoots)
