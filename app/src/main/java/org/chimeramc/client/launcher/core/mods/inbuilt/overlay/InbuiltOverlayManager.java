@@ -49,6 +49,7 @@ public class InbuiltOverlayManager {
     private KillEffectsOverlay killEffectsOverlay;
     private VoiceChatOverlay voiceChatOverlay;
     private VoiceNametagOverlay voiceNametagOverlay;
+    private org.chimeramc.client.core.cosmetics.CosmeticSyncModule cosmeticSyncModule;
     private ModMenuButton modMenuButton;
     private HudOverlay hudOverlay;
     private BaseOverlayButton selectedHudEditorOverlay;
@@ -94,6 +95,10 @@ public class InbuiltOverlayManager {
         // A fresh session: clear the Replay highlight trigger state so a streak or death from a
         // previous session cannot carry over into this one.
         ReplayTriggerFeed.reset();
+
+        // Cosmetic sync is independent of voice: it advertises the equipped cape/accessory/pet to
+        // other Chimera users in the world so they can see it, on its own socket and its own pref.
+        startCosmeticSync(manager);
 
         if (hudOverlay == null) {
             hudOverlay = new HudOverlay(activity);
@@ -800,6 +805,7 @@ public class InbuiltOverlayManager {
                 activity instanceof PojavControlsHost ? (PojavControlsHost) activity : null,
                 false);
         PojavControlsMod.setEnabled(false);
+        stopCosmeticSync();
         selectHudEditorOverlay(null);
         for (BaseOverlayButton overlay : overlays) {
             overlay.hide();
@@ -929,6 +935,46 @@ public class InbuiltOverlayManager {
         org.chimeramc.client.core.voice.VoiceChatModule module =
                 org.chimeramc.client.core.voice.VoiceChatModule.peek();
         if (module != null) module.stop();
+    }
+
+    /**
+     * Starts advertising and collecting equipped cosmetics over the LAN.
+     *
+     * <p>Independent of voice: a player can have voice off and still want their cape visible to
+     * other Chimera users, so this is its own module on its own socket, gated by its own pref. The
+     * peer id is the same device id voice uses, so a peer is the same person across both features.
+     */
+    private void startCosmeticSync(InbuiltModManager manager) {
+        try {
+            if (!manager.isCosmeticSyncEnabled()) return;
+            if (cosmeticSyncModule == null) {
+                cosmeticSyncModule = new org.chimeramc.client.core.cosmetics.CosmeticSyncModule(
+                        activity, manager.getVoiceDeviceId(), deviceName());
+            }
+            cosmeticSyncModule.start();
+        } catch (Throwable t) {
+            android.util.Log.w("InbuiltOverlayManager", "Could not start cosmetic sync", t);
+        }
+    }
+
+    private void stopCosmeticSync() {
+        if (cosmeticSyncModule != null) {
+            cosmeticSyncModule.stop();
+            cosmeticSyncModule = null;
+        }
+    }
+
+    /**
+     * Re-announces the equipped cosmetics after a change, so peers see a cape swap without waiting
+     * for the slow timer. A no-op when the module is not running.
+     */
+    public void announceCosmetics() {
+        if (cosmeticSyncModule != null) cosmeticSyncModule.announce();
+    }
+
+    /** The running cosmetic-sync module, or null; the Cosmetics panel lists peers from it. */
+    public org.chimeramc.client.core.cosmetics.CosmeticSyncModule cosmeticSync() {
+        return cosmeticSyncModule;
     }
 
     /**

@@ -100,6 +100,8 @@ public class InbuiltModManager {
     private static final String KEY_VOICE_RELAY_PASSWORD = "voice_relay_password";
     private static final String KEY_VOICE_RELAY_TOKEN_SECRET = "voice_relay_token_secret";
     private static final String KEY_VOICE_DEVICE_ID = "voice_device_id";
+    /** Whether the equipped cape/accessory/pet is advertised to other Chimera users in the world. */
+    private static final String KEY_COSMETIC_SYNC_ENABLED = "cosmetic_sync_enabled";
     private static final int DEFAULT_AIM_SMOOTHING = 40;
     private static final int DEFAULT_AIM_SENSITIVITY = 100;
     private static final int DEFAULT_AIM_CROSSHAIR_COLOR = 0xFF3DDC84;
@@ -871,6 +873,21 @@ public class InbuiltModManager {
 
     public void setVoiceMicEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_VOICE_MIC, enabled).apply();
+    }
+
+    /**
+     * Whether the equipped cape/accessory/pet is advertised to other Chimera users in the world.
+     *
+     * <p>On by default: the feature is client-side only and shows your cosmetics to the same
+     * players who can already hear you on proximity voice, so the expected behaviour is that it
+     * works. Turning it off stops both advertising and collecting.
+     */
+    public boolean isCosmeticSyncEnabled() {
+        return prefs.getBoolean(KEY_COSMETIC_SYNC_ENABLED, true);
+    }
+
+    public void setCosmeticSyncEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_COSMETIC_SYNC_ENABLED, enabled).apply();
     }
 
     /** Resets the channel to the open one, used by the panel's "World" button. */

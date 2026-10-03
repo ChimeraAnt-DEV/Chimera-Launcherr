@@ -21,8 +21,10 @@ import org.chimeramc.client.core.content.InGamePackChanger;
 import org.chimeramc.client.core.content.SkinPackActivator;
 import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
 import org.chimeramc.client.core.cosmetics.CosmeticStore;
+import org.chimeramc.client.core.cosmetics.CosmeticSyncModule;
 import org.chimeramc.client.core.versions.GameVersion;
 import org.chimeramc.client.core.versions.VersionManager;
+import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
 import org.chimeramc.client.ui.animation.DynamicAnim;
 import org.chimeramc.client.util.LauncherStorage;
 
@@ -63,6 +65,8 @@ final class CosmeticsPanel {
     private final LinearLayout root;
     private final CapePreviewView preview;
     private TextView gameStatus;
+    private TextView syncStatus;
+    private TextView syncToggle;
 
     /** True while the panel is programmatically setting a spinner, so its callback is ignored. */
     private boolean suppressSelection;
@@ -148,6 +152,22 @@ final class CosmeticsPanel {
         gameStatus.setTextColor(0xFF8F979F);
         column.addView(gameStatus);
 
+        // Cosmetic sync: whether the equipped set is being advertised to other Chimera users in the
+        // world, and how many have been heard. This is the cross-player half of "cosmetic sync",
+        // distinct from applying the pack to the running game above.
+        syncStatus = new TextView(activity);
+        syncStatus.setTextSize(compact ? 10f : 11f);
+        syncStatus.setTextColor(0xFF8F979F);
+        syncStatus.setPadding(0, dp(4), 0, 0);
+        column.addView(syncStatus);
+
+        syncToggle = gameButton(R.string.cosmetics_sync_toggle_on, false, v -> {
+            InbuiltModManager manager = InbuiltModManager.getInstance(activity);
+            manager.setCosmeticSyncEnabled(!manager.isCosmeticSyncEnabled());
+            refreshSyncStatus();
+        });
+        column.addView(syncToggle);
+
         LinearLayout actions = new LinearLayout(activity);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setPadding(0, dp(6), 0, 0);
@@ -155,6 +175,39 @@ final class CosmeticsPanel {
         actions.addView(gameButton(R.string.cosmetics_remove_in_game, false, v -> removeInGame()));
         column.addView(actions);
         refreshGameStatus();
+        refreshSyncStatus();
+    }
+
+    /**
+     * Tells the running sync module to re-advertise now, so a peer sees a cape/accessory/pet swap
+     * without waiting for the slow timer, and refreshes the peer count line.
+     */
+    private void onCosmeticChanged() {
+        CosmeticSyncModule.requestAnnounce();
+        refreshSyncStatus();
+    }
+
+    private void refreshSyncStatus() {
+        if (syncStatus == null) return;
+        InbuiltModManager manager = InbuiltModManager.getInstance(activity);
+        boolean enabled = manager.isCosmeticSyncEnabled();
+        if (syncToggle != null) {
+            syncToggle.setText(enabled
+                    ? R.string.cosmetics_sync_toggle_off
+                    : R.string.cosmetics_sync_toggle_on);
+        }
+        if (!enabled) {
+            syncStatus.setText(R.string.cosmetics_sync_off);
+            return;
+        }
+        CosmeticSyncModule module = CosmeticSyncModule.peek();
+        if (module == null || !module.isRunning()) {
+            // The link only runs during a game session (the overlay manager starts it there), so
+            // outside a session the honest status is "starts with the game", not "off".
+            syncStatus.setText(R.string.cosmetics_sync_with_game);
+            return;
+        }
+        syncStatus.setText(activity.getString(R.string.cosmetics_sync_seen, module.registry().size()));
     }
 
     // ---- Dropdowns -----------------------------------------------------------------------
@@ -166,12 +219,14 @@ final class CosmeticsPanel {
             store.setEquippedCape(CosmeticCatalog.NONE);
             preview.setCape(null);
             refreshGameStatus();
+            onCosmeticChanged();
         }));
         for (final CosmeticCatalog.Cape cape : CosmeticCatalog.capes()) {
             options.add(new Option(cape.id, cape.name, () -> {
                 store.setEquippedCape(cape.id);
                 preview.setCape(cape);
                 refreshGameStatus();
+                onCosmeticChanged();
             }));
         }
         return options;
@@ -183,12 +238,14 @@ final class CosmeticsPanel {
                 activity.getString(R.string.cosmetics_none), () -> {
             store.setEquippedAccessory(CosmeticCatalog.NONE);
             preview.setAccessory(null);
+            onCosmeticChanged();
         }));
         for (final CosmeticCatalog.Accessory accessory : CosmeticCatalog.accessories()) {
             if (CosmeticCatalog.NONE.equals(accessory.id)) continue;
             options.add(new Option(accessory.id, accessory.name, () -> {
                 store.setEquippedAccessory(accessory.id);
                 preview.setAccessory(accessory);
+                onCosmeticChanged();
             }));
         }
         return options;
@@ -200,11 +257,13 @@ final class CosmeticsPanel {
                 activity.getString(R.string.cosmetics_none), () -> {
             store.setEquippedPet(CosmeticCatalog.NONE);
             preview.setPet(null);
+            onCosmeticChanged();
         }));
         for (final CosmeticCatalog.Pet pet : CosmeticCatalog.pets()) {
             options.add(new Option(pet.id, pet.name, () -> {
                 store.setEquippedPet(pet.id);
                 preview.setPet(pet);
+                onCosmeticChanged();
             }));
         }
         return options;

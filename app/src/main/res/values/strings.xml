@@ -861,6 +861,11 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="cosmetics_in_game">On your character in-game</string>
     <string name="cosmetics_apply_in_game">Apply in game</string>
     <string name="cosmetics_remove_in_game">Remove</string>
+    <string name="cosmetics_sync_off">Cosmetic sync is off — other Chimera users cannot see your cosmetics.</string>
+    <string name="cosmetics_sync_with_game">Cosmetic sync starts with the game, so other Chimera users in the same world can see your equipped cape, accessory and pet — and you can see theirs.</string>
+    <string name="cosmetics_sync_seen">Cosmetic sync is on — %1$d other Chimera user(s) in this world can see your cosmetics.</string>
+    <string name="cosmetics_sync_toggle_on">Turn on cosmetic sync</string>
+    <string name="cosmetics_sync_toggle_off">Turn off cosmetic sync</string>
     <string name="cosmetics_in_game_installed">Applied to the selected instance. If a session is running it reloads or relaunches to show it.</string>
     <string name="cosmetics_in_game_not_installed">Not applied yet. Apply it to wear this cape in the selected instance.</string>
     <string name="cosmetics_applied_in_game">Cape applied — launch the instance to see it</string>
