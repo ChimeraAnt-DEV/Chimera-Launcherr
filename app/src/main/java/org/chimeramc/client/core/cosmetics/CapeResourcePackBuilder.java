@@ -444,53 +444,14 @@ public final class CapeResourcePackBuilder {
     }
 
     /**
-     * The cape geometry.
-     *
-     * <p>A 10x16x1 box on the player's back, using the vanilla {@code geometry.cape} bone layout
-     * (bone {@code cape}, parent {@code body}, pivot at the shoulders) and the standard cape UV
-     * unwrap at {@code [0,0]}, which is the layout {@link CapeTexturePainter} paints.
+     * The cape geometry: a chain of {@link CapeGeometry#SEGMENT_COUNT} thin bones parented in
+     * sequence, spanning the same 10x16 box the single-bone cape used. Each segment's UV row is its
+     * own slice of the cape texture, so the artwork is not stretched across the chain. See
+     * {@link CapeGeometry} for why a chain is used instead of one rigid box, and for the
+     * performance fallback.
      */
     static String capeModelJson() {
-        return "{\n"
-                + "  \"format_version\": \"1.12.0\",\n"
-                + "  \"minecraft:geometry\": [\n"
-                + "    {\n"
-                + "      \"description\": {\n"
-                + "        \"identifier\": \"" + CAPE_GEOMETRY_ID + "\",\n"
-                + "        \"texture_width\": 64,\n"
-                + "        \"texture_height\": 32,\n"
-                + "        \"visible_bounds_width\": 2,\n"
-                + "        \"visible_bounds_height\": 3,\n"
-                + "        \"visible_bounds_offset\": [0, 1, 0]\n"
-                + "      },\n"
-                + "      \"bones\": [\n"
-                + "        {\n"
-                + "          \"name\": \"body\",\n"
-                + "          \"pivot\": [0.0, 24.0, 0.0],\n"
-                + "          \"parent\": \"waist\"\n"
-                + "        },\n"
-                + "        {\n"
-                + "          \"name\": \"waist\",\n"
-                + "          \"pivot\": [0.0, 12.0, 0.0]\n"
-                + "        },\n"
-                + "        {\n"
-                + "          \"name\": \"cape\",\n"
-                + "          \"parent\": \"body\",\n"
-                + "          \"pivot\": [0.0, 24.0, 3.0],\n"
-                + "          \"bind_pose_rotation\": [0.0, 180.0, 0.0],\n"
-                + "          \"rotation\": [0.0, 180.0, 0.0],\n"
-                + "          \"cubes\": [\n"
-                + "            {\n"
-                + "              \"origin\": [-5.0, 8.0, 3.0],\n"
-                + "              \"size\": [10, 16, 1],\n"
-                + "              \"uv\": [0, 0]\n"
-                + "            }\n"
-                + "          ]\n"
-                + "        }\n"
-                + "      ]\n"
-                + "    }\n"
-                + "  ]\n"
-                + "}\n";
+        return CapeGeometry.modelJson(CAPE_GEOMETRY_ID);
     }
 
     /**

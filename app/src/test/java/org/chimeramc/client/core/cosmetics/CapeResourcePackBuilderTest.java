@@ -1,6 +1,7 @@
 package org.chimeramc.client.core.cosmetics;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -129,21 +130,23 @@ public class CapeResourcePackBuilderTest {
                 controller.contains("\"cape\": \"" + CapeResourcePackBuilder.capeVisibilityCondition() + "\""));
     }
 
-    /** The cape geometry is the vanilla cape box so the texture unwrap is the standard one. */
+    /** The cape geometry is now a chain of thin bones spanning the vanilla cape box. */
     @Test
-    public void theCapeGeometryIsTheStandardCapeBox() {
+    public void theCapeGeometryIsASegmentedChainAcrossTheStandardCapeBox() {
         String model = CapeResourcePackBuilder.capeModelJson();
         assertTrue("geometry id", model.contains("\"" + CapeResourcePackBuilder.CAPE_GEOMETRY_ID + "\""));
         assertTrue("64x32 texture", model.contains("\"texture_width\": 64")
                 && model.contains("\"texture_height\": 32"));
-        assertTrue("cape bone parented to the body", model.contains("\"name\": \"cape\"")
-                && model.contains("\"parent\": \"body\""));
-        assertTrue("10x16x1 cape box", model.contains("\"origin\": [-5.0, 8.0, 3.0]")
-                && model.contains("\"size\": [10, 16, 1]"));
-        assertTrue("standard cape UV", model.contains("\"uv\": [0, 0]"));
-        // The 180-degree turn is what puts the box front face outward; without it the artwork
-        // would face the player's back and the cape would read as inside-out.
-        assertTrue("cape bone is turned to face outward", model.contains("\"rotation\": [0.0, 180.0, 0.0]"));
+        // The first segment hangs from the body; the chain continues from there.
+        assertTrue("first segment parented to the body",
+                model.contains("\"name\": \"cape_1\"") && model.contains("\"parent\": \"body\""));
+        assertTrue("a later segment parented to the one above",
+                model.contains("\"name\": \"cape_2\"") && model.contains("\"parent\": \"cape_1\""));
+        // The single 10x16x1 box is gone: the chain spans that box in 10x1 slices.
+        assertFalse("no single rigid 16px box", model.contains("\"size\": [10, 16, 1]"));
+        assertTrue("thin segments", model.contains("\"size\": [10, 1.0, 1]"));
+        // The 180-degree turn is what puts each segment's face outward.
+        assertTrue("segments are turned to face outward", model.contains("\"rotation\": [0.0, 180.0, 0.0]"));
     }
 
     @Test
