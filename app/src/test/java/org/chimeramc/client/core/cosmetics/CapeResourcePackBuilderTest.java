@@ -491,9 +491,9 @@ public class CapeResourcePackBuilderTest {
                 .getAsJsonArray("rotation");
         assertEquals("hat tilt has one rotation triple", 3, rotation.size());
         assertTrue("hat animation turns with the head yaw",
-                rotation.toString().contains("query.head_y_rotation"));
+                rotation.toString().contains("query.target_y_rotation"));
         assertTrue("hat animation pitches with the head pitch",
-                rotation.toString().contains("query.head_x_rotation"));
+                rotation.toString().contains("query.target_x_rotation"));
 
         JsonObject scripts = JsonParser.parseString(CapeResourcePackBuilder.playerEntityJson())
                 .getAsJsonObject()

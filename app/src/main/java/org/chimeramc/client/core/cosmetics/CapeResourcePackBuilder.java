@@ -640,11 +640,11 @@ public final class CapeResourcePackBuilder {
      *
      * <p>The hat is a separate render-controller geometry, so it cannot be parented to the player's
      * head bone and would otherwise stay bolt upright however the player looks. The animation
-     * drives its bone from the same head queries the vanilla head controller uses
-     * ({@code query.head_y_rotation} / {@code query.head_x_rotation}), which the entity exposes to
-     * every controller on the player, so the hat follows the look direction like an attachable
-     * would. The pivot is the neck, so the hat rotates with the head rather than orbiting a point
-     * inside it.
+     * drives its bone from the same target-rotation queries the vanilla head bone uses
+     * ({@code animation.humanoid.look_at_target.default} rotates {@code head} by
+     * {@code query.target_x_rotation} / {@code query.target_y_rotation}), so the hat follows the
+     * look direction exactly as the head does. The pivot is the neck, so the hat rotates with the
+     * head rather than orbiting a point inside it.
      */
     static String hatAnimationJson() {
         return "{\n"
@@ -655,8 +655,8 @@ public final class CapeResourcePackBuilder {
                 + "      \"bones\": {\n"
                 + "        \"acc\": {\n"
                 + "          \"rotation\": [\n"
-                + "            \"query.head_x_rotation\",\n"
-                + "            \"query.head_y_rotation\",\n"
+                + "            \"query.target_x_rotation\",\n"
+                + "            \"query.target_y_rotation\",\n"
                 + "            0.0\n"
                 + "          ]\n"
                 + "        }\n"
