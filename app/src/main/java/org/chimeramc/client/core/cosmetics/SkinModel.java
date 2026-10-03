@@ -29,6 +29,19 @@ public final class SkinModel {
     /** One model pixel, expressed in blocks. The player is 32 px for 1.8 blocks. */
     public static final float PIXELS_TO_BLOCKS = 1.8f / 32f;
 
+    /**
+     * Camera distance in model pixels, for {@link Camera}.
+     *
+     * <p>The model is ~16 px deep and 32 px tall, so a camera 46 px out gives a gentle, believable
+     * perspective: a near part is magnified by roughly 1.2x and a far part shrunk by roughly 0.8x.
+     * A shorter distance would bow the body, a longer one collapses back to the flat orthographic
+     * look this replaced.
+     */
+    public static final float CAMERA_DISTANCE = 46f;
+
+    /** Floor on the camera-space depth so a point at the camera cannot divide by zero. */
+    private static final float MIN_CAMERA_DEPTH = 8f;
+
     /** A texture rectangle in atlas pixels: (u,v) top-left, (w,h) size. */
     public static final class Uv {
         public final int u, v, w, h;
@@ -245,13 +258,11 @@ public final class SkinModel {
     }
 
     /**
-     * Projects a model-space point to screen space.
+     * Projects a model-space point to screen space with the legacy orthographic isometric view.
      *
-     * <p>The point is yawed about Y then pitched about X, and the result is dropped straight onto
-     * the screen — an orthographic isometric view, which is exactly right for a blocky model and
-     * far cheaper than a perspective camera.
-     *
-     * <p>Screen Y is negated because screen coordinates grow downward while the model grows up.
+     * <p>Kept because the preview's rotation widgets and several tests are written against it.
+     * The character render uses {@link Camera} for a true perspective projection; this stays as
+     * the documented reference for the yaw/pitch convention.
      *
      * @param out receives {screenX, screenY, depth}; depth grows toward the viewer
      */
@@ -290,6 +301,96 @@ public final class SkinModel {
         double nz1 = -nx * sinY + nz * cosY;
         double nz2 = ny * sinP + nz1 * cosP;
         return nz2 > 0.0001;
+    }
+
+    /**
+     * A reusable perspective camera for the character preview.
+     *
+     * <p>{@link #project} and {@link #faceVisible} use the <em>same</em> rotation and the same
+     * translation, so the cull test can never disagree with the projection: a face is drawn exactly
+     * when its rotated normal points at the camera. That invariant is why the camera is one object
+     * rather than two free functions — a second rotation convention is how the preview ends up
+     * culling a side it is drawing, or drawing one it culled.
+     *
+     * <p>The camera sits on the +Z axis at {@code distance}, looking toward −Z. The model is
+     * translated to it and rotated by yaw about Y then pitch about X, then divided by camera depth.
+     * The result is a real perspective: the head is a little larger and the feet a little smaller,
+     * which is what stops the render reading as a flat cardboard cut-out.
+     *
+     * <p>{@code scale} and the screen origin are passed per call rather than baked in, because the
+     * character and the pet share one camera but are drawn at different scales. Allocation-free
+     * after construction: {@link #project} writes into a caller array, so the per-frame draw path
+     * allocates nothing.
+     */
+    public static final class Camera {
+        public final float yawDeg;
+        public final float pitchDeg;
+        public final float distance;
+
+        private final double cosY, sinY, cosP, sinP;
+        private final float ox, oy, oz;
+
+        public Camera(float yawDeg, float pitchDeg, float distance,
+                      float orbitX, float orbitY, float orbitZ) {
+            this.yawDeg = yawDeg;
+            this.pitchDeg = pitchDeg;
+            this.distance = distance;
+            double yaw = Math.toRadians(yawDeg);
+            double pitch = Math.toRadians(pitchDeg);
+            this.cosY = Math.cos(yaw);
+            this.sinY = Math.sin(yaw);
+            this.cosP = Math.cos(pitch);
+            this.sinP = Math.sin(pitch);
+            this.ox = orbitX;
+            this.oy = orbitY;
+            this.oz = orbitZ;
+        }
+
+        /** Perspective magnification at a model point: 1 at the orbit centre, >1 nearer. */
+        public float perspectiveAt(float x, float y, float z) {
+            float dx = x - ox;
+            float dy = y - oy;
+            float dz = z - oz;
+            double z1 = -dx * sinY + dz * cosY;
+            double z2 = dy * sinP + z1 * cosP;
+            float depth = (float) (distance - z2);
+            if (depth < MIN_CAMERA_DEPTH) depth = MIN_CAMERA_DEPTH;
+            return distance / depth;
+        }
+
+        /**
+         * Projects a model-space point to {screenX, screenY, cameraDepth}.
+         *
+         * <p>Camera depth grows toward the viewer, matching the legacy projection, so the painter's
+         * sort order is unchanged.
+         */
+        public void project(float x, float y, float z, float scale, float originX, float originY,
+                            float[] out) {
+            float dx = x - ox;
+            float dy = y - oy;
+            float dz = z - oz;
+
+            double x1 = dx * cosY + dz * sinY;
+            double z1 = -dx * sinY + dz * cosY;
+            double y1 = dy * cosP - z1 * sinP;
+            double z2 = dy * sinP + z1 * cosP;
+
+            float depth = (float) (distance - z2);
+            if (depth < MIN_CAMERA_DEPTH) depth = MIN_CAMERA_DEPTH;
+            float perspective = distance / depth;
+
+            out[0] = originX + (float) (x1 * scale * perspective);
+            out[1] = originY - (float) (y1 * scale * perspective);
+            out[2] = depth;
+        }
+
+        /** Whether a face's rotated normal points at the camera. */
+        public boolean faceVisible(Face face) {
+            double nx1 = face.nx * cosY + face.nz * sinY;
+            double nz1 = -face.nx * sinY + face.nz * cosY;
+            double nz2 = face.ny * sinP + nz1 * cosP;
+            return nz2 > 0.0001;
+        }
     }
 
     /** True when the UV lies inside the atlas, so a typo cannot sample out of bounds. */

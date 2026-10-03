@@ -19,7 +19,7 @@ import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
 import org.chimeramc.client.core.versions.GameVersion;
 import org.chimeramc.client.core.versions.VersionManager;
 import org.chimeramc.client.core.content.CapeInGameInstaller;
-import org.chimeramc.client.core.content.SkinPackActivator;
+import org.chimeramc.client.core.content.InGamePackChanger;
 import org.chimeramc.client.launcher.core.content.CosmeticsDiagnostics;
 import org.chimeramc.client.launcher.core.content.CosmeticsDiagnostics.Check;
 import org.chimeramc.client.launcher.core.content.CosmeticsDiagnostics.Status;
@@ -169,15 +169,14 @@ public class CosmeticsStatusActivity extends BaseActivity {
 
         Toast.makeText(this, R.string.skins_loading, Toast.LENGTH_SHORT).show();
         new Thread(() -> {
-            final SkinPackActivator.Result result =
+            final InGamePackChanger.ApplyOutcome outcome =
                     CapeInGameInstaller.install(stagingRoot, roots, TEST_CAPE);
             mainHandler.post(() -> {
-                if (result.success) {
-                    Toast.makeText(this, R.string.cosmetics_test_cape_applied,
+                if (outcome == InGamePackChanger.ApplyOutcome.FAILED) {
+                    Toast.makeText(this, R.string.cosmetics_test_cape_failed,
                             Toast.LENGTH_LONG).show();
                 } else {
-                    Toast.makeText(this,
-                            getString(R.string.cosmetics_test_cape_failed, result.message),
+                    Toast.makeText(this, R.string.cosmetics_test_cape_applied,
                             Toast.LENGTH_LONG).show();
                 }
                 runChecks();

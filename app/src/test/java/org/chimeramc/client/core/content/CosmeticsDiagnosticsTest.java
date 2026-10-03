@@ -26,10 +26,26 @@ public class CosmeticsDiagnosticsTest {
     private static final String UUID = "b7c1a5e2-3d4f-4a6b-9c8d-1e2f3a4b5c6d";
 
     private File writtenPack(File root, String minEngine) throws Exception {
+        return writtenPack(root, minEngine, true);
+    }
+
+    private File writtenPack(File root, String minEngine, boolean withEntity) throws Exception {
         File pack = new File(new File(root, "resource_packs"), UUID);
         assertTrue(pack.mkdirs());
         try (FileWriter w = new FileWriter(new File(pack, "manifest.json"))) {
             w.write("{\"header\":{\"min_engine_version\":[" + minEngine + "]}}");
+        }
+        if (withEntity) {
+            File entity = new File(pack, "entity/player.entity.json");
+            assertTrue(entity.getParentFile().mkdirs());
+            try (FileWriter w = new FileWriter(entity)) {
+                w.write("{}");
+            }
+            File controller = new File(pack, "render_controllers/chimera_cape.render_controllers.json");
+            assertTrue(controller.getParentFile().mkdirs());
+            try (FileWriter w = new FileWriter(controller)) {
+                w.write("{}");
+            }
         }
         return pack;
     }
@@ -70,7 +86,24 @@ public class CosmeticsDiagnosticsTest {
         assertEquals(CosmeticsDiagnostics.Status.OK,
                 find(checks, "global_resource_packs").status);
         assertEquals(CosmeticsDiagnostics.Status.OK,
+                find(checks, "entity override").status);
+        assertEquals(CosmeticsDiagnostics.Status.OK,
                 find(checks, "Manifest accepts").status);
+    }
+
+    @Test
+    public void aPackWithoutTheEntityOverrideFailsTheRendererCheck() throws Exception {
+        // A pack that is written and active but has no player entity override cannot draw a cape;
+        // the diagnostics must say so rather than reporting everything green.
+        File root = folder.newFolder("root");
+        writtenPack(root, "1, 20, 0", false);
+        activate(root);
+
+        List<CosmeticsDiagnostics.Check> checks = CosmeticsDiagnostics.run(
+                Arrays.asList(root), null, "1.26.60.28");
+
+        assertEquals(CosmeticsDiagnostics.Status.FAIL,
+                find(checks, "entity override").status);
     }
 
     @Test
@@ -110,15 +143,15 @@ public class CosmeticsDiagnosticsTest {
     }
 
     @Test
-    public void unknownEquipStateIsManualNotInvented() throws Exception {
+    public void unknownRenderStateIsManualNotInvented() throws Exception {
         File root = folder.newFolder("root");
         List<CosmeticsDiagnostics.Check> checks = CosmeticsDiagnostics.run(
                 Arrays.asList(root), null, "1.26.60.28");
 
         assertEquals(CosmeticsDiagnostics.Status.MANUAL,
-                find(checks, "equipped").status);
+                find(checks, "entity override").status);
         assertEquals(CosmeticsDiagnostics.Status.MANUAL,
-                find(checks, "Renderer").status);
+                find(checks, "Renderer draws").status);
     }
 
     @Test

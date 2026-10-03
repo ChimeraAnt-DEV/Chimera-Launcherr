@@ -26,13 +26,16 @@ import java.util.List;
  *
  * <p>The model is built from the skin's actual texture: each face of each box samples its own
  * rectangle out of the 64x64 atlas, so the preview shows the player's skin — their hair, their
- * shirt, their face — rather than a generic stand-in. The projection is an orthographic
- * isometric view, which suits a blocky model exactly and costs no matrix stack, and hidden faces
- * are dropped by a normal test that uses the same transform as the projection.
+ * shirt, their face — rather than a generic stand-in. The projection is a real perspective camera
+ * ({@link SkinModel.Camera}): the near side of the body is magnified and the far side recedes, which
+ * is what gives the render depth instead of reading as a flat isometric sketch. Hidden faces are
+ * dropped by a normal test that uses the same transform as the projection, so a face is drawn
+ * exactly when it points at the camera.
  *
  * <p>Faces are painter-sorted back to front by centroid depth. For a body whose boxes never
  * interpenetrate that is sufficient, and it avoids maintaining a depth buffer for a 30-quad
- * scene.
+ * scene. Textured faces are drawn anti-aliased with bilinear filtering, so the skin reads smoothly
+ * rather than as hard pixel blocks.
  *
  * <p>The cape is a {@link CapeSimulator} cloth mesh, drawn behind the body, with the animated
  * Chimera mark crawling across it. The frame callback only runs while there is motion to show,
@@ -86,6 +89,12 @@ public class CapePreviewView extends View {
     private boolean userRotating;
     private long lastFrameNanos;
 
+    /**
+     * The perspective camera for the current frame. Rebuilt once per {@code onDraw} from the live
+     * yaw/pitch/scale, and used by every projection and cull test so the two cannot disagree.
+     */
+    private SkinModel.Camera camera;
+
     private long animStartMs;
     private boolean animating;
     private boolean attached;
@@ -127,8 +136,9 @@ public class CapePreviewView extends View {
     public CapePreviewView(Context context) {
         super(context);
         setWillNotDraw(false);
-        // Skins are pixel art: nearest-neighbour keeps every texel crisp instead of blurring the
-        // face into mush, which is the whole reason the texture is legible at this size.
+        // Textured faces are sampled with bilinear filtering and anti-aliasing set per draw in
+        // drawModel; flat accessory quads use `paint`, which is anti-aliased but unfiltered, so a
+        // solid colour stays hard-edged.
         pixelPaint.setFilterBitmap(false);
         pixelPaint.setAntiAlias(false);
         this.skin = PlayerSkinProvider.resolve(context);
@@ -296,6 +306,11 @@ public class CapePreviewView extends View {
         float originX = w * 0.40f;
         float originY = h * 0.58f + SkinModel.heightPixels() * 0.5f * scale;
 
+        // One perspective camera for the whole frame, orbiting the body's centre so the character
+        // sits still while the near side grows and the far side recedes. Every draw call and cull
+        // test below goes through it, so they cannot drift apart.
+        camera = new SkinModel.Camera(yawDeg, pitchDeg, SkinModel.CAMERA_DISTANCE, 0f, 18f, 0f);
+
         drawGroundShadow(canvas, originX, originY, scale);
         if (pet != null) {
             // The pet is drawn first so the character always reads as the subject; it sits to the
@@ -326,9 +341,12 @@ public class CapePreviewView extends View {
     private void drawPet(Canvas canvas, float originX, float originY, float scale) {
         if (pet == null) return;
         float ps = scale * pet.scale;
-        // Ground the pet on the same baseline as the character, a little to the right.
+        // Ground the pet on the same baseline as the character, a little to the right. The ground
+        // line is the projected model origin, since the camera orbits above the feet.
+        camera.project(0f, 0f, 0f, scale, originX, originY, projected);
+        float groundY = projected[1];
         float px = originX + 20f * scale;
-        float py = originY - SkinModel.heightPixels() * 0.5f * scale + 0.5f * scale;
+        float py = groundY + 0.5f * scale;
 
         CosmeticCatalog.PetSpecies species = pet.species;
         int body = pet.color;
@@ -460,7 +478,7 @@ public class CapePreviewView extends View {
         SkinModel.Box box = SkinModel.Box.of("pet", cx, cy, cz, w, h, d);
         paint.setShader(null);
         for (SkinModel.Face face : SkinModel.Face.values()) {
-            if (!SkinModel.faceVisible(face, yawDeg, pitchDeg)) continue;
+            if (!camera.faceVisible(face)) continue;
             float[][] c = box.faceCorners(face);
             for (int i = 0; i < 4; i++) {
                 projectPoint(c[i][0], c[i][1], c[i][2], scale, originX, originY);
@@ -597,14 +615,18 @@ public class CapePreviewView extends View {
     private void drawGroundShadow(Canvas canvas, float originX, float originY, float scale) {
         paint.setShader(null);
         paint.setColor(0x33000000);
+        // The camera orbits the body's centre, so the feet no longer sit at originY; project the
+        // model origin to find the real ground line, or the shadow floats at the character's waist.
+        camera.project(0f, 0f, 0f, scale, originX, originY, projected);
+        float groundY = projected[1];
         float rx = 14f * scale;
         float ry = 3.2f * scale;
-        canvas.drawOval(originX - rx, originY - ry, originX + rx, originY + ry, paint);
+        canvas.drawOval(originX - rx, groundY - ry, originX + rx, groundY + ry, paint);
     }
 
     private void projectPoint(float x, float y, float z, float scale,
                              float originX, float originY) {
-        SkinModel.project(x, y, z, yawDeg, pitchDeg, scale, originX, originY, projected);
+        camera.project(x, y, z, scale, originX, originY, projected);
     }
 
     private void drawModel(Canvas canvas, float originX, float originY, float scale) {
@@ -614,7 +636,7 @@ public class CapePreviewView extends View {
         for (int b = 0; b < boxes.size(); b++) {
             SkinModel.Box box = boxes.get(b);
             for (SkinModel.Face face : SkinModel.Face.values()) {
-                if (!SkinModel.faceVisible(face, yawDeg, pitchDeg)) continue;
+                if (!camera.faceVisible(face)) continue;
 
                 float[][] modelCorners = box.faceCorners(face);
                 FaceQuad quad = new FaceQuad();
@@ -629,7 +651,7 @@ public class CapePreviewView extends View {
                 }
                 quad.depth = depthSum / 4f;
                 quad.texture = baseFaceCrops == null ? null : baseFaceCrops[b][face.ordinal()];
-                quad.tint = shadeFor(face);
+                quad.tint = shadeFor(face, camera.perspectiveAt(box.cx, box.cy, box.cz));
                 drawList.add(quad);
 
                 Bitmap over = overlayFaceCrops == null ? null : overlayFaceCrops[b][face.ordinal()];
@@ -647,6 +669,12 @@ public class CapePreviewView extends View {
         // Painter's algorithm: farthest centroid first, so a nearer face covers a farther one.
         drawList.sort((a, bq) -> Float.compare(a.depth, bq.depth));
 
+        // Textured faces get a smooth, anti-aliased bilinear sample — the difference between a
+        // blocky proof-of-concept and a render. The pixel paint is reserved for flat accessory
+        // quads, which must stay hard-edged.
+        pixelPaint.setAntiAlias(true);
+        pixelPaint.setFilterBitmap(true);
+        pixelPaint.setDither(true);
         for (FaceQuad quad : drawList) {
             if (quad.texture != null) {
                 canvas.drawBitmapMesh(quad.texture, 1, 1, quad.verts, 0, null, 0, pixelPaint);
@@ -673,24 +701,25 @@ public class CapePreviewView extends View {
      * Per-face shading. The light comes from the upper front-left, so the front is brightest and
      * the back darkest, with the sides in between. Constants rather than a real light model: a
      * fixed ramp reads as crisp pixel-art shading, which is what the game does.
+     *
+     * <p>The {@code perspective} factor is the camera magnification at the face's centre. A nearer
+     * face is lit a touch more and a farther one a touch less, which is the cheap depth cue that
+     * makes a perspective render read as volumetric rather than flat.
      */
-    private static int shadeFor(SkinModel.Face face) {
+    private static int shadeFor(SkinModel.Face face, float perspective) {
+        int base;
         switch (face) {
-            case FRONT:
-                return 0x00000000;
-            case TOP:
-                return 0x12FFFFFF;
-            case LEFT:
-                return 0x16000000;
-            case RIGHT:
-                return 0x1E000000;
-            case BACK:
-                return 0x33000000;
-            case BOTTOM:
-                return 0x44000000;
-            default:
-                return 0x00000000;
+            case FRONT: base = 0x00000000; break;
+            case TOP: base = 0x12FFFFFF; break;
+            case LEFT: base = 0x16000000; break;
+            case RIGHT: base = 0x1E000000; break;
+            case BACK: base = 0x33000000; break;
+            case BOTTOM: base = 0x44000000; break;
+            default: base = 0x00000000; break;
         }
+        float depthScale = perspective < 0.85f ? 0.85f : Math.min(perspective, 1.2f);
+        int alpha = (int) ((base >>> 24) * depthScale);
+        return (alpha << 24) | (base & 0x00FFFFFF);
     }
 
     /** Draws the cloth mesh behind the body, with the animated mark printed on it. */
@@ -1143,7 +1172,7 @@ public class CapePreviewView extends View {
                          float originX, float originY) {
         SkinModel.Box box = SkinModel.Box.of("acc", cx, cy, cz, w, h, d);
         for (SkinModel.Face face : SkinModel.Face.values()) {
-            if (!SkinModel.faceVisible(face, yawDeg, pitchDeg)) continue;
+            if (!camera.faceVisible(face)) continue;
             float[][] c = box.faceCorners(face);
             for (int i = 0; i < 4; i++) {
                 projectPoint(c[i][0], c[i][1], c[i][2], scale, originX, originY);

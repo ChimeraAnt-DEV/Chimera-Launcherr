@@ -12,17 +12,17 @@ import java.util.Locale;
 /**
  * Works out, on-device, which link of the cape pipeline is broken.
  *
- * <p>Capes are delivered by a resource pack that overrides {@code textures/entity/cape_invisible.png};
- * the code's own design note says the worst case is an invisible cape, so a failure is silent.
- * This class turns the silent failure into a set of named checks a person can read off a screen.
+ * <p>Capes are delivered by a resource pack that overrides the player client entity to draw a cape
+ * model on the player's back; the code's own design note says a failure is silent, so this class
+ * turns that silence into a set of named checks a person can read off a screen.
  *
  * <p>It is deliberately {@code File}-based and Android-light: the caller resolves the candidate
  * game-data roots and the staging directory, so the logic is unit-testable against a temporary
  * directory tree and never guesses a path itself.
  *
- * <p>Only three of the four links can be checked from the launcher. Whether the player has a cape
- * equipped in the game's own dressing room, and whether RenderDragon honours the override, cannot
- * be read without the game, so those are reported as manual checks rather than invented.
+ * <p>Only some of the links can be checked from the launcher. Whether RenderDragon honours the
+ * entity override, and whether the cape is visible in third person, cannot be read without the
+ * game, so those are reported as manual checks rather than invented.
  */
 public final class CosmeticsDiagnostics {
 
@@ -109,9 +109,32 @@ public final class CosmeticsDiagnostics {
                     "Listed in the root the game reads."));
         }
 
-        // 3. Does the manifest's minimum engine version accept the installed game?
+        // 3. Is the pack's player-entity override present, so the cape actually renders?
         File manifestRoot = activeRoot != null ? activeRoot
                 : (writtenRoots.isEmpty() ? null : writtenRoots.get(0));
+        File entityRoot = manifestRoot;
+        if (entityRoot == null) {
+            checks.add(new Check("Player entity override present", Status.MANUAL,
+                    "No written pack to read."));
+        } else {
+            File packDir = new File(new File(entityRoot, "resource_packs"), uuid);
+            File entity = new File(packDir, CapeResourcePackBuilder.PLAYER_ENTITY_PATH);
+            File controller = new File(packDir, CapeResourcePackBuilder.CAPE_RENDER_CONTROLLER_PATH);
+            if (!entity.isFile()) {
+                checks.add(new Check("Player entity override present", Status.FAIL,
+                        "The pack is active but has no entity/player.entity.json, so no cape model "
+                                + "is added. Re-apply the cape to rebuild the pack."));
+            } else if (!controller.isFile()) {
+                checks.add(new Check("Player entity override present", Status.FAIL,
+                        "The entity override exists but its render controller is missing; the cape "
+                                + "would not be drawn."));
+            } else {
+                checks.add(new Check("Player entity override present", Status.OK,
+                        "The player entity and its cape render controller are in the pack."));
+            }
+        }
+
+        // 4. Does the manifest's minimum engine version accept the installed game?
         if (manifestRoot == null) {
             checks.add(new Check("Manifest accepts this game version", Status.MANUAL,
                     "No written pack to read."));
@@ -133,13 +156,12 @@ public final class CosmeticsDiagnostics {
             }
         }
 
-        // The two links only the game can speak to.
-        checks.add(new Check("A cape is equipped in game", Status.MANUAL,
-                "The override only shows if the player entity has a cape in the game's dressing "
-                        + "room. Equip any vanilla cape once, then check."));
-        checks.add(new Check("Renderer honours the override", Status.MANUAL,
-                "Use \"Test cape\" below: if no magenta appears, this RenderDragon build ignores "
-                        + "the texture override and the resource-pack route cannot work."));
+        // The link only the game can speak to.
+        checks.add(new Check("Renderer draws the cape model", Status.MANUAL,
+                "Use \"Test cape\" below: a magenta cape on your character's back in third person "
+                        + "(or the dressing-room paperdoll) means the entity override is working. "
+                        + "If it never appears, this RenderDragon build ignores entity overrides and "
+                        + "no resource-pack route can work."));
         return checks;
     }
 

@@ -102,6 +102,38 @@ public class SkinModelTest {
     }
 
     @Test
+    public void theCameraCullsAndProjectsWithTheSameTransform() {
+        SkinModel.Camera camera =
+                new SkinModel.Camera(35f, 18f, SkinModel.CAMERA_DISTANCE, 0f, 18f, 0f);
+        // A face is drawn exactly when the legacy test says it is; the camera must not disagree.
+        for (SkinModel.Face face : SkinModel.Face.values()) {
+            assertEquals(face.name(),
+                    SkinModel.faceVisible(face, 35f, 18f), camera.faceVisible(face));
+        }
+        // A point at the orbit centre projects to the screen origin.
+        float[] out = new float[3];
+        camera.project(0f, 18f, 0f, 1f, 100f, 200f, out);
+        assertEquals(100f, out[0], 1e-3f);
+        assertEquals(200f, out[1], 1e-3f);
+    }
+
+    @Test
+    public void perspectiveMagnifiesTheNearSideAndShrinksTheFarSide() {
+        // The camera sits on +Z, so a larger model Z is nearer the viewer.
+        SkinModel.Camera camera =
+                new SkinModel.Camera(0f, 0f, SkinModel.CAMERA_DISTANCE, 0f, 0f, 0f);
+        float[] near = new float[3];
+        float[] far = new float[3];
+        camera.project(6f, 0f, 6f, 1f, 0f, 0f, near);
+        camera.project(6f, 0f, -6f, 1f, 0f, 0f, far);
+        // Same x, but the near point is pushed further from centre, so it reads larger.
+        assertTrue("near side must be magnified", Math.abs(near[0]) > Math.abs(far[0]));
+        assertTrue("near point must have the smaller camera depth", near[2] < far[2]);
+        assertTrue("magnification must exceed 1 nearer than the orbit centre",
+                camera.perspectiveAt(0f, 0f, 6f) > 1f);
+    }
+
+    @Test
     public void projectionKeepsThePointOnScreenAndMovesWithYaw() {
         float[] a = new float[3];
         float[] b = new float[3];
