@@ -271,8 +271,15 @@ public final class InGamePackChanger {
     /**
      * Asks the running session to pick up a pack change immediately.
      *
-     * @return true when a live reload happened; false when no session is running or it could not
-     *         refresh, in which case the change applies on the next world load.
+     * <p>The shipped Bedrock builds have no verified in-place refresh: the preloader export
+     * resolves to "no hook" and returns false, so the caller relaunches. The native side detects
+     * support at runtime — it marks the running build supported only after a refresh it confirmed,
+     * and never retries a failed call in the same session — so there is no version list here to
+     * keep in step.
+     *
+     * @return true when a live reload happened; false when no session is running or the running
+     *         build could not refresh, in which case the change applies on the next world load or
+     *         the caller relaunches.
      */
     public static boolean requestReload() {
         Reloader current = reloader;
