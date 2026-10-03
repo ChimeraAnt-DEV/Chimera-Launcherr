@@ -140,9 +140,17 @@ public final class CosmeticsDiagnostics {
                 checks.add(new Check("Cape animation present", Status.FAIL,
                         "The pack has no cape animation, so the cape renders stiff. Re-apply the "
                                 + "cape to rebuild the pack."));
+            } else if (!entityPlaysAnimation(entity, CapeResourcePackBuilder.CAPE_ANIMATION_ID)) {
+                // The file existing is not enough: the vanilla root controller plays the cape key
+                // only when query.has_cape is true, which is false for this unconditional cape, so
+                // the animation must also be listed in the entity's animate list to run at all.
+                checks.add(new Check("Cape animation present", Status.FAIL,
+                        "The cape animation is not in the player entity's animate list, so it never "
+                                + "plays and the cape renders stiff. Re-apply the cape."));
             } else {
                 checks.add(new Check("Cape animation present", Status.OK,
-                        "The cape animation is in the pack, so the cloth moves with the player."));
+                        "The cape animation is in the pack and played, so the cloth folds as the "
+                                + "player moves."));
             }
         }
 
@@ -267,6 +275,41 @@ public final class CosmeticsDiagnostics {
         for (int i = 0; i < parts.length; i++) {
             if (i > 0) sb.append('.');
             sb.append(parts[i]);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Whether the player entity's {@code animate} list names the given animation. A file existing
+     * in the pack is not the same as the game playing it: an animation that is only mapped in the
+     * {@code animations} table is played by whoever references it, and for the cape that is the
+     * vanilla root controller, which gates the cape key on {@code query.has_cape}. Listing it in
+     * {@code animate} is what makes it run unconditionally.
+     *
+     * <p>Reads the raw JSON text rather than parsing it, so this stays Android-light and
+     * dependency-free like the rest of the class. The value is always a quoted animation id, so a
+     * substring match cannot collide with a different key.
+     */
+    private static boolean entityPlaysAnimation(File entity, String animationId) {
+        String json = readAll(entity);
+        if (json == null) return false;
+        int animateAt = json.indexOf("\"animate\"");
+        if (animateAt < 0) return false;
+        int end = json.indexOf(']', animateAt);
+        if (end < 0) end = json.length();
+        return json.substring(animateAt, end).contains("\"" + animationId + "\"");
+    }
+
+    private static String readAll(File file) {
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            char[] buffer = new char[4096];
+            int read;
+            while ((read = reader.read(buffer)) >= 0) {
+                sb.append(buffer, 0, read);
+            }
+        } catch (Exception e) {
+            return null;
         }
         return sb.toString();
     }

@@ -104,22 +104,27 @@ public final class PetGeometry {
 
         StringBuilder cubes = new StringBuilder();
 
-        // Legs (behind the body). Crawlers get six, the rest four.
+        // Legs (behind the body). Crawlers get six, the rest four. The along-axis is measured from
+        // the body's centre, not its front face, or every leg sits a body-length ahead of the
+        // animal it is supposed to hold up.
         if (species != CosmeticCatalog.PetSpecies.SNAKE) {
             int legs = (species == CosmeticCatalog.PetSpecies.SPIDER
                     || species == CosmeticCatalog.PetSpecies.ANT) ? 6 : 4;
             for (int i = 0; i < legs; i++) {
                 float side = (i % 2 == 0) ? -1f : 1f;
                 float along = (i / 2 - 0.5f) * bodyD * 0.5f;
-                cube(cubes, baseX + side * bodyW * 0.42f, 0f, baseZ + along,
-                        1.6f, legLen, 1.6f, false);
+                cube(cubes, baseX + side * bodyW * 0.42f, 0f,
+                        baseZ + bodyD / 2f + along, 1.6f, legLen, 1.6f, false);
             }
         } else {
-            // A snake's tail: tapered segments trailing behind the body.
+            // A snake's tail: tapered segments trailing behind the body, the first sitting
+            // against the body's rear face so the tail reads as one animal rather than a line of
+            // blocks floating in space.
+            float tailStartZ = baseZ - 1.6f;
             for (int seg = 1; seg <= 4; seg++) {
                 float size = 2.4f - seg * 0.3f;
-                cube(cubes, baseX, bodyY + bodyH / 2f, baseZ - bodyD / 2f - seg * 1.6f,
-                        size, size, 1.6f, seg % 2 == 0);
+                cube(cubes, baseX + bodyW / 2f - size / 2f, bodyY + bodyH / 2f,
+                        tailStartZ - (seg - 1) * 1.6f, size, size, 1.6f, seg % 2 == 0);
             }
         }
 
@@ -131,7 +136,7 @@ public final class PetGeometry {
 
         // Species-defining parts.
         drawHeadgear(cubes, species, baseX, headY, headZ, headSize);
-        drawSpeciesBody(cubes, species, baseX, bodyY, bodyH, bodyW, bodyD);
+        drawSpeciesBody(cubes, species, baseX, bodyY, bodyH, bodyW, bodyD, baseZ);
 
         return "{\n"
                 + "  \"format_version\": \"1.12.0\",\n"
@@ -248,79 +253,90 @@ public final class PetGeometry {
     /** Shells, wings, stripes and tails: the parts that distinguish body shapes. */
     private static void drawSpeciesBody(StringBuilder out, CosmeticCatalog.PetSpecies species,
                                         float x, float bodyY, float bodyH, float bodyW,
-                                        float bodyD) {
+                                        float bodyD, float baseZ) {
+        // Every part is anchored to the body it belongs to. The body occupies x..x+bodyW and
+        // baseZ..baseZ+bodyD, so a part placed at absolute z=0 (the old code) floated detached in
+        // empty space several units behind the animal and never read as its shell, wing or tail.
+        float cx = x + bodyW / 2f;
+        float cz = baseZ + bodyD / 2f;
+        float rearZ = baseZ;
         float top = bodyY + bodyH;
-        float tailZ = -bodyD / 2f;
+        float midY = bodyY + bodyH * 0.5f;
         switch (species) {
             case TURTLE:
-                cube(out, x, bodyY + bodyH - 0.4f, 0f, bodyW + 1f, 1.4f, bodyD + 1f, true);
+                // A domed shell half-sunk into the back.
+                cubeC(out, cx, top + 0.3f, cz, bodyW + 1f, 1.4f, bodyD + 1f, true);
                 break;
             case PARROT:
-                cube(out, x - bodyW * 0.8f, bodyY + bodyH * 0.4f, 0f, 3f, 0.6f, 4f, true);
-                cube(out, x + bodyW * 0.8f, bodyY + bodyH * 0.4f, 0f, 3f, 0.6f, 4f, true);
-                cube(out, x, bodyY + bodyH * 0.6f, tailZ - 2f, 0.8f, 3f, 2f, false);
+                // Wings folded along the sides, plus a tail streaming behind.
+                cubeC(out, cx - (bodyW / 2f + 1.5f), midY, cz, 3f, 0.6f, 4f, true);
+                cubeC(out, cx + (bodyW / 2f + 1.5f), midY, cz, 3f, 0.6f, 4f, true);
+                cubeC(out, cx, bodyY + bodyH * 0.6f, rearZ - 1f, 0.8f, 3f, 2f, false);
                 break;
             case BUTTERFLY:
-                // Large, rounded wings.
-                cube(out, x - bodyW * 0.9f, bodyY + bodyH * 0.3f, 0f, 4f, 0.5f, 5f, true);
-                cube(out, x + bodyW * 0.9f, bodyY + bodyH * 0.3f, 0f, 4f, 0.5f, 5f, true);
+                // Large, rounded wings out to each side.
+                cubeC(out, cx - (bodyW / 2f + 2f), midY, cz, 4f, 0.5f, 5f, true);
+                cubeC(out, cx + (bodyW / 2f + 2f), midY, cz, 4f, 0.5f, 5f, true);
                 break;
             case DRAGONFLY:
-                // Long, narrow wings set further back.
-                cube(out, x - bodyW * 1.4f, bodyY + bodyH * 0.4f, 1f, 5f, 0.3f, 2f, true);
-                cube(out, x + bodyW * 1.4f, bodyY + bodyH * 0.4f, 1f, 5f, 0.3f, 2f, true);
+                // Long, narrow wings set a little back.
+                cubeC(out, cx - (bodyW / 2f + 2.5f), midY, cz + 1f, 5f, 0.3f, 2f, true);
+                cubeC(out, cx + (bodyW / 2f + 2.5f), midY, cz + 1f, 5f, 0.3f, 2f, true);
                 break;
             case BEE:
-                cube(out, x, bodyY + 0.2f, -bodyD * 0.25f, bodyW + 0.6f, 0.6f, bodyD * 0.5f, true);
-                cube(out, x, bodyY + 0.2f, -bodyD * 0.7f, bodyW + 0.4f, 0.6f, 1f, true);
+                // Two dark bands wrapping the abdomen.
+                cubeC(out, cx, midY, cz - bodyD * 0.25f, bodyW + 0.6f, 0.6f, bodyD * 0.5f, true);
+                cubeC(out, cx, midY, rearZ + bodyD * 0.15f, bodyW + 0.4f, 0.6f, 1f, true);
                 break;
             case SPIDER:
-                cube(out, x, bodyY + bodyH - 0.6f, -bodyD * 0.35f, bodyW, 1.6f, 2.6f, true);
+                // A rounded abdomen on the back half.
+                cubeC(out, cx, top + 0.2f, rearZ + bodyD * 0.35f, bodyW, 1.6f, 2.6f, true);
                 break;
             case BEETLE:
                 // A hard elytra shell over the whole back.
-                cube(out, x, top - 0.4f, -bodyD * 0.1f, bodyW + 0.6f, 1.4f, bodyD * 0.9f, true);
+                cubeC(out, cx, top + 0.3f, cz - bodyD * 0.05f, bodyW + 0.6f, 1.4f,
+                        bodyD * 0.9f, true);
                 break;
             case DRAGON:
-                cube(out, x, top - 0.4f, -bodyD * 0.1f, 1f, 2f, bodyD * 0.8f, true);
-                cube(out, x - bodyW * 0.7f, bodyY + bodyH * 0.5f, -bodyD * 0.1f,
-                        3.5f, 0.6f, 5f, true);
-                cube(out, x + bodyW * 0.7f, bodyY + bodyH * 0.5f, -bodyD * 0.1f,
-                        3.5f, 0.6f, 5f, true);
+                // A spine ridge, plus two wings swept back from the shoulders.
+                cubeC(out, cx, top + 0.6f, cz, 1f, 2f, bodyD * 0.8f, true);
+                cubeC(out, cx - (bodyW / 2f + 1.75f), midY, cz, 3.5f, 0.6f, 5f, true);
+                cubeC(out, cx + (bodyW / 2f + 1.75f), midY, cz, 3.5f, 0.6f, 5f, true);
                 break;
             case CAT:
-                // A long, thin, curling tail.
-                cube(out, x, bodyY + bodyH * 0.5f, tailZ - 1f, 0.9f, 0.9f, 3f, false);
-                cube(out, x, bodyY + bodyH * 0.9f, tailZ - 3.4f, 0.9f, 0.9f, 1.4f, false);
+                // A long, thin tail with a curl at the tip.
+                cubeC(out, cx, midY, rearZ - 1.5f, 0.9f, 0.9f, 3f, false);
+                cubeC(out, cx, bodyY + bodyH * 0.9f, rearZ - 3.4f, 0.9f, 0.9f, 1.4f, false);
                 break;
             case DOG:
                 // A short stub tail.
-                cube(out, x, bodyY + bodyH * 0.7f, tailZ - 1f, 1.4f, 1.4f, 1.6f, false);
+                cubeC(out, cx, bodyY + bodyH * 0.7f, rearZ - 0.8f, 1.4f, 1.4f, 1.6f, false);
                 break;
             case WOLF:
                 // A medium bushy tail.
-                cube(out, x, bodyY + bodyH * 0.55f, tailZ - 1.4f, 1.8f, 1.8f, 3f, false);
+                cubeC(out, cx, bodyY + bodyH * 0.55f, rearZ - 1.5f, 1.8f, 1.8f, 3f, false);
                 break;
             case FOX:
                 // A large bushy tail with an accent tip.
-                cube(out, x, bodyY + bodyH * 0.5f, tailZ - 1.6f, 2.2f, 2.2f, 3.4f, false);
-                cube(out, x, bodyY + bodyH * 0.5f, tailZ - 4.6f, 2.2f, 2.2f, 1.2f, true);
+                cubeC(out, cx, bodyY + bodyH * 0.5f, rearZ - 1.7f, 2.2f, 2.2f, 3.4f, false);
+                cubeC(out, cx, bodyY + bodyH * 0.5f, rearZ - 4.0f, 2.2f, 2.2f, 1.2f, true);
                 break;
             case RABBIT:
                 // A round puff tail.
-                cube(out, x, bodyY + bodyH * 0.6f, tailZ - 1f, 1.4f, 1.4f, 1.4f, true);
+                cubeC(out, cx, bodyY + bodyH * 0.6f, rearZ - 0.7f, 1.4f, 1.4f, 1.4f, true);
                 break;
             case LIZARD:
                 // A thin, long tail.
-                cube(out, x, bodyY + bodyH * 0.4f, tailZ - 1.6f, 0.9f, 0.9f, 3.4f, false);
+                cubeC(out, cx, bodyY + bodyH * 0.4f, rearZ - 1.7f, 0.9f, 0.9f, 3.4f, false);
                 break;
             case FROG:
-                // A squat rear haunch.
-                cube(out, x, bodyY, tailZ + 0.4f, bodyW + 0.4f, bodyH + 0.6f, 2f, false);
+                // A squat rear haunch sitting on the ground against the body's rear.
+                cubeC(out, cx, (bodyH + 0.6f) / 2f, rearZ + 1f, bodyW + 0.4f, bodyH + 0.6f,
+                        2f, false);
                 break;
             case AXOLOTL:
                 // A finned tail.
-                cube(out, x, bodyY + bodyH * 0.6f, tailZ - 1.6f, 1.2f, 2f, 3.4f, true);
+                cubeC(out, cx, bodyY + bodyH * 0.6f, rearZ - 1.7f, 1.2f, 2f, 3.4f, true);
                 break;
             default:
                 break;
@@ -362,6 +378,16 @@ public final class PetGeometry {
                 .append(f(z)).append("], \"size\": [").append(f(sx)).append(", ")
                 .append(f(sy)).append(", ").append(f(sz)).append("], \"uv\": [")
                 .append(uvx).append(", ").append(uvy).append("]}");
+    }
+
+    /**
+     * A cube placed by its centre, for the species parts. Bedrock's {@code origin} is the minimum
+     * corner, so a part authored from the body's centre needs the half-size subtracted; doing that
+     * by hand at every call site is how a shell ends up half a body off the animal.
+     */
+    private static void cubeC(StringBuilder out, float cx, float cy, float cz,
+                              float sx, float sy, float sz, boolean accent) {
+        cube(out, cx - sx / 2f, cy - sy / 2f, cz - sz / 2f, sx, sy, sz, accent);
     }
 
     static String f(float value) {

@@ -54,10 +54,23 @@ public final class CapeResourcePackBuilder {
     public static final String CAPE_GEOMETRY_ID = "geometry.chimera_cape";
     /** Render controller that draws the cape; listed by the player client entity. */
     public static final String CAPE_CONTROLLER_ID = "controller.render.chimera_cape";
-    /** The animation that gives the cape its cloth motion; played by the {@code cape} key. */
+    /**
+     * The animation that gives the cape its cloth motion. It is bound to the vanilla {@code cape}
+     * key <em>and</em> listed directly in the entity's {@code animate} list: the vanilla root
+     * controller only plays the {@code cape} key when {@code query.has_cape} is true, which is
+     * false for this unconditional cape, so binding it to that key alone left the chain sitting at
+     * its bind pose and the cape rendering stiff. See {@link #playerEntityJson}.
+     */
     public static final String CAPE_ANIMATION_ID = "animation.chimera_cape";
     /** Render controller that draws the worn accessory (hat/headwear). */
     public static final String HAT_CONTROLLER_ID = "controller.render.chimera_hat";
+    /**
+     * The animation that tilts the hat with the player's head. The hat is a separate
+     * render-controller geometry, not an attachable, so it cannot be parented to the player's head
+     * bone and would otherwise sit bolt upright however the player looks. The animation drives its
+     * bone from the same head queries the vanilla head controller uses.
+     */
+    public static final String HAT_ANIMATION_ID = "animation.chimera_hat_tilt";
     /** Render controller that draws the equipped pet. */
     public static final String PET_CONTROLLER_ID = "controller.render.chimera_pet";
     /** The animation that bobs the pet; played by the {@code pet} key. */
@@ -73,6 +86,7 @@ public final class CapeResourcePackBuilder {
     public static final String HAT_MODEL_PATH = "models/entity/chimera_hat.geo.json";
     public static final String HAT_RENDER_CONTROLLER_PATH =
             "render_controllers/chimera_hat.render_controllers.json";
+    public static final String HAT_ANIMATION_PATH = "animations/chimera_hat.animation.json";
     public static final String HAT_TEXTURE_PATH = "textures/entity/chimera_hat.png";
     public static final String PET_MODEL_PATH = "models/entity/chimera_pet.geo.json";
     public static final String PET_RENDER_CONTROLLER_PATH =
@@ -172,6 +186,9 @@ public final class CapeResourcePackBuilder {
         writeAt(targetDir, HAT_MODEL_PATH, hatModel.getBytes(StandardCharsets.UTF_8));
         writeAt(targetDir, HAT_RENDER_CONTROLLER_PATH,
                 hatRenderControllerJson().getBytes(StandardCharsets.UTF_8));
+        // Always written so the entity's reference to it resolves even with no accessory.
+        writeAt(targetDir, HAT_ANIMATION_PATH,
+                hatAnimationJson().getBytes(StandardCharsets.UTF_8));
         writeAt(targetDir, HAT_TEXTURE_PATH,
                 accessory == null
                         ? FlatColorAtlas.paint(0x00000000, 0x00000000,
@@ -307,6 +324,8 @@ public final class CapeResourcePackBuilder {
                 + "        ],\n"
                 + "        \"animate\": [\n"
                 + "          \"root\",\n"
+                + "          \"" + CAPE_ANIMATION_ID + "\",\n"
+                + "          \"" + HAT_ANIMATION_ID + "\",\n"
                 + "          \"" + PET_ANIMATION_ID + "\"\n"
                 + "        ],\n"
                 + "        \"variables\": {\n"
@@ -330,7 +349,11 @@ public final class CapeResourcePackBuilder {
                 + "        \"look_at_target_gliding\": \"animation.humanoid.look_at_target.gliding\",\n"
                 + "        \"look_at_target_swimming\": \"animation.humanoid.look_at_target.swimming\",\n"
                 + "        \"look_at_target_inverted\": \"animation.player.look_at_target.inverted\",\n"
+                // Kept so a player who *does* wear a vanilla cape still drives our animation
+                // through the vanilla root controller; the unconditional case is covered by the
+                // animate list above, which the root controller does not gate on has_cape.
                 + "        \"cape\": \"" + CAPE_ANIMATION_ID + "\",\n"
+                + "        \"chimera_hat_tilt\": \"" + HAT_ANIMATION_ID + "\",\n"
                 + "        \"move.arms\": \"animation.player.move.arms\",\n"
                 + "        \"move.legs\": \"animation.player.move.legs\",\n"
                 + "        \"swimming\": \"animation.player.swim\",\n"
@@ -606,6 +629,37 @@ public final class CapeResourcePackBuilder {
                 + "        \"g\": 0.0,\n"
                 + "        \"b\": 0.0,\n"
                 + "        \"a\": 0.0\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "}\n";
+    }
+
+    /**
+     * The accessory's head-tilt animation.
+     *
+     * <p>The hat is a separate render-controller geometry, so it cannot be parented to the player's
+     * head bone and would otherwise stay bolt upright however the player looks. The animation
+     * drives its bone from the same target-rotation queries the vanilla head bone uses
+     * ({@code animation.humanoid.look_at_target.default} rotates {@code head} by
+     * {@code query.target_x_rotation} / {@code query.target_y_rotation}), so the hat follows the
+     * look direction exactly as the head does. The pivot is the neck, so the hat rotates with the
+     * head rather than orbiting a point inside it.
+     */
+    static String hatAnimationJson() {
+        return "{\n"
+                + "  \"format_version\": \"1.8.0\",\n"
+                + "  \"animations\": {\n"
+                + "    \"" + HAT_ANIMATION_ID + "\": {\n"
+                + "      \"loop\": true,\n"
+                + "      \"bones\": {\n"
+                + "        \"acc\": {\n"
+                + "          \"rotation\": [\n"
+                + "            \"query.target_x_rotation\",\n"
+                + "            \"query.target_y_rotation\",\n"
+                + "            0.0\n"
+                + "          ]\n"
+                + "        }\n"
                 + "      }\n"
                 + "    }\n"
                 + "  }\n"

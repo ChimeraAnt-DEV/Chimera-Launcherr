@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -248,6 +249,29 @@ public class CapeResourcePackBuilderTest {
                         .contains("\"" + CapeResourcePackBuilder.CAPE_ANIMATION_ID + "\""));
     }
 
+    /**
+     * The vanilla root controller only plays the {@code cape} key when {@code query.has_cape} is
+     * true, which is false for this unconditional cape, so the animation must also be listed
+     * directly in the entity's {@code animate} list. Without that the chain sat at its bind pose
+     * and the cape rendered stiff on device.
+     */
+    @Test
+    public void theEntityPlaysTheCapeAnimationUnconditionally() {
+        JsonObject entity = JsonParser.parseString(CapeResourcePackBuilder.playerEntityJson())
+                .getAsJsonObject()
+                .getAsJsonObject("minecraft:client_entity")
+                .getAsJsonObject("description")
+                .getAsJsonObject("scripts");
+        JsonArray animate = entity.getAsJsonArray("animate");
+        boolean listed = false;
+        for (int i = 0; i < animate.size(); i++) {
+            if (CapeResourcePackBuilder.CAPE_ANIMATION_ID.equals(animate.get(i).getAsString())) {
+                listed = true;
+            }
+        }
+        assertTrue("cape animation is in the animate list, not only the has_cape-gated key", listed);
+    }
+
     @Test
     public void packUuidIsStableSoReapplyingReplacesInPlace() {
         // A random uuid per build would accumulate one pack per cape change in the instance.
@@ -443,9 +467,47 @@ public class CapeResourcePackBuilderTest {
                     new File(dir, CapeResourcePackBuilder.HAT_RENDER_CONTROLLER_PATH).isFile());
             assertTrue("hat texture",
                     new File(dir, CapeResourcePackBuilder.HAT_TEXTURE_PATH).isFile());
+            assertTrue("hat head-tilt animation",
+                    new File(dir, CapeResourcePackBuilder.HAT_ANIMATION_PATH).isFile());
         } finally {
             deleteRecursively(dir);
         }
+    }
+
+    /**
+     * The hat is a separate render-controller geometry, so it cannot be parented to the player's
+     * head bone and would sit bolt upright however the player looks. The entity must play an
+     * animation that drives its bone from the head queries, and that animation must be listed in
+     * the animate list (not only the animations map, which nothing plays by itself).
+     */
+    @Test
+    public void theHatFollowsThePlayersHeadLook() {
+        JsonArray rotation = JsonParser.parseString(CapeResourcePackBuilder.hatAnimationJson())
+                .getAsJsonObject()
+                .getAsJsonObject("animations")
+                .getAsJsonObject(CapeResourcePackBuilder.HAT_ANIMATION_ID)
+                .getAsJsonObject("bones")
+                .getAsJsonObject("acc")
+                .getAsJsonArray("rotation");
+        assertEquals("hat tilt has one rotation triple", 3, rotation.size());
+        assertTrue("hat animation turns with the head yaw",
+                rotation.toString().contains("query.target_y_rotation"));
+        assertTrue("hat animation pitches with the head pitch",
+                rotation.toString().contains("query.target_x_rotation"));
+
+        JsonObject scripts = JsonParser.parseString(CapeResourcePackBuilder.playerEntityJson())
+                .getAsJsonObject()
+                .getAsJsonObject("minecraft:client_entity")
+                .getAsJsonObject("description")
+                .getAsJsonObject("scripts");
+        JsonArray animate = scripts.getAsJsonArray("animate");
+        boolean listed = false;
+        for (int i = 0; i < animate.size(); i++) {
+            if (CapeResourcePackBuilder.HAT_ANIMATION_ID.equals(animate.get(i).getAsString())) {
+                listed = true;
+            }
+        }
+        assertTrue("hat tilt is in the animate list so it actually plays", listed);
     }
 
     /**
