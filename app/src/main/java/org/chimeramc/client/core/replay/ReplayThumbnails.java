@@ -91,6 +91,54 @@ public final class ReplayThumbnails {
         if (file != null) CACHE.remove(key(file));
     }
 
+    /**
+     * The frame at a given position in a clip, for a hold-to-scrub preview.
+     *
+     * <p>Distinct from {@link #load}: the preview follows the finger, so it must decode at an
+     * arbitrary timestamp rather than the fixed {@link #CAPTURE_POSITION_MS}. Frames are cached
+     * per whole second so a slow drag re-decodes a handful of times rather than once per pixel.
+     * A non-finite or negative fraction is clamped, so a stray touch coordinate cannot ask for a
+     * frame past the end.
+     *
+     * @param fraction 0..1 through the clip; values outside are clamped
+     */
+    public static Bitmap frameAt(ReplayClip clip, float fraction) {
+        if (clip == null || clip.file() == null) return null;
+        File file = clip.file();
+        long durationMs = clip.durationMs();
+        if (durationMs <= 0L) durationMs = 1L;
+        float clamped = Float.isNaN(fraction) ? 0f : Math.max(0f, Math.min(1f, fraction));
+        long positionMs = (long) (clamped * durationMs);
+        // Avoid the very first sync frame, which is often the menu/fade the static thumb skips.
+        positionMs = Math.max(0L, Math.min(positionMs, durationMs - 1L));
+
+        String key = scrubKey(file, positionMs);
+        Bitmap existing = CACHE.get(key);
+        if (existing != null) return existing;
+
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(file.getAbsolutePath());
+            Bitmap frame = retriever.getFrameAtTime(positionMs * 1000L,
+                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+            if (frame == null) return null;
+            Bitmap scaled = scale(frame);
+            CACHE.put(key, scaled);
+            return scaled;
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            try {
+                retriever.release();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private static String scrubKey(File file, long positionMs) {
+        return key(file) + "@" + (positionMs / 1000L);
+    }
+
     public static void clear() {
         CACHE.evictAll();
     }

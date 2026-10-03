@@ -36,6 +36,8 @@ final class ReplayClipActionsDialog {
 
         void onExport(ReplayClip clip);
 
+        void onShare(ReplayClip clip);
+
         void onFavorite(ReplayClip clip);
 
         void onRename(ReplayClip clip);
@@ -78,6 +80,11 @@ final class ReplayClipActionsDialog {
                 v -> {
                     dialog.dismiss();
                     if (actions != null) actions.onExport(clip);
+                }));
+        root.addView(actionRow(activity, style, R.string.replay_action_share, false,
+                v -> {
+                    dialog.dismiss();
+                    if (actions != null) actions.onShare(clip);
                 }));
         root.addView(actionRow(activity, style, clip.favorite()
                         ? R.string.replay_action_unfavorite : R.string.replay_action_favorite,

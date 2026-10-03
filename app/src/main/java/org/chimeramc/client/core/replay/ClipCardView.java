@@ -37,6 +37,24 @@ final class ClipCardView extends FrameLayout {
     private Runnable onOpen;
     private Runnable onFavorite;
     private Runnable onLongPress;
+    private ScrubListener scrubListener;
+    private Bitmap staticThumbnail;
+
+    /**
+     * Hold-and-drag across a card to preview a moment in the clip.
+     *
+     * <p>A single static thumbnail cannot tell one fight clip from another, so the card supports a
+     * scrub gesture: a horizontal drag past touch slop reports a 0..1 fraction and the panel
+     * decodes the frame there. The gesture consumes its own up event so scrubbing never also opens
+     * the clip.
+     */
+    interface ScrubListener {
+        void onScrubStart(ReplayClip clip);
+
+        void onScrub(ReplayClip clip, float fraction);
+
+        void onScrubEnd(ReplayClip clip);
+    }
 
     ClipCardView(Context context, ReplayStyle style) {
         super(context);
@@ -161,8 +179,59 @@ final class ClipCardView extends FrameLayout {
             }
             return false;
         });
-        org.chimeramc.client.ui.animation.DynamicAnim.applyPressScale(this);
+        org.chimeramc.client.ui.animation.DynamicAnim.applyPressScale(this, this::handleScrubTouch);
     }
+
+    /**
+     * The scrub gesture, layered on top of the shared press feedback.
+     *
+     * <p>A horizontal drag past touch slop previews a frame at the finger's x. It is deliberately
+     * distinct from the long-press action sheet: a long press without movement still opens the
+     * sheet, while a drag scrubs. Once a scrub has begun the gesture consumes its events so the up
+     * never fires the card's click and the clip does not also open.
+     */
+    private boolean handleScrubTouch(View v, android.view.MotionEvent event) {
+        if (clip == null || scrubListener == null) return false;
+        switch (event.getActionMasked()) {
+            case android.view.MotionEvent.ACTION_DOWN:
+                scrubActive = false;
+                scrubDownX = event.getX();
+                scrubDownY = event.getY();
+                return false;
+            case android.view.MotionEvent.ACTION_MOVE: {
+                float dx = Math.abs(event.getX() - scrubDownX);
+                float dy = Math.abs(event.getY() - scrubDownY);
+                if (!scrubActive) {
+                    int slop = android.view.ViewConfiguration.get(context).getScaledTouchSlop();
+                    if (dx > slop && dx > dy) {
+                        scrubActive = true;
+                        scrubListener.onScrubStart(clip);
+                    }
+                }
+                if (scrubActive) {
+                    float width = Math.max(1f, getWidth());
+                    float fraction = Math.max(0f, Math.min(1f, event.getX() / width));
+                    scrubListener.onScrub(clip, fraction);
+                    return true;
+                }
+                return false;
+            }
+            case android.view.MotionEvent.ACTION_UP:
+            case android.view.MotionEvent.ACTION_CANCEL:
+                if (scrubActive) {
+                    scrubActive = false;
+                    scrubListener.onScrubEnd(clip);
+                    return true;
+                }
+                return false;
+            default:
+                return false;
+        }
+    }
+
+    private boolean scrubActive;
+    private float scrubDownX;
+    private float scrubDownY;
 
     void setClip(ReplayClip value) {
         this.clip = value;
@@ -175,7 +244,28 @@ final class ClipCardView extends FrameLayout {
     }
 
     void setThumbnail(Bitmap bitmap) {
+        if (bitmap == null) return;
+        staticThumbnail = bitmap;
+        thumbnail.setImageBitmap(bitmap);
+    }
+
+    /**
+     * Shows a scrub frame, keeping the original thumbnail so the preview can be dismissed.
+     *
+     * <p>A null frame (still decoding, or undecodable) leaves the current image in place rather
+     * than flashing the gradient placeholder.
+     */
+    void setScrubPreview(Bitmap bitmap) {
         if (bitmap != null) thumbnail.setImageBitmap(bitmap);
+    }
+
+    /** Restores the static thumbnail after a scrub ends. */
+    void clearScrubPreview() {
+        if (staticThumbnail != null) thumbnail.setImageBitmap(staticThumbnail);
+    }
+
+    void setScrubListener(ScrubListener listener) {
+        this.scrubListener = listener;
     }
 
     void setOnOpen(Runnable runnable) {

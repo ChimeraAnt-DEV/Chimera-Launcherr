@@ -15,6 +15,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 
 /**
  * Tier 3 export: putting a clip somewhere the player can share it from.
@@ -178,6 +179,129 @@ public final class ReplayExporter {
                 }
             }
         }
+    }
+
+    /**
+     * Concatenates several clips into one highlight reel.
+     *
+     * <p>Container-level, like {@link #trim}: the encoded samples are copied from each source in
+     * order without a decode/re-encode round trip, so the reel is lossless and fast. The first
+     * source's track layout is adopted and every later source's samples are remapped onto those
+     * tracks by MIME; a source that does not carry the first source's tracks is skipped rather
+     * than corrupting the mux.
+     *
+     * <p>Returns the new file, or null when there was nothing usable to stitch or the mux failed.
+     * The sources are never modified.
+     */
+    public static File stitch(Context context, List<ReplayClip> clips) {
+        List<ReplayClip> ordered = ReplayStitch.ordered(clips);
+        if (ordered.size() < ReplayStitch.MIN_CLIPS) return null;
+
+        ReplayClip first = ordered.get(0);
+        File target = ReplayStorage.uniqueFile(first.file().getParentFile(),
+                ReplayStitch.stitchedName());
+        MediaMuxer muxer = null;
+        boolean muxerStarted = false;
+        long timeOffsetUs = 0L;
+        try {
+            muxer = new MediaMuxer(target.getAbsolutePath(),
+                    MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+
+            // Adopt the first clip's tracks. Track MIME is what identifies a track across sources;
+            // track indices differ per file, so a straight copy of index i would mux the audio
+            // samples into the video track.
+            android.media.MediaExtractor firstExtractor = new android.media.MediaExtractor();
+            firstExtractor.setDataSource(first.file().getAbsolutePath());
+            int firstTrackCount = firstExtractor.getTrackCount();
+            String[] firstMime = new String[firstTrackCount];
+            int[] muxerTrack = new int[firstTrackCount];
+            for (int i = 0; i < firstTrackCount; i++) {
+                android.media.MediaFormat format = firstExtractor.getTrackFormat(i);
+                firstMime[i] = format.getString(android.media.MediaFormat.KEY_MIME);
+                muxerTrack[i] = muxer.addTrack(format);
+            }
+            firstExtractor.release();
+            muxer.start();
+            muxerStarted = true;
+
+            for (ReplayClip clip : ordered) {
+                long copied = appendClip(muxer, muxerTrack, firstMime, clip.file(), timeOffsetUs);
+                if (copied <= 0L) continue;
+                timeOffsetUs += copied;
+            }
+            return target;
+        } catch (Throwable t) {
+            Log.w(TAG, "Stitch failed", t);
+            //noinspection ResultOfMethodCallIgnored
+            target.delete();
+            return null;
+        } finally {
+            if (muxer != null) {
+                if (muxerStarted) {
+                    try {
+                        muxer.stop();
+                    } catch (Throwable ignored) {
+                    }
+                }
+                try {
+                    muxer.release();
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+    }
+
+    /**
+     * Copies one clip's samples onto the muxer's tracks.
+     *
+     * @return the clip's duration in microseconds, or 0 when nothing was written
+     */
+    private static long appendClip(MediaMuxer muxer, int[] muxerTrack, String[] targetMime,
+                                   File source, long timeOffsetUs) {
+        android.media.MediaExtractor extractor = new android.media.MediaExtractor();
+        long maxTimeUs = 0L;
+        try {
+            extractor.setDataSource(source.getAbsolutePath());
+            int trackCount = extractor.getTrackCount();
+            for (int i = 0; i < trackCount; i++) {
+                android.media.MediaFormat format = extractor.getTrackFormat(i);
+                String mime = format.getString(android.media.MediaFormat.KEY_MIME);
+                int target = trackIndexFor(targetMime, mime);
+                if (target < 0) continue;
+                extractor.selectTrack(i);
+                java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(1024 * 1024);
+                android.media.MediaCodec.BufferInfo info = new android.media.MediaCodec.BufferInfo();
+                while (true) {
+                    int size = extractor.readSampleData(buffer, 0);
+                    if (size < 0) break;
+                    long time = extractor.getSampleTime();
+                    info.offset = 0;
+                    info.size = size;
+                    info.presentationTimeUs = timeOffsetUs + time;
+                    info.flags = extractor.getSampleFlags();
+                    muxer.writeSampleData(muxerTrack[target], buffer, info);
+                    maxTimeUs = Math.max(maxTimeUs, time);
+                    if (!extractor.advance()) break;
+                }
+                extractor.unselectTrack(i);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Stitch: skipping unreadable clip " + source.getName(), t);
+        } finally {
+            try {
+                extractor.release();
+            } catch (Throwable ignored) {
+            }
+        }
+        return maxTimeUs;
+    }
+
+    private static int trackIndexFor(String[] mimes, String mime) {
+        if (mime == null) return -1;
+        for (int i = 0; i < mimes.length; i++) {
+            if (mime.equals(mimes[i])) return i;
+        }
+        return -1;
     }
 
     private static long readDurationUs(File file) {

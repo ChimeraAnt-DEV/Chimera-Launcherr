@@ -80,6 +80,7 @@ public final class ReplayPanel {
     private TextView filterFavorites;
     private TextView filterHighlights;
     private TextView sortButton;
+    private TextView stitchButton;
 
     private final List<TextView> filterChips = new ArrayList<>();
     private final List<ClipCardView> cards = new ArrayList<>();
@@ -390,6 +391,23 @@ public final class ReplayPanel {
         sortButton.setOnClickListener(v -> cycleSort());
         DynamicAnim.applyPressScale(sortButton);
         row.addView(sortButton);
+
+        stitchButton = new TextView(activity);
+        stitchButton.setText(R.string.replay_action_stitch);
+        stitchButton.setTextColor(style.textSecondary());
+        stitchButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f);
+        stitchButton.setBackground(ReplayStyle.rippled(
+                ReplayStyle.rounded(style.surfaceElevated(), 10f, activity),
+                style.accentFill(60), activity));
+        stitchButton.setPadding(ReplayStyle.dpInt(activity, 10), ReplayStyle.dpInt(activity, 5),
+                ReplayStyle.dpInt(activity, 10), ReplayStyle.dpInt(activity, 5));
+        LinearLayout.LayoutParams stitchParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        stitchParams.setMarginStart(ReplayStyle.dpInt(activity, 6));
+        stitchButton.setLayoutParams(stitchParams);
+        stitchButton.setOnClickListener(v -> stitchFavorites());
+        DynamicAnim.applyPressScale(stitchButton);
+        row.addView(stitchButton);
         column.addView(row);
 
         LinearLayout chips = new LinearLayout(activity);
@@ -663,6 +681,30 @@ public final class ReplayPanel {
                 highlightSelection();
                 showClipActions(clip);
             });
+            card.setScrubListener(new ClipCardView.ScrubListener() {
+                @Override
+                public void onScrubStart(ReplayClip c) {
+                    // A scrub is a preview, not a selection; it must not disturb the selected card.
+                }
+
+                @Override
+                public void onScrub(ReplayClip c, float fraction) {
+                    io.execute(() -> {
+                        final android.graphics.Bitmap frame = ReplayThumbnails.frameAt(c, fraction);
+                        if (frame == null) return;
+                        mainHandler.post(() -> {
+                            // The card may have been recycled onto another clip while the frame
+                            // decoded; only apply it if it still holds the scrubbed clip.
+                            if (card.clip() == c) card.setScrubPreview(frame);
+                        });
+                    });
+                }
+
+                @Override
+                public void onScrubEnd(ReplayClip c) {
+                    card.clearScrubPreview();
+                }
+            });
             LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                     0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
             if (i % columns != 0) cardParams.setMarginStart(ReplayStyle.dpInt(activity, 10));
@@ -726,6 +768,11 @@ public final class ReplayPanel {
                     }
 
                     @Override
+                    public void onShare(ReplayClip c) {
+                        shareClip(c);
+                    }
+
+                    @Override
                     public void onFavorite(ReplayClip c) {
                         toggleFavorite(c);
                     }
@@ -760,6 +807,48 @@ public final class ReplayPanel {
             mainHandler.post(() -> Toast.makeText(activity, uri != null
                     ? R.string.replay_exported : R.string.replay_export_failed,
                     Toast.LENGTH_SHORT).show());
+        });
+    }
+
+    /**
+     * Opens the system share sheet for a clip.
+     *
+     * <p>The chooser is launched on the UI thread and the file is handed over as a FileProvider
+     * content uri, so a receiving app can read it without any storage permission. Best-effort: a
+     * missing receiver is reported by the share helper rather than crashing the overlay.
+     */
+    private void shareClip(ReplayClip clip) {
+        if (clip == null || clip.file() == null || !clip.file().isFile()) {
+            Toast.makeText(activity, R.string.replay_share_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ReplayShareSheet.share(activity, clip);
+    }
+
+    /**
+     * Stitches the favorite clips into one reel, in the library's current order.
+     *
+     * <p>The favorites are read from the last scan rather than a fresh disk walk so the reel
+     * matches what the grid is showing. Fewer than two usable favorites is a message, not a mux:
+     * a "reel" of one clip is just that clip.
+     */
+    private void stitchFavorites() {
+        List<ReplayClip> favorites = new ArrayList<>();
+        for (ReplayClip clip : lastFiltered) {
+            if (clip.favorite()) favorites.add(clip);
+        }
+        if (!ReplayStitch.isStitchable(favorites)) {
+            Toast.makeText(activity, R.string.replay_stitch_needs_two, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        io.execute(() -> {
+            File reel = ReplayExporter.stitch(activity, favorites);
+            mainHandler.post(() -> {
+                Toast.makeText(activity, reel != null
+                        ? R.string.replay_reel_saved : R.string.replay_stitch_failed,
+                        Toast.LENGTH_SHORT).show();
+                if (reel != null) refreshLibrary();
+            });
         });
     }
 

@@ -1896,6 +1896,14 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="replay_exported">Exported to your gallery</string>
     <string name="replay_export_failed">Export failed</string>
     <string name="replay_shared">Shared</string>
+    <string name="replay_share_failed">Could not prepare the clip for sharing</string>
+    <string name="replay_share_no_app">No app on this device can receive the clip</string>
+    <string name="replay_scrub_preview_hint">Hold a card to preview a moment</string>
+    <string name="replay_action_stitch">Reel</string>
+    <string name="replay_stitch_needs_two">Favorite at least two clips to build a reel</string>
+    <string name="replay_stitch_failed">Could not build the reel</string>
+    <string name="replay_reel_saved">Highlight reel saved</string>
+    <string name="replay_stitch_hint">Stitch your favorites into one clip</string>
     <string name="replay_favorited_on">Added to favorites</string>
     <string name="replay_favorited_off">Removed from favorites</string>
     <string name="replay_settings_title">Replay settings</string>
