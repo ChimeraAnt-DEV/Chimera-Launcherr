@@ -10,6 +10,9 @@ import org.chimeramc.client.core.mods.ModManager
 import org.chimeramc.client.core.mods.ModNativeLoader
 import org.chimeramc.client.core.mods.ModSafeMode
 import org.chimeramc.client.core.minecraft.MinecraftLauncher
+import org.chimeramc.client.core.content.CapeInGameInstaller
+import org.chimeramc.client.core.cosmetics.CosmeticCatalog
+import org.chimeramc.client.core.cosmetics.CosmeticStore
 import org.chimeramc.client.core.versions.GameVersion
 import io.bambosan.mbloader.launcherUtils.LibBindings
 import org.chimeramc.client.preloader.PreloaderInput
@@ -143,6 +146,27 @@ val modsDir = modManager.currentVersion?.modsDir?.absolutePath
         } catch (error: Exception) {
             trace.error("Bundled native-mod pack synchronization failed", error.message ?: error.javaClass.simpleName)
             throw RuntimeException("Failed to prepare bundled native-mod packs", error)
+        }
+
+        // The equipped cape is written to the pack list before every launch, so entering a world
+        // shows it immediately. Applying it mid-session needs the game to refresh or relaunch, so
+        // syncing here is what lets the player equip a cape and just play. A failure is logged,
+        // never fatal: the cape is a cosmetic and must not block the launch.
+        try {
+            val profileId = MinecraftLauncher.getStorageProfileId(version)
+            val candidateRoots = LauncherStorage.getCandidateGameDataDirs(
+                context, profileId, version.versionIsolation
+            )
+            val cape = CosmeticStore(context).equippedCape
+            val stagingRoot = File(context.filesDir, "cape")
+            if (cape != null) {
+                CapeInGameInstaller.installQuietly(stagingRoot, candidateRoots, cape)
+                fileListener.onLog("Prepared in-game cape: ${cape.name}")
+            } else {
+                CapeInGameInstaller.uninstallQuietly(candidateRoots)
+            }
+        } catch (error: Exception) {
+            trace.error("Cape pack synchronization failed", error.message ?: error.javaClass.simpleName)
         }
 
         fileListener.onProgress(100,"Runtime ready", "Entering Minecraft")

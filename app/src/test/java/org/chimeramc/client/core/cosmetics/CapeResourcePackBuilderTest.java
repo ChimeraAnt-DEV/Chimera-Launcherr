@@ -138,6 +138,9 @@ public class CapeResourcePackBuilderTest {
         assertTrue("10x16x1 cape box", model.contains("\"origin\": [-5.0, 8.0, 3.0]")
                 && model.contains("\"size\": [10, 16, 1]"));
         assertTrue("standard cape UV", model.contains("\"uv\": [0, 0]"));
+        // The 180-degree turn is what puts the box front face outward; without it the artwork
+        // would face the player's back and the cape would read as inside-out.
+        assertTrue("cape bone is turned to face outward", model.contains("\"rotation\": [0.0, 180.0, 0.0]"));
     }
 
     @Test
@@ -186,6 +189,29 @@ public class CapeResourcePackBuilderTest {
         JsonObject geo = model.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
         assertEquals(CapeResourcePackBuilder.CAPE_GEOMETRY_ID,
                 geo.getAsJsonObject("description").get("identifier").getAsString());
+
+        // The cape animation must parse too: a malformed expression file is skipped silently and
+        // the cape reverts to the stiff box the animation exists to fix.
+        JsonObject animation = JsonParser.parseString(CapeResourcePackBuilder.capeAnimationJson())
+                .getAsJsonObject()
+                .getAsJsonObject("animations")
+                .getAsJsonObject(CapeResourcePackBuilder.CAPE_ANIMATION_ID);
+        assertTrue("animation drives the cape bone",
+                animation.getAsJsonObject("bones").has("cape"));
+    }
+
+    /**
+     * The vanilla player controller plays the {@code cape} key in third person and the paperdoll,
+     * so the entity must point that key at this pack's animation or the cape never animates.
+     */
+    @Test
+    public void theEntityPointsTheCapeKeyAtTheClothAnimation() {
+        String entity = CapeResourcePackBuilder.playerEntityJson();
+        assertTrue("entity binds the cape animation",
+                entity.contains("\"cape\": \"" + CapeResourcePackBuilder.CAPE_ANIMATION_ID + "\""));
+        assertTrue("the animation file is written under the same id",
+                CapeResourcePackBuilder.capeAnimationJson()
+                        .contains("\"" + CapeResourcePackBuilder.CAPE_ANIMATION_ID + "\""));
     }
 
     @Test
@@ -246,17 +272,34 @@ public class CapeResourcePackBuilderTest {
         }
     }
 
-    /** The front and back of the cape must differ, or the cape reads as a flat sheet. */
+    /**
+     * The outward-facing panel must carry the bright artwork and the panel against the player's
+     * back the darker shade. With the cape bone's {@code rotation:[0,180,0]} the outward face is
+     * the box "front" at {@link CapeTexturePainter#VISIBLE_X} (x=1), not the box back at x=12.
+     * Painting the artwork at x=12 was the "cape texture on the wrong side" bug.
+     */
     @Test
-    public void frontAndBackPanelsHaveDifferentShading() {
+    public void theOutwardPanelIsBrighterThanTheInnerPanel() {
         int[] pixels = decodeToPixels(CapeTexturePainter.paint(0xFF6236E8, 0xFFA88CFF, true));
         // Sample away from the inset trim band and the brand mark so both points are panel fill.
-        int back = pixels[14 * 64 + 14];
-        int front = pixels[8 * 64 + 6];
-        assertTrue("front and back must not be identical", back != front);
-        // Back is the bright base colour; front is a darker shade of the same hue.
-        assertTrue("back must be brighter than front",
-                ((back >>> 16) & 0xFF) > ((front >>> 16) & 0xFF));
+        int outward = pixels[8 * 64 + 6];
+        int inner = pixels[14 * 64 + 14];
+        assertTrue("outward and inner panels must not be identical", outward != inner);
+        assertTrue("the outward panel must be the brighter one",
+                ((outward >>> 16) & 0xFF) > ((inner >>> 16) & 0xFF));
+    }
+
+    /**
+     * The artwork must sit on the face the player actually sees.
+     *
+     * <p>Pinned to the concrete x ranges so a future edit cannot silently move the bright panel
+     * back onto the hidden side: the visible face is the box "front" at x=1..11.
+     */
+    @Test
+    public void theArtworkSitsOnTheVisibleFace() {
+        assertEquals(1, CapeTexturePainter.VISIBLE_X);
+        assertEquals(12, CapeTexturePainter.INNER_X);
+        assertEquals(CapeTexturePainter.VISIBLE_X, CapeTexturePainter.CLOTH_X);
     }
 
     @Test

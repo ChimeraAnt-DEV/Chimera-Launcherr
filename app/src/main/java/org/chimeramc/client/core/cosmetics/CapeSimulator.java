@@ -24,8 +24,8 @@ package org.chimeramc.client.core.cosmetics;
 public final class CapeSimulator {
 
     /** Grid resolution: enough columns that the hem curves, few enough to stay trivially cheap. */
-    public static final int COLS = 5;
-    public static final int ROWS = 7;
+    public static final int COLS = 7;
+    public static final int ROWS = 9;
 
     /** Cape width in blocks, from Minecraft's 10-px cape texture (10/16). */
     public static final float WIDTH_BLOCKS = 10f / 16f;

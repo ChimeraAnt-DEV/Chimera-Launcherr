@@ -54,12 +54,15 @@ public final class CapeResourcePackBuilder {
     public static final String CAPE_GEOMETRY_ID = "geometry.chimera_cape";
     /** Render controller that draws the cape; listed by the player client entity. */
     public static final String CAPE_CONTROLLER_ID = "controller.render.chimera_cape";
+    /** The animation that gives the cape its cloth motion; played by the {@code cape} key. */
+    public static final String CAPE_ANIMATION_ID = "animation.chimera_cape";
 
     /** Paths the pack writes. Public so diagnostics and tests can verify the pack layout. */
     public static final String PLAYER_ENTITY_PATH = "entity/player.entity.json";
     public static final String CAPE_MODEL_PATH = "models/entity/chimera_cape.geo.json";
     public static final String CAPE_RENDER_CONTROLLER_PATH =
             "render_controllers/chimera_cape.render_controllers.json";
+    public static final String CAPE_ANIMATION_PATH = "animations/chimera_cape.animation.json";
     public static final String CAPE_TEXTURE_PATH = "textures/entity/chimera_cape.png";
     static final String PACK_ICON_PATH = "pack_icon.png";
 
@@ -119,6 +122,8 @@ public final class CapeResourcePackBuilder {
                 capeModelJson().getBytes(StandardCharsets.UTF_8));
         writeAt(targetDir, CAPE_RENDER_CONTROLLER_PATH,
                 capeRenderControllerJson().getBytes(StandardCharsets.UTF_8));
+        writeAt(targetDir, CAPE_ANIMATION_PATH,
+                capeAnimationJson().getBytes(StandardCharsets.UTF_8));
         writeAt(targetDir, CAPE_TEXTURE_PATH, texture);
         writeAt(targetDir, PACK_ICON_PATH, texture);
 
@@ -243,7 +248,7 @@ public final class CapeResourcePackBuilder {
                 + "        \"look_at_target_gliding\": \"animation.humanoid.look_at_target.gliding\",\n"
                 + "        \"look_at_target_swimming\": \"animation.humanoid.look_at_target.swimming\",\n"
                 + "        \"look_at_target_inverted\": \"animation.player.look_at_target.inverted\",\n"
-                + "        \"cape\": \"animation.player.cape\",\n"
+                + "        \"cape\": \"" + CAPE_ANIMATION_ID + "\",\n"
                 + "        \"move.arms\": \"animation.player.move.arms\",\n"
                 + "        \"move.legs\": \"animation.player.move.legs\",\n"
                 + "        \"swimming\": \"animation.player.swim\",\n"
@@ -365,6 +370,7 @@ public final class CapeResourcePackBuilder {
                 + "          \"name\": \"cape\",\n"
                 + "          \"parent\": \"body\",\n"
                 + "          \"pivot\": [0.0, 24.0, 3.0],\n"
+                + "          \"bind_pose_rotation\": [0.0, 180.0, 0.0],\n"
                 + "          \"rotation\": [0.0, 180.0, 0.0],\n"
                 + "          \"cubes\": [\n"
                 + "            {\n"
@@ -377,6 +383,36 @@ public final class CapeResourcePackBuilder {
                 + "      ]\n"
                 + "    }\n"
                 + "  ]\n"
+                + "}\n";
+    }
+
+    /**
+     * The cape's cloth animation.
+     *
+     * <p>A geometry alone renders the cape as a rigid box: the vanilla player controller plays the
+     * {@code cape} animation key in third person and the paperdoll, and the pack points that key at
+     * this animation, so this is what turns a stiff plank into cloth. It drives the {@code cape}
+     * bone with the movement queries Bedrock exposes — {@code modified_move_speed},
+     * {@code is_jumping}, {@code vertical_speed} and {@code modified_distance_moved} — through the
+     * expressions {@link CapeAnimationCurve} also implements in Java, so the amplitudes have one
+     * definition rather than one per language.
+     *
+     * <p>No {@code loop} key: the default (non-looping) is what vanilla uses for this bone, and the
+     * expression is a continuous function of the queries, so it tracks the player either way.
+     */
+    static String capeAnimationJson() {
+        return "{\n"
+                + "  \"format_version\": \"1.8.0\",\n"
+                + "  \"animations\": {\n"
+                + "    \"" + CAPE_ANIMATION_ID + "\": {\n"
+                + "      \"bones\": {\n"
+                + "        \"cape\": {\n"
+                + "          \"rotation\": [\"" + CapeAnimationCurve.leanExpression() + "\", 180.0, \""
+                + CapeAnimationCurve.swayExpression() + "\"]\n"
+                + "        }\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
                 + "}\n";
     }
 
