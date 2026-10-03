@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -246,6 +247,29 @@ public class CapeResourcePackBuilderTest {
         assertTrue("the animation file is written under the same id",
                 CapeResourcePackBuilder.capeAnimationJson()
                         .contains("\"" + CapeResourcePackBuilder.CAPE_ANIMATION_ID + "\""));
+    }
+
+    /**
+     * The vanilla root controller only plays the {@code cape} key when {@code query.has_cape} is
+     * true, which is false for this unconditional cape, so the animation must also be listed
+     * directly in the entity's {@code animate} list. Without that the chain sat at its bind pose
+     * and the cape rendered stiff on device.
+     */
+    @Test
+    public void theEntityPlaysTheCapeAnimationUnconditionally() {
+        JsonObject entity = JsonParser.parseString(CapeResourcePackBuilder.playerEntityJson())
+                .getAsJsonObject()
+                .getAsJsonObject("minecraft:client_entity")
+                .getAsJsonObject("description")
+                .getAsJsonObject("scripts");
+        JsonArray animate = entity.getAsJsonArray("animate");
+        boolean listed = false;
+        for (int i = 0; i < animate.size(); i++) {
+            if (CapeResourcePackBuilder.CAPE_ANIMATION_ID.equals(animate.get(i).getAsString())) {
+                listed = true;
+            }
+        }
+        assertTrue("cape animation is in the animate list, not only the has_cape-gated key", listed);
     }
 
     @Test

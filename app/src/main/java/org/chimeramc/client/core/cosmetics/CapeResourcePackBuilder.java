@@ -54,7 +54,13 @@ public final class CapeResourcePackBuilder {
     public static final String CAPE_GEOMETRY_ID = "geometry.chimera_cape";
     /** Render controller that draws the cape; listed by the player client entity. */
     public static final String CAPE_CONTROLLER_ID = "controller.render.chimera_cape";
-    /** The animation that gives the cape its cloth motion; played by the {@code cape} key. */
+    /**
+     * The animation that gives the cape its cloth motion. It is bound to the vanilla {@code cape}
+     * key <em>and</em> listed directly in the entity's {@code animate} list: the vanilla root
+     * controller only plays the {@code cape} key when {@code query.has_cape} is true, which is
+     * false for this unconditional cape, so binding it to that key alone left the chain sitting at
+     * its bind pose and the cape rendering stiff. See {@link #playerEntityJson}.
+     */
     public static final String CAPE_ANIMATION_ID = "animation.chimera_cape";
     /** Render controller that draws the worn accessory (hat/headwear). */
     public static final String HAT_CONTROLLER_ID = "controller.render.chimera_hat";
@@ -307,6 +313,7 @@ public final class CapeResourcePackBuilder {
                 + "        ],\n"
                 + "        \"animate\": [\n"
                 + "          \"root\",\n"
+                + "          \"" + CAPE_ANIMATION_ID + "\",\n"
                 + "          \"" + PET_ANIMATION_ID + "\"\n"
                 + "        ],\n"
                 + "        \"variables\": {\n"
@@ -330,6 +337,9 @@ public final class CapeResourcePackBuilder {
                 + "        \"look_at_target_gliding\": \"animation.humanoid.look_at_target.gliding\",\n"
                 + "        \"look_at_target_swimming\": \"animation.humanoid.look_at_target.swimming\",\n"
                 + "        \"look_at_target_inverted\": \"animation.player.look_at_target.inverted\",\n"
+                // Kept so a player who *does* wear a vanilla cape still drives our animation
+                // through the vanilla root controller; the unconditional case is covered by the
+                // animate list above, which the root controller does not gate on has_cape.
                 + "        \"cape\": \"" + CAPE_ANIMATION_ID + "\",\n"
                 + "        \"move.arms\": \"animation.player.move.arms\",\n"
                 + "        \"move.legs\": \"animation.player.move.legs\",\n"
