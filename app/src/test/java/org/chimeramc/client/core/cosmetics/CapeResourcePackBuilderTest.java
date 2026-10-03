@@ -4,6 +4,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
@@ -71,17 +74,21 @@ public class CapeResourcePackBuilderTest {
     }
 
     @Test
-    public void packWritesThePathsTheGameSamples() throws Exception {
+    public void packWritesTheFilesTheRendererNeeds() throws Exception {
         File dir = Files.createTempDirectory("cape-pack").toFile();
         try {
             CapeResourcePackBuilder.BuiltPack built =
                     CapeResourcePackBuilder.build(dir, CosmeticCatalog.cape("chimera"));
 
             assertTrue("manifest", new File(dir, "manifest.json").isFile());
+            assertTrue("player client entity",
+                    new File(dir, CapeResourcePackBuilder.PLAYER_ENTITY_PATH).isFile());
+            assertTrue("cape geometry",
+                    new File(dir, CapeResourcePackBuilder.CAPE_MODEL_PATH).isFile());
+            assertTrue("cape render controller",
+                    new File(dir, CapeResourcePackBuilder.CAPE_RENDER_CONTROLLER_PATH).isFile());
             assertTrue("cape texture",
                     new File(dir, CapeResourcePackBuilder.CAPE_TEXTURE_PATH).isFile());
-            assertTrue("elytra texture",
-                    new File(dir, CapeResourcePackBuilder.ELYTRA_TEXTURE_PATH).isFile());
             assertTrue("pack icon", new File(dir, CapeResourcePackBuilder.PACK_ICON_PATH).isFile());
 
             assertNotNull(built);
@@ -89,6 +96,48 @@ public class CapeResourcePackBuilderTest {
         } finally {
             deleteRecursively(dir);
         }
+    }
+
+    /**
+     * The pack must draw the cape through the player client entity, not by overriding the
+     * persona-fetched {@code cape_invisible} texture. A future edit that quietly reverts to the
+     * texture override fails here rather than silently rendering nothing on a device.
+     */
+    @Test
+    public void theCapeIsDrawnByARenderControllerNotByOverridingTheVanillaTexture() {
+        String entity = CapeResourcePackBuilder.playerEntityJson();
+        assertTrue("player identifier", entity.contains("\"identifier\": \"minecraft:player\""));
+        assertTrue("cape geometry shortname", entity.contains("\"chimera_cape\": \"geometry.chimera_cape\""));
+        assertTrue("cape texture shortname",
+                entity.contains("\"chimera_cape\": \"textures/entity/chimera_cape.png\""));
+        assertTrue("cape controller wired", entity.contains(CapeResourcePackBuilder.CAPE_CONTROLLER_ID));
+        // Persona skins keep working only below this threshold.
+        assertTrue("min_engine_version must stay <= 1.13.0",
+                entity.contains("\"min_engine_version\": \"1.8.0\""));
+
+        String controller = CapeResourcePackBuilder.capeRenderControllerJson();
+        assertTrue("controller renders the cape geometry",
+                controller.contains("\"geometry\": \"Geometry.chimera_cape\""));
+        assertTrue("controller samples the cape texture",
+                controller.contains("\"Texture.chimera_cape\""));
+        assertTrue("controller uses the cape material",
+                controller.contains("\"Material.chimera_cape\""));
+        assertTrue("cape part is gated by visibility",
+                controller.contains("\"cape\": \"" + CapeResourcePackBuilder.capeVisibilityCondition() + "\""));
+    }
+
+    /** The cape geometry is the vanilla cape box so the texture unwrap is the standard one. */
+    @Test
+    public void theCapeGeometryIsTheStandardCapeBox() {
+        String model = CapeResourcePackBuilder.capeModelJson();
+        assertTrue("geometry id", model.contains("\"" + CapeResourcePackBuilder.CAPE_GEOMETRY_ID + "\""));
+        assertTrue("64x32 texture", model.contains("\"texture_width\": 64")
+                && model.contains("\"texture_height\": 32"));
+        assertTrue("cape bone parented to the body", model.contains("\"name\": \"cape\"")
+                && model.contains("\"parent\": \"body\""));
+        assertTrue("10x16x1 cape box", model.contains("\"origin\": [-5.0, 8.0, 3.0]")
+                && model.contains("\"size\": [10, 16, 1]"));
+        assertTrue("standard cape UV", model.contains("\"uv\": [0, 0]"));
     }
 
     @Test
@@ -102,6 +151,41 @@ public class CapeResourcePackBuilderTest {
         assertTrue("header version", manifest.contains("\"version\": [1, 0, 0]"));
         assertTrue("uuid differs from the pack uuid",
                 !CapeResourcePackBuilder.PACK_UUID.equals(CapeResourcePackBuilder.moduleUuid()));
+    }
+
+    /**
+     * Every generated file must be well-formed JSON. A malformed client-entity or render
+     * controller file is skipped by the game with no visible error, so the cape would silently not
+     * appear; parsing here catches a broken string edit before it ships.
+     */
+    @Test
+    public void everyGeneratedFileIsValidJson() {
+        JsonObject manifest = JsonParser.parseString(
+                CapeResourcePackBuilder.manifestJson()).getAsJsonObject();
+        assertTrue("manifest has a header", manifest.has("header"));
+        assertTrue("manifest has modules", manifest.getAsJsonArray("modules").size() == 1);
+
+        JsonObject entity = JsonParser.parseString(CapeResourcePackBuilder.playerEntityJson())
+                .getAsJsonObject();
+        JsonObject description = entity.getAsJsonObject("minecraft:client_entity")
+                .getAsJsonObject("description");
+        assertEquals("minecraft:player", description.get("identifier").getAsString());
+        assertTrue("entity declares the cape controller",
+                description.getAsJsonArray("render_controllers").toString()
+                        .contains(CapeResourcePackBuilder.CAPE_CONTROLLER_ID));
+
+        JsonObject controller = JsonParser.parseString(
+                        CapeResourcePackBuilder.capeRenderControllerJson())
+                .getAsJsonObject()
+                .getAsJsonObject("render_controllers")
+                .getAsJsonObject(CapeResourcePackBuilder.CAPE_CONTROLLER_ID);
+        assertEquals("Geometry.chimera_cape", controller.get("geometry").getAsString());
+
+        JsonObject model = JsonParser.parseString(CapeResourcePackBuilder.capeModelJson())
+                .getAsJsonObject();
+        JsonObject geo = model.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
+        assertEquals(CapeResourcePackBuilder.CAPE_GEOMETRY_ID,
+                geo.getAsJsonObject("description").get("identifier").getAsString());
     }
 
     @Test

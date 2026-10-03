@@ -45,10 +45,11 @@ public class CapeInGameInstallerTest {
         File rootB = temp.newFolder("root_b");
         List<File> roots = Arrays.asList(rootA, rootB);
 
-        SkinPackActivator.Result result =
+        InGamePackChanger.ApplyOutcome outcome =
                 CapeInGameInstaller.install(staging, roots, cape());
 
-        assertTrue("install should report success", result.success);
+        assertTrue("install should write to the roots",
+                outcome != InGamePackChanger.ApplyOutcome.FAILED);
         // The point of the fix: a single-root install leaves the cape invisible whenever the
         // game resolved a different root, so every candidate must actually receive the pack.
         assertTrue("root A should have the cape pack",
@@ -61,13 +62,13 @@ public class CapeInGameInstallerTest {
     }
 
     @Test
-    public void writesTheTextureTheGameSamples() throws Exception {
+    public void writesTheEntityOverrideAndCapeModelTheRendererNeeds() throws Exception {
         File staging = temp.newFolder("staging2");
         File root = temp.newFolder("root_c");
 
-        SkinPackActivator.Result result = CapeInGameInstaller.install(
+        InGamePackChanger.ApplyOutcome outcome = CapeInGameInstaller.install(
                 staging, Collections.singletonList(root), cape());
-        assertTrue(result.success);
+        assertTrue(outcome != InGamePackChanger.ApplyOutcome.FAILED);
 
         // The pack name the game looks the installed pack up by is derived from the uuid, so
         // finding the directory by scanning is the only honest check.
@@ -76,8 +77,14 @@ public class CapeInGameInstallerTest {
         assertNotNull("resource_packs should exist", packDirs);
         assertEquals("exactly one pack should be installed", 1, packDirs.length);
 
-        File capeTexture = new File(packDirs[0], "textures/entity/cape_invisible.png");
-        assertTrue("cape texture must be written at the path the game samples",
+        // The cape is drawn by the player entity override + render controller, not by replacing
+        // the persona-fetched cape_invisible texture.
+        assertTrue("player entity override must be present",
+                new File(packDirs[0], "entity/player.entity.json").isFile());
+        assertTrue("cape render controller must be present",
+                new File(packDirs[0], "render_controllers/chimera_cape.render_controllers.json").isFile());
+        File capeTexture = new File(packDirs[0], "textures/entity/chimera_cape.png");
+        assertTrue("cape texture must be written at the path the controller samples",
                 capeTexture.isFile());
         assertTrue("cape texture must not be empty", capeTexture.length() > 0);
 
@@ -93,7 +100,8 @@ public class CapeInGameInstallerTest {
         File rootB = temp.newFolder("root_e");
         List<File> roots = Arrays.asList(rootA, rootB);
 
-        assertTrue(CapeInGameInstaller.install(staging, roots, cape()).success);
+        assertTrue(CapeInGameInstaller.install(staging, roots, cape())
+                != InGamePackChanger.ApplyOutcome.FAILED);
         assertTrue(CapeInGameInstaller.uninstall(roots).success);
 
         assertFalse("root A should no longer report the cape",
@@ -103,10 +111,12 @@ public class CapeInGameInstallerTest {
     }
 
     @Test
-    public void noRootsIsAFailureNotASilentSuccess() {
+    public void noRootsIsAFailureNotASilentSuccess() throws Exception {
         // Reporting success with nothing written is the exact bug this class exists to prevent.
         assertFalse(CapeInGameInstaller.uninstall(Collections.<File>emptyList()).success);
         assertFalse(CapeInGameInstaller.isInstalled(Collections.<File>emptyList()));
+        assertEquals(InGamePackChanger.ApplyOutcome.FAILED,
+                CapeInGameInstaller.install(temp.newFolder(), Collections.<File>emptyList(), cape()));
     }
 
     @Test
@@ -117,7 +127,8 @@ public class CapeInGameInstallerTest {
         File staging = temp.newFolder("staging_array");
         File root = temp.newFolder("root_array");
 
-        assertTrue(CapeInGameInstaller.install(staging, Collections.singletonList(root), cape()).success);
+        assertTrue(CapeInGameInstaller.install(staging, Collections.singletonList(root), cape())
+                != InGamePackChanger.ApplyOutcome.FAILED);
 
         File global = new File(new File(root, "minecraftpe"), "global_resource_packs.json");
         assertTrue("global pack list must exist", global.isFile());
@@ -132,10 +143,11 @@ public class CapeInGameInstallerTest {
         File staging = temp.newFolder("staging4");
         File realRoot = temp.newFolder("root_f");
 
-        SkinPackActivator.Result result = CapeInGameInstaller.install(
+        InGamePackChanger.ApplyOutcome outcome = CapeInGameInstaller.install(
                 staging, Arrays.asList(null, realRoot), cape());
 
-        assertTrue("the real root should still be written", result.success);
+        assertTrue("the real root should still be written",
+                outcome != InGamePackChanger.ApplyOutcome.FAILED);
         assertTrue(CapeInGameInstaller.isInstalled(realRoot));
     }
 }

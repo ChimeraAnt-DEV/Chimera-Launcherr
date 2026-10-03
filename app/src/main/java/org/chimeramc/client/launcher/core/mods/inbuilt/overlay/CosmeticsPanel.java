@@ -17,6 +17,7 @@ import android.widget.Toast;
 
 import org.chimeramc.client.R;
 import org.chimeramc.client.core.content.CapeInGameInstaller;
+import org.chimeramc.client.core.content.InGamePackChanger;
 import org.chimeramc.client.core.content.SkinPackActivator;
 import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
 import org.chimeramc.client.core.cosmetics.CosmeticStore;
@@ -40,7 +41,7 @@ import java.util.List;
  * and relaunching the game.
  *
  * <p>Selecting a cape also offers to put it on the character in-game, which is done by installing
- * a resource pack that overrides the player's cape texture. See {@link CapeInGameInstaller}.
+ * a resource pack that adds a cape model to the player entity. See {@link CapeInGameInstaller}.
  */
 final class CosmeticsPanel {
 
@@ -339,9 +340,22 @@ final class CosmeticsPanel {
             toast(R.string.cosmetics_no_cape_selected);
             return;
         }
-        SkinPackActivator.Result result = CapeInGameInstaller.install(
+        InGamePackChanger.ApplyOutcome outcome = CapeInGameInstaller.install(
                 new File(activity.getFilesDir(), "cape"), gameDataDirs, cape);
-        toast(result.success ? R.string.cosmetics_applied_in_game : R.string.cosmetics_apply_failed);
+        switch (outcome) {
+            case RELOADED:
+                toast(R.string.cosmetics_applied_live);
+                break;
+            case RESTARTING:
+                toast(R.string.cosmetics_applied_restarting);
+                break;
+            case NEXT_LOAD:
+                toast(R.string.cosmetics_applied_next_load);
+                break;
+            default:
+                toast(R.string.cosmetics_apply_failed);
+                break;
+        }
         refreshGameStatus();
     }
 

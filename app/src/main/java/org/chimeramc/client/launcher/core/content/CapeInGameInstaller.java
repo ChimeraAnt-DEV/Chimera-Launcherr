@@ -10,18 +10,24 @@ import java.util.List;
 /**
  * Puts the equipped cape onto the player in the running game.
  *
- * <p>The cape is delivered as a resource pack rather than through any native hook. The pack
- * overrides the player's cape texture, so once it is active the cape selected in the dressing
- * room renders with the pack's artwork. See {@link CapeResourcePackBuilder} for why this is
- * texture-only.
+ * <p>The cape is delivered as a resource pack built by {@link CapeResourcePackBuilder}: a player
+ * client-entity render controller that draws a cape on the player's back. See that class for why
+ * this replaced the old {@code cape_invisible} texture override (a Persona-equipped cape is fetched
+ * per account and never samples that file).
  *
  * <p>Installation reuses {@link SkinPackActivator}, which is the launcher's already-proven path
  * into an instance's {@code resource_packs/} and {@code minecraftpe/global_resource_packs.json}.
- * Building a second writer for the same two files is how the two would drift and start
- * clobbering each other's entries.
+ * Building a second writer for the same two files is how the two would drift and start clobbering
+ * each other's entries.
  *
  * <p>The pack is staged into the app's private files before being applied, so a failure part-way
  * through cannot leave a half-written pack in the instance the game would then refuse to load.
+ *
+ * <p><b>Applying while the game is running.</b> After the files are written the change is pushed to
+ * the live session the same way the in-game pack changer does: an in-place reload if the build
+ * supports it, otherwise a relaunch of the same instance. The player never has to back out to the
+ * launcher, leave their world, or leave a server — the pack is written to the running world's own
+ * list and the session refreshes or relaunches around them.
  */
 public final class CapeInGameInstaller {
 
@@ -31,7 +37,8 @@ public final class CapeInGameInstaller {
     }
 
     /**
-     * Builds the cape pack for {@code cape} and makes it active for an instance.
+     * Builds the cape pack for {@code cape} and makes it active for an instance, then pushes the
+     * change to any running session.
      *
      * <p>Applies to every candidate game data root rather than one resolved path. The game picks
      * its storage from the instance's isolation setting and the player's internal/external
@@ -42,35 +49,51 @@ public final class CapeInGameInstaller {
      * @param stagingRoot the app-private directory to build the pack in
      * @param gameDataDirs the instance's candidate game data roots
      * @param cape        the cape to show, or {@code null} to install a blank pack
+     * @return what happened: {@link InGamePackChanger.ApplyOutcome#FAILED} when nothing was written,
+     *         otherwise whether the session reloaded, relaunched, or will pick it up on next load
      */
-    public static SkinPackActivator.Result install(File stagingRoot, List<File> gameDataDirs,
-                                                   CosmeticCatalog.Cape cape) {
-        if (stagingRoot == null) return failure("no staging directory");
-        if (gameDataDirs == null || gameDataDirs.isEmpty()) return failure("no instance storage");
+    public static InGamePackChanger.ApplyOutcome install(File stagingRoot, List<File> gameDataDirs,
+                                                         CosmeticCatalog.Cape cape) {
+        if (stagingRoot == null) return InGamePackChanger.ApplyOutcome.FAILED;
+        if (gameDataDirs == null || gameDataDirs.isEmpty()) {
+            return InGamePackChanger.ApplyOutcome.FAILED;
+        }
 
         File packDir = new File(stagingRoot, STAGING_DIR);
         try {
             deleteRecursively(packDir);
             CapeResourcePackBuilder.build(packDir, cape);
         } catch (IOException e) {
-            return failure(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+            return InGamePackChanger.ApplyOutcome.FAILED;
         }
 
-        SkinPackActivator.Result last = null;
-        boolean anySucceeded = false;
+        boolean wrote = false;
         for (File gameDataDir : gameDataDirs) {
             if (gameDataDir == null) continue;
-            last = SkinPackActivator.apply(packDir, gameDataDir);
-            anySucceeded |= last.success;
+            // SkinPackActivator copies the pack into resource_packs/<uuid> and records it in the
+            // global list; setActive then adds it to every running world's own pack list, which is
+            // the file the *loaded* world reads. Doing only the global list leaves a running world
+            // unchanged until it is re-entered.
+            SkinPackActivator.Result result = SkinPackActivator.apply(packDir, gameDataDir);
+            if (!result.success) continue;
+            InGamePackChanger.setActive(gameDataDir, CapeResourcePackBuilder.PACK_UUID,
+                    CapeResourcePackBuilder.PACK_VERSION, true);
+            wrote = true;
         }
-        if (anySucceeded) return SkinPackActivator.Result.ok("cape pack applied");
-        return last != null ? last : failure("no instance storage");
+        if (!wrote) return InGamePackChanger.ApplyOutcome.FAILED;
+
+        // The files are written to the global list and every running world's own list; now ask the
+        // live session to pick them up. reload -> restart -> next load, exactly like the pack
+        // changer, so the player does not have to leave the world for the cape to appear.
+        if (InGamePackChanger.requestReload()) return InGamePackChanger.ApplyOutcome.RELOADED;
+        if (InGamePackChanger.requestRestart()) return InGamePackChanger.ApplyOutcome.RESTARTING;
+        return InGamePackChanger.ApplyOutcome.NEXT_LOAD;
     }
 
     /** Backwards-compatible single-root install. */
-    public static SkinPackActivator.Result install(File stagingRoot, File gameDataDir,
-                                                   CosmeticCatalog.Cape cape) {
-        if (gameDataDir == null) return failure("no instance storage");
+    public static InGamePackChanger.ApplyOutcome install(File stagingRoot, File gameDataDir,
+                                                         CosmeticCatalog.Cape cape) {
+        if (gameDataDir == null) return InGamePackChanger.ApplyOutcome.FAILED;
         return install(stagingRoot, java.util.Collections.singletonList(gameDataDir), cape);
     }
 
@@ -82,9 +105,19 @@ public final class CapeInGameInstaller {
         for (File gameDataDir : gameDataDirs) {
             if (gameDataDir == null) continue;
             last = SkinPackActivator.unapply(gameDataDir, CapeResourcePackBuilder.PACK_UUID);
+            if (last.success) {
+                // Drop it from every running world's list too, so the cape disappears from a
+                // session already in progress rather than only on the next world load.
+                InGamePackChanger.setActive(gameDataDir, CapeResourcePackBuilder.PACK_UUID,
+                        CapeResourcePackBuilder.PACK_VERSION, false);
+            }
             anySucceeded |= last.success;
         }
-        if (anySucceeded) return SkinPackActivator.Result.ok("cape pack applied");
+        if (anySucceeded) {
+            // Drop it from the running session too, so the cape disappears without a manual reload.
+            InGamePackChanger.requestReload();
+            return SkinPackActivator.Result.ok("cape pack removed");
+        }
         return last != null ? last : failure("no instance storage");
     }
 
