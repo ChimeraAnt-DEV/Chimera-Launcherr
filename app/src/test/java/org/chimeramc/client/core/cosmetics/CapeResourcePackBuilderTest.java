@@ -189,6 +189,29 @@ public class CapeResourcePackBuilderTest {
         JsonObject geo = model.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
         assertEquals(CapeResourcePackBuilder.CAPE_GEOMETRY_ID,
                 geo.getAsJsonObject("description").get("identifier").getAsString());
+
+        // The cape animation must parse too: a malformed expression file is skipped silently and
+        // the cape reverts to the stiff box the animation exists to fix.
+        JsonObject animation = JsonParser.parseString(CapeResourcePackBuilder.capeAnimationJson())
+                .getAsJsonObject()
+                .getAsJsonObject("animations")
+                .getAsJsonObject(CapeResourcePackBuilder.CAPE_ANIMATION_ID);
+        assertTrue("animation drives the cape bone",
+                animation.getAsJsonObject("bones").has("cape"));
+    }
+
+    /**
+     * The vanilla player controller plays the {@code cape} key in third person and the paperdoll,
+     * so the entity must point that key at this pack's animation or the cape never animates.
+     */
+    @Test
+    public void theEntityPointsTheCapeKeyAtTheClothAnimation() {
+        String entity = CapeResourcePackBuilder.playerEntityJson();
+        assertTrue("entity binds the cape animation",
+                entity.contains("\"cape\": \"" + CapeResourcePackBuilder.CAPE_ANIMATION_ID + "\""));
+        assertTrue("the animation file is written under the same id",
+                CapeResourcePackBuilder.capeAnimationJson()
+                        .contains("\"" + CapeResourcePackBuilder.CAPE_ANIMATION_ID + "\""));
     }
 
     @Test

@@ -120,6 +120,7 @@ public final class CosmeticsDiagnostics {
             File packDir = new File(new File(entityRoot, "resource_packs"), uuid);
             File entity = new File(packDir, CapeResourcePackBuilder.PLAYER_ENTITY_PATH);
             File controller = new File(packDir, CapeResourcePackBuilder.CAPE_RENDER_CONTROLLER_PATH);
+            File animation = new File(packDir, CapeResourcePackBuilder.CAPE_ANIMATION_PATH);
             if (!entity.isFile()) {
                 checks.add(new Check("Player entity override present", Status.FAIL,
                         "The pack is active but has no entity/player.entity.json, so no cape model "
@@ -131,6 +132,16 @@ public final class CosmeticsDiagnostics {
             } else {
                 checks.add(new Check("Player entity override present", Status.OK,
                         "The player entity and its cape render controller are in the pack."));
+            }
+            // The cape renders without the animation, but as a rigid box; this is the difference
+            // between a plank and cloth, so a missing animation is reported rather than ignored.
+            if (!animation.isFile()) {
+                checks.add(new Check("Cape animation present", Status.FAIL,
+                        "The pack has no cape animation, so the cape renders stiff. Re-apply the "
+                                + "cape to rebuild the pack."));
+            } else {
+                checks.add(new Check("Cape animation present", Status.OK,
+                        "The cape animation is in the pack, so the cloth moves with the player."));
             }
         }
 
