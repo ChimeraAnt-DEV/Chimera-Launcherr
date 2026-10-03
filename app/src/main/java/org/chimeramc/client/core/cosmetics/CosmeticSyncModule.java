@@ -179,12 +179,38 @@ public final class CosmeticSyncModule {
                 System.arraycopy(packet.getData(), packet.getOffset(), data, 0, packet.getLength());
                 CosmeticSyncProtocol.Advert advert = CosmeticSyncProtocol.decode(data);
                 // Our own multicast echo comes back to us; the peer id filters it.
-                if (advert != null && !advert.peerId.isEmpty() && !advert.peerId.equals(peerId)) {
-                    registry.put(advert);
+                if (advert == null || advert.peerId.isEmpty() || advert.peerId.equals(peerId)) {
+                    continue;
                 }
+                if (advert.isRequest()) {
+                    // A peer asked everyone to state their set now, so answer immediately rather
+                    // than making them wait for the slow timer. This is what makes cosmetics
+                    // appear promptly when someone joins the world.
+                    announce();
+                    continue;
+                }
+                // The first time we hear a peer, ask them (and the group) to re-state their set,
+                // so a player who joined after us is not invisible until their next timer tick.
+                boolean firstSight = !registry.contains(advert.peerId);
+                registry.put(advert);
+                if (firstSight) requestAll();
             } catch (IOException e) {
                 if (!running.get()) break; // the socket was closed by stop()
             }
+        }
+    }
+
+    /** Asks every listener to re-advertise immediately; used when a new peer is first heard. */
+    private void requestAll() {
+        MulticastSocket target = socket;
+        if (target == null || !running.get()) return;
+        try {
+            byte[] data = CosmeticSyncProtocol.encodeRequest(peerId, displayName);
+            if (data.length == 0) return;
+            target.send(new DatagramPacket(data, data.length,
+                    InetAddress.getByName(GROUP), PORT));
+        } catch (IOException e) {
+            // The peer's own timer will eventually reach us; a lost request is not fatal.
         }
     }
 

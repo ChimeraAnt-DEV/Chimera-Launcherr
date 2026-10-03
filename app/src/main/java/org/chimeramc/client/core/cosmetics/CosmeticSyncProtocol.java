@@ -33,8 +33,17 @@ public final class CosmeticSyncProtocol {
     public static final byte[] MAGIC = {'C', 'S'};
     public static final byte VERSION = 1;
 
-    /** The only packet type today; room to add "request" or "hello" without a version bump. */
+    /** A full advertisement of the sender's equipped set. */
     public static final byte TYPE_ADVERTISE = 1;
+
+    /**
+     * A prompt to re-advertise immediately.
+     *
+     * <p>Sent when a peer is first heard: multicast announcements are periodic, so a player who
+     * joins after us could wait a full interval to be told what we wear. The request makes every
+     * listener answer at once, which is what makes cosmetics appear promptly "on join".
+     */
+    public static final byte TYPE_REQUEST = 2;
 
     /** Caps a string so a hostile sender cannot make us allocate without bound. */
     public static final int MAX_STRING = 64;
@@ -45,32 +54,51 @@ public final class CosmeticSyncProtocol {
     private CosmeticSyncProtocol() {
     }
 
-    /** A decoded advertisement. Ids are never null; an absent cosmetic is {@link CosmeticCatalog#NONE}. */
+    /** A decoded packet. Ids are never null; an absent cosmetic is {@link CosmeticCatalog#NONE}. */
     public static final class Advert {
+        /** {@link #TYPE_ADVERTISE} or {@link #TYPE_REQUEST}. */
+        public final byte type;
         public final String peerId;
         public final String name;
         public final String capeId;
         public final String accessoryId;
         public final String petId;
 
-        Advert(String peerId, String name, String capeId, String accessoryId, String petId) {
+        Advert(byte type, String peerId, String name, String capeId, String accessoryId,
+               String petId) {
+            this.type = type;
             this.peerId = peerId == null ? "" : peerId;
             this.name = name == null ? "" : name;
             this.capeId = capeId == null ? CosmeticCatalog.NONE : capeId;
             this.accessoryId = accessoryId == null ? CosmeticCatalog.NONE : accessoryId;
             this.petId = petId == null ? CosmeticCatalog.NONE : petId;
         }
+
+        public boolean isRequest() {
+            return type == TYPE_REQUEST;
+        }
     }
 
     /** Encodes one advertisement. Null ids become {@link CosmeticCatalog#NONE}. */
     public static byte[] encode(String peerId, String name, String capeId, String accessoryId,
                                 String petId) {
+        return encode(TYPE_ADVERTISE, peerId, name, capeId, accessoryId, petId);
+    }
+
+    /** Encodes a request for peers to re-advertise immediately. */
+    public static byte[] encodeRequest(String peerId, String name) {
+        return encode(TYPE_REQUEST, peerId, name,
+                CosmeticCatalog.NONE, CosmeticCatalog.NONE, CosmeticCatalog.NONE);
+    }
+
+    private static byte[] encode(byte type, String peerId, String name, String capeId,
+                                 String accessoryId, String petId) {
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             DataOutputStream out = new DataOutputStream(bytes);
             out.write(MAGIC);
             out.writeByte(VERSION);
-            out.writeByte(TYPE_ADVERTISE);
+            out.writeByte(type);
             writeString(out, peerId);
             writeString(out, name);
             writeString(out, capeId == null ? CosmeticCatalog.NONE : capeId);
@@ -93,13 +121,13 @@ public final class CosmeticSyncProtocol {
             in.skipBytes(MAGIC.length);
             in.readByte(); // version, already checked
             byte type = in.readByte();
-            if (type != TYPE_ADVERTISE) return null;
+            if (type != TYPE_ADVERTISE && type != TYPE_REQUEST) return null;
             String peerId = readString(in);
             String name = readString(in);
             String capeId = readString(in);
             String accessoryId = readString(in);
             String petId = readString(in);
-            return new Advert(peerId, name, capeId, accessoryId, petId);
+            return new Advert(type, peerId, name, capeId, accessoryId, petId);
         } catch (IOException e) {
             return null;
         }

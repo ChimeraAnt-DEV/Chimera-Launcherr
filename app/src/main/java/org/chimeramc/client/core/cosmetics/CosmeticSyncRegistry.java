@@ -21,10 +21,19 @@ public final class CosmeticSyncRegistry {
 
     private final Map<String, CosmeticSyncProtocol.Advert> byPeer = new LinkedHashMap<>();
 
-    /** Records (or refreshes) a peer's advertisement. An advert with no peer id is ignored. */
+    /**
+     * Records (or refreshes) a peer's advertisement. An advert with no peer id is ignored, and a
+     * {@link CosmeticSyncProtocol#TYPE_REQUEST} is not stored: it carries no cosmetics, it only
+     * asks us to send ours.
+     */
     public synchronized void put(CosmeticSyncProtocol.Advert advert) {
-        if (advert == null || advert.peerId.isEmpty()) return;
+        if (advert == null || advert.isRequest() || advert.peerId.isEmpty()) return;
         byPeer.put(advert.peerId, advert);
+    }
+
+    /** Whether a peer is already known, so a first sighting can be told apart from a routine one. */
+    public synchronized boolean contains(String peerId) {
+        return peerId != null && byPeer.containsKey(peerId);
     }
 
     /** Removes a peer that has left. */

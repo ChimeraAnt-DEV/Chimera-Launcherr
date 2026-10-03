@@ -52,6 +52,20 @@ public class CosmeticSyncTest {
                 CosmeticSyncProtocol.VERSION, CosmeticSyncProtocol.TYPE_ADVERTISE, 0, 5}));
     }
 
+    /** A request carries no cosmetics and must not be stored as one; it only prompts a reply. */
+    @Test
+    public void aRequestIsDecodedButNotStored() {
+        byte[] data = CosmeticSyncProtocol.encodeRequest("peer-1", "Alex");
+        CosmeticSyncProtocol.Advert advert = CosmeticSyncProtocol.decode(data);
+        assertNotNull(advert);
+        assertTrue(advert.isRequest());
+        assertEquals("peer-1", advert.peerId);
+
+        CosmeticSyncRegistry registry = new CosmeticSyncRegistry();
+        registry.put(advert);
+        assertEquals("a request is not an advert", 0, registry.size());
+    }
+
     @Test
     public void registryKeepsTheLatestAdvertPerPeer() {
         CosmeticSyncRegistry registry = new CosmeticSyncRegistry();
