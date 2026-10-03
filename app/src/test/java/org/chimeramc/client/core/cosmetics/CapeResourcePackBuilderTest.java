@@ -467,9 +467,47 @@ public class CapeResourcePackBuilderTest {
                     new File(dir, CapeResourcePackBuilder.HAT_RENDER_CONTROLLER_PATH).isFile());
             assertTrue("hat texture",
                     new File(dir, CapeResourcePackBuilder.HAT_TEXTURE_PATH).isFile());
+            assertTrue("hat head-tilt animation",
+                    new File(dir, CapeResourcePackBuilder.HAT_ANIMATION_PATH).isFile());
         } finally {
             deleteRecursively(dir);
         }
+    }
+
+    /**
+     * The hat is a separate render-controller geometry, so it cannot be parented to the player's
+     * head bone and would sit bolt upright however the player looks. The entity must play an
+     * animation that drives its bone from the head queries, and that animation must be listed in
+     * the animate list (not only the animations map, which nothing plays by itself).
+     */
+    @Test
+    public void theHatFollowsThePlayersHeadLook() {
+        JsonArray rotation = JsonParser.parseString(CapeResourcePackBuilder.hatAnimationJson())
+                .getAsJsonObject()
+                .getAsJsonObject("animations")
+                .getAsJsonObject(CapeResourcePackBuilder.HAT_ANIMATION_ID)
+                .getAsJsonObject("bones")
+                .getAsJsonObject("acc")
+                .getAsJsonArray("rotation");
+        assertEquals("hat tilt has one rotation triple", 3, rotation.size());
+        assertTrue("hat animation turns with the head yaw",
+                rotation.toString().contains("query.head_y_rotation"));
+        assertTrue("hat animation pitches with the head pitch",
+                rotation.toString().contains("query.head_x_rotation"));
+
+        JsonObject scripts = JsonParser.parseString(CapeResourcePackBuilder.playerEntityJson())
+                .getAsJsonObject()
+                .getAsJsonObject("minecraft:client_entity")
+                .getAsJsonObject("description")
+                .getAsJsonObject("scripts");
+        JsonArray animate = scripts.getAsJsonArray("animate");
+        boolean listed = false;
+        for (int i = 0; i < animate.size(); i++) {
+            if (CapeResourcePackBuilder.HAT_ANIMATION_ID.equals(animate.get(i).getAsString())) {
+                listed = true;
+            }
+        }
+        assertTrue("hat tilt is in the animate list so it actually plays", listed);
     }
 
     /**

@@ -39,11 +39,18 @@ public class CosmeticsDiagnosticsTest {
             File entity = new File(pack, "entity/player.entity.json");
             assertTrue(entity.getParentFile().mkdirs());
             try (FileWriter w = new FileWriter(entity)) {
-                w.write("{}");
+                w.write("{\"minecraft:client_entity\":{\"description\":{\"scripts\":{\"animate\":"
+                        + "[\"root\",\"animation.chimera_cape\",\"animation.chimera_hat_tilt\","
+                        + "\"animation.chimera_pet\"]}}}}");
             }
             File controller = new File(pack, "render_controllers/chimera_cape.render_controllers.json");
             assertTrue(controller.getParentFile().mkdirs());
             try (FileWriter w = new FileWriter(controller)) {
+                w.write("{}");
+            }
+            File animation = new File(pack, "animations/chimera_cape.animation.json");
+            assertTrue(animation.getParentFile().mkdirs());
+            try (FileWriter w = new FileWriter(animation)) {
                 w.write("{}");
             }
         }
@@ -104,6 +111,42 @@ public class CosmeticsDiagnosticsTest {
 
         assertEquals(CosmeticsDiagnostics.Status.FAIL,
                 find(checks, "entity override").status);
+    }
+
+    /**
+     * A cape animation file in the pack is not the same as the game playing it: the vanilla root
+     * controller gates the cape key on query.has_cape, so the animation must also be in the
+     * entity's animate list. The diagnostics must fail a pack whose animation exists but is not
+     * played, which is the on-device "cape renders stiff" symptom.
+     */
+    @Test
+    public void anAnimationPresentButNotPlayedFails() throws Exception {
+        File root = folder.newFolder("root");
+        File pack = writtenPack(root, "1, 20, 0");
+        activate(root);
+        // Overwrite the entity with one whose animate list omits the cape animation.
+        try (FileWriter w = new FileWriter(new File(pack, "entity/player.entity.json"))) {
+            w.write("{\"minecraft:client_entity\":{\"description\":{\"scripts\":{\"animate\":"
+                    + "[\"root\"]}}}}");
+        }
+
+        List<CosmeticsDiagnostics.Check> checks = CosmeticsDiagnostics.run(
+                Arrays.asList(root), null, "1.26.60.28");
+
+        assertEquals(CosmeticsDiagnostics.Status.FAIL,
+                find(checks, "cape animation").status);
+    }
+
+    @Test
+    public void aPlayedAnimationPassesTheCapeAnimationCheck() throws Exception {
+        File root = folder.newFolder("root");
+        writtenPack(root, "1, 20, 0");
+        activate(root);
+
+        List<CosmeticsDiagnostics.Check> checks = CosmeticsDiagnostics.run(
+                Arrays.asList(root), null, "1.26.60.28");
+
+        assertEquals(CosmeticsDiagnostics.Status.OK, find(checks, "cape animation").status);
     }
 
     @Test
