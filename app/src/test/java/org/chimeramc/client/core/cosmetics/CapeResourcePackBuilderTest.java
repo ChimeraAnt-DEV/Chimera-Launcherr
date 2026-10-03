@@ -90,6 +90,9 @@ public class CapeResourcePackBuilderTest {
             assertTrue("cape texture",
                     new File(dir, CapeResourcePackBuilder.CAPE_TEXTURE_PATH).isFile());
             assertTrue("pack icon", new File(dir, CapeResourcePackBuilder.PACK_ICON_PATH).isFile());
+            // Written even with no pet, so the entity's reference to it always resolves.
+            assertTrue("pet animation",
+                    new File(dir, CapeResourcePackBuilder.PET_ANIMATION_PATH).isFile());
 
             assertNotNull(built);
             assertEquals(CapeResourcePackBuilder.PACK_UUID, built.uuid);
@@ -151,7 +154,11 @@ public class CapeResourcePackBuilderTest {
         assertTrue("module uuid", manifest.contains(CapeResourcePackBuilder.moduleUuid()));
         // A pack with no resources module imports but applies nothing.
         assertTrue("resources module", manifest.contains("\"type\": \"resources\""));
-        assertTrue("header version", manifest.contains("\"version\": [1, 0, 0]"));
+        // Derived from the constant so a version bump does not need this test edited, while a
+        // version that stopped matching the code would still fail here.
+        assertTrue("header version",
+                manifest.contains("\"version\": [" + CapeResourcePackBuilder.PACK_VERSION
+                        .replace(".", ", ") + "]"));
         assertTrue("uuid differs from the pack uuid",
                 !CapeResourcePackBuilder.PACK_UUID.equals(CapeResourcePackBuilder.moduleUuid()));
     }
@@ -198,6 +205,23 @@ public class CapeResourcePackBuilderTest {
                 .getAsJsonObject(CapeResourcePackBuilder.CAPE_ANIMATION_ID);
         assertTrue("animation drives the cape bone",
                 animation.getAsJsonObject("bones").has("cape"));
+
+        // The hat and pet controllers and the pet animation must parse too, for the same reason.
+        JsonObject hatController = JsonParser.parseString(
+                        CapeResourcePackBuilder.hatRenderControllerJson())
+                .getAsJsonObject()
+                .getAsJsonObject("render_controllers")
+                .getAsJsonObject(CapeResourcePackBuilder.HAT_CONTROLLER_ID);
+        assertEquals("Geometry.chimera_hat", hatController.get("geometry").getAsString());
+
+        JsonObject petController = JsonParser.parseString(
+                        CapeResourcePackBuilder.petRenderControllerJson())
+                .getAsJsonObject()
+                .getAsJsonObject("render_controllers")
+                .getAsJsonObject(CapeResourcePackBuilder.PET_CONTROLLER_ID);
+        assertEquals("Geometry.chimera_pet", petController.get("geometry").getAsString());
+
+        JsonParser.parseString(CapeResourcePackBuilder.petAnimationJson()).getAsJsonObject();
     }
 
     /**
@@ -366,6 +390,127 @@ public class CapeResourcePackBuilderTest {
     private static int readInt(byte[] data, int offset) {
         return ((data[offset] & 0xFF) << 24) | ((data[offset + 1] & 0xFF) << 16)
                 | ((data[offset + 2] & 0xFF) << 8) | (data[offset + 3] & 0xFF);
+    }
+
+    /**
+     * A worn accessory must reach the game through the same first-party route as the cape: a
+     * render controller on the player, not a texture override. An accessory-less pack writes no
+     * hat model, but the entity still names the controller so the two cases share one entity file.
+     */
+    @Test
+    public void theWornAccessoryIsDrawnByARenderController() {
+        String entity = CapeResourcePackBuilder.playerEntityJson();
+        assertTrue("hat geometry shortname",
+                entity.contains("\"chimera_hat\": \"" + AccessoryGeometry.GEOMETRY_ID + "\""));
+        assertTrue("hat texture shortname",
+                entity.contains("\"chimera_hat\": \"" + CapeResourcePackBuilder.HAT_TEXTURE_PATH + "\""));
+        assertTrue("hat controller wired",
+                entity.contains(CapeResourcePackBuilder.HAT_CONTROLLER_ID));
+
+        JsonObject controller = JsonParser.parseString(
+                        CapeResourcePackBuilder.hatRenderControllerJson())
+                .getAsJsonObject()
+                .getAsJsonObject("render_controllers")
+                .getAsJsonObject(CapeResourcePackBuilder.HAT_CONTROLLER_ID);
+        assertEquals("Geometry.chimera_hat", controller.get("geometry").getAsString());
+        assertTrue("controller samples the hat texture",
+                controller.toString().contains("Texture.chimera_hat"));
+        assertTrue("controller uses the hat material",
+                controller.toString().contains("Material.chimera_hat"));
+    }
+
+    /** A pack built with an accessory writes the hat model, controller and texture. */
+    @Test
+    public void packWritesTheAccessoryFilesWhenOneIsEquipped() throws Exception {
+        File dir = Files.createTempDirectory("hat-pack").toFile();
+        try {
+            CosmeticCatalog.Accessory accessory = CosmeticCatalog.accessory("amethyst_crown");
+            CapeResourcePackBuilder.build(dir, null, accessory);
+
+            assertTrue("hat geometry",
+                    new File(dir, CapeResourcePackBuilder.HAT_MODEL_PATH).isFile());
+            assertTrue("hat render controller",
+                    new File(dir, CapeResourcePackBuilder.HAT_RENDER_CONTROLLER_PATH).isFile());
+            assertTrue("hat texture",
+                    new File(dir, CapeResourcePackBuilder.HAT_TEXTURE_PATH).isFile());
+        } finally {
+            deleteRecursively(dir);
+        }
+    }
+
+    /**
+     * With no accessory the pack still writes a hat geometry, but an empty one: the player entity
+     * always names the geometry, and a reference that does not resolve can fail the whole client
+     * entity (taking the cape with it). An empty bone draws nothing.
+     */
+    @Test
+    public void packWritesAResolvingButEmptyAccessoryGeometryWithoutOne() throws Exception {
+        File dir = Files.createTempDirectory("no-hat-pack").toFile();
+        try {
+            CapeResourcePackBuilder.build(dir, CosmeticCatalog.cape("chimera"), null);
+            File hat = new File(dir, CapeResourcePackBuilder.HAT_MODEL_PATH);
+            assertTrue("hat geometry is always written so the reference resolves", hat.isFile());
+
+            JsonObject geometry = JsonParser.parseString(
+                            new String(Files.readAllBytes(hat.toPath()), StandardCharsets.UTF_8))
+                    .getAsJsonObject()
+                    .getAsJsonArray("minecraft:geometry")
+                    .get(0)
+                    .getAsJsonObject();
+            int cubes = geometry.getAsJsonArray("bones").get(0).getAsJsonObject()
+                    .getAsJsonArray("cubes").size();
+            assertEquals("empty geometry draws nothing", 0, cubes);
+        } finally {
+            deleteRecursively(dir);
+        }
+    }
+
+    /**
+     * The pet reaches the game the same first-party way as the cape and hat: a render controller
+     * on the player, with the pet animation always present so the entity's reference resolves.
+     */
+    @Test
+    public void thePetIsDrawnByARenderController() {
+        String entity = CapeResourcePackBuilder.playerEntityJson();
+        assertTrue("pet geometry shortname",
+                entity.contains("\"chimera_pet\": \"" + PetGeometry.GEOMETRY_ID + "\""));
+        assertTrue("pet texture shortname",
+                entity.contains("\"chimera_pet\": \"" + CapeResourcePackBuilder.PET_TEXTURE_PATH + "\""));
+        assertTrue("pet controller wired",
+                entity.contains(CapeResourcePackBuilder.PET_CONTROLLER_ID));
+        assertTrue("pet animation always referenced",
+                entity.contains("\"" + CapeResourcePackBuilder.PET_ANIMATION_ID + "\""));
+
+        JsonObject controller = JsonParser.parseString(
+                        CapeResourcePackBuilder.petRenderControllerJson())
+                .getAsJsonObject()
+                .getAsJsonObject("render_controllers")
+                .getAsJsonObject(CapeResourcePackBuilder.PET_CONTROLLER_ID);
+        assertEquals("Geometry.chimera_pet", controller.get("geometry").getAsString());
+        assertTrue("controller samples the pet texture",
+                controller.toString().contains("Texture.chimera_pet"));
+    }
+
+    /** A pack built with a pet writes the pet model, controller, texture and animation. */
+    @Test
+    public void packWritesThePetFilesWhenOneIsEquipped() throws Exception {
+        File dir = Files.createTempDirectory("pet-pack").toFile();
+        try {
+            CapeResourcePackBuilder.build(dir, null, null,
+                    new CosmeticCatalog.Pet("test", "Test",
+                            CosmeticCatalog.PetSpecies.CAT, 0xFF6236E8, 0xFFA88CFF, 1f));
+
+            assertTrue("pet geometry",
+                    new File(dir, CapeResourcePackBuilder.PET_MODEL_PATH).isFile());
+            assertTrue("pet render controller",
+                    new File(dir, CapeResourcePackBuilder.PET_RENDER_CONTROLLER_PATH).isFile());
+            assertTrue("pet texture",
+                    new File(dir, CapeResourcePackBuilder.PET_TEXTURE_PATH).isFile());
+            assertTrue("pet animation",
+                    new File(dir, CapeResourcePackBuilder.PET_ANIMATION_PATH).isFile());
+        } finally {
+            deleteRecursively(dir);
+        }
     }
 
     private static void deleteRecursively(File file) {

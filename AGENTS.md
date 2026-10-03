@@ -1140,3 +1140,39 @@ these are the conclusions.
   seam.** `VoiceNametagOverlay.cameraSource()` is only installed when voice chat starts, so a player
   with voice off could never draw the peer boxes even though the peer feed worked. The rest of the
   PvP suite already read the camera directly for the same reason.
+
+## Cosmetics in-game: attachable mechanism, and why the static cape texture is not the fix
+- **The static `textures/entity/cape_invisible.png` override is a dead end for this build.** The
+  shipped binary routes an *equipped* cape through Microsoft's Persona cosmetics system
+  (`persona_capes`, `persona.cape.texture_`, `PersonaNetworkHandlerDelegate::_fetchLodSkinTexture`),
+  whose texture is fetched per account rather than read from that fixed slot. A resource pack that
+  overrides the slot therefore changes a file the renderer does not consult for the case that
+  matters, which is why a cape could be "applied successfully" and still never show.
+- **`cosmetics_scope_note` describes the honest model**: all three cosmetics are drawn on the
+  player's own client entity by the generated pack, so only Chimera users (via cosmetic sync) see
+  them - vanilla players cannot, because Bedrock offers no app API to push a cosmetic onto another
+  account. Keep it in step with the feature or the UI over-claims.
+- Pets and hats are drawn **on your own player**, never spawned: `/summon` is a server-side command
+  that would flag the account, so the client-entity route is the only server-safe one.
+- **A named geometry that does not resolve can fail the whole client entity.** `AccessoryGeometry`
+  and `PetGeometry` always emit a resolving-but-empty mesh for "none equipped", so the player
+  entity's geometry references resolve and the cape is not dragged down with them.
+- **In-place pack reload is not implemented in this build.** The preloader exports no
+  `nativeReloadResourcePacks`, so a running world keeps its cached pack stack; the supported apply
+  path relaunches the instance (`MinecraftSessionRestarter`). Do not promise a live recolour.
+
+## Cosmetic sync (core.cosmetics.CosmeticSync*) - cross-player cosmetic visibility
+- A **separate wire protocol** (`CosmeticSyncProtocol`, magic `CS`, own group/port) exists beside
+  `VoiceProtocol` on purpose: voice's wire format is pinned cross-language by golden vectors, so a
+  cosmetic field must not be folded into it. Cosmetic sync only ever carries catalogue **ids**;
+  each client resolves them against its own catalogue, so a new cape is a catalogue entry, not a
+  protocol change, and an unknown id degrades to "no cosmetic" rather than a crash or placeholder.
+- The registry keeps the **latest advert per peer** and `contains(peerId)` distinguishes a first
+  sighting from a routine refresh. On a first sighting the module sends a `TYPE_REQUEST` so a
+  player who joined after us is not invisible until their next timer tick - this is the "capes
+  don't sync on join" fix. A request carries no cosmetics and is never stored as an advert.
+- Started/stopped with the game session from `InbuiltOverlayManager` (`startCosmeticSync` / hide
+  path), and the panel can toggle it via `InbuiltModManager.isCosmeticSyncEnabled`. Changing a
+  cosmetic calls `CosmeticSyncModule.requestAnnounce()` so a swap is advertised immediately.
+- The Cosmetics panel's sync line is honest about state: off / "starts with the game" (no session) /
+  "N peers can see you".

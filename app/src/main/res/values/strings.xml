@@ -856,10 +856,16 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="cosmetics_gait_swim">Swim</string>
     <string name="cosmetics_none">None</string>
     <string name="cosmetics_equipped">Equipped %1$s</string>
-    <string name="cosmetics_scope_note">Capes, accessories and pets are launcher-side looks. The preview shows your own skin wearing the equipped cape, accessory and pet, and pets animate their walk, run, crouch, fly and swim gaits here. Only the cape can reach the running game: Apply in game installs a resource pack that adds a cape model to the player entity for the selected instance, so only you see it and only while that pack is applied. Accessories and pets are preview-only — Bedrock gives a launcher no way to spawn a client-side companion. Cape movement is drawn in the preview; in-game the pack supplies a still model, so the cape itself does not animate.</string>
+    <string name="cosmetics_scope_note">Capes, accessories and pets are launcher-side looks. The preview shows your own skin wearing the equipped cape, accessory and pet, and pets animate their walk, run, crouch, fly and swim gaits here. All three can reach the running game: Apply in game installs a resource pack that draws a cape, a hat and a pet on the player entity for the selected instance, and cosmetic sync shows them to other Chimera users in the same world. Vanilla players do not see them — Bedrock gives an app no way to push a cosmetic onto someone else\'s account — and the pet is drawn on your own player rather than spawned as an entity, so it needs no server command and cannot trip a server check. Cape movement is drawn in the preview; in-game the pack supplies a still cape model plus a gentle idle bob for the pet.</string>
+    <string name="accessory_style_note">Each style is a real, different mesh — a cap, a beanie, a crown, horns, a halo and so on are separate geometry. Every palette then tints those meshes, so "Amethyst Crown" and "Ember Crown" are the same shape in different colours while "Amethyst Crown" and "Amethyst Cap" are different shapes.</string>
     <string name="cosmetics_in_game">On your character in-game</string>
     <string name="cosmetics_apply_in_game">Apply in game</string>
     <string name="cosmetics_remove_in_game">Remove</string>
+    <string name="cosmetics_sync_off">Cosmetic sync is off — other Chimera users cannot see your cosmetics.</string>
+    <string name="cosmetics_sync_with_game">Cosmetic sync starts with the game, so other Chimera users in the same world can see your equipped cape, accessory and pet — and you can see theirs.</string>
+    <string name="cosmetics_sync_seen">Cosmetic sync is on — %1$d other Chimera user(s) in this world can see your cosmetics.</string>
+    <string name="cosmetics_sync_toggle_on">Turn on cosmetic sync</string>
+    <string name="cosmetics_sync_toggle_off">Turn off cosmetic sync</string>
     <string name="cosmetics_in_game_installed">Applied to the selected instance. If a session is running it reloads or relaunches to show it.</string>
     <string name="cosmetics_in_game_not_installed">Not applied yet. Apply it to wear this cape in the selected instance.</string>
     <string name="cosmetics_applied_in_game">Cape applied — launch the instance to see it</string>
@@ -870,7 +876,7 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="cosmetics_apply_failed">Could not apply the cape to this instance</string>
     <string name="cosmetics_remove_failed">Could not remove the cape from this instance</string>
     <string name="cosmetics_no_instance">No instance selected — pick one in Versions first</string>
-    <string name="cosmetics_no_cape_selected">Select a cape first</string>
+    <string name="cosmetics_no_cape_selected">Select a cape, accessory or pet first</string>
     <string name="cosmetics_preview_description">Preview of your character wearing the selected cape and accessory</string>
     <string name="cosmetics_skin_source">Skin: %1$s</string>
     <string name="cosmetics_skin_fallback">Showing the default character — no skin pack is applied for this instance yet. Apply one in Customize → Skins and it will appear here.</string>
