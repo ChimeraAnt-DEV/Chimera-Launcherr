@@ -99,4 +99,87 @@ public class CapeAnimationCurveTest {
         assertTrue("sway frequency", sway.contains("41.0"));
         assertTrue("sway distance query", sway.contains("query.modified_distance_moved"));
     }
+
+    @Test
+    public void segmentSharesRampFromShouldersToHemAndSumToOne() {
+        int total = CapeGeometry.SEGMENT_COUNT;
+        double sum = 0.0;
+        for (int i = 1; i <= total; i++) {
+            sum += CapeAnimationCurve.segmentShare(i, total);
+        }
+        // The sum is what keeps the total bend equal to the single-bone lean; a non-unit sum would
+        // make the segmented cape lean further than the one it replaces.
+        assertEquals(1.0, sum, 1e-9);
+        // The hem carries the most and the shoulders the least, which is what reads as a fold.
+        assertTrue("hem carries more than shoulders",
+                CapeAnimationCurve.segmentShare(total, total)
+                        > CapeAnimationCurve.segmentShare(1, total));
+        assertTrue("every segment carries some bend",
+                CapeAnimationCurve.segmentShare(1, total) > 0.0);
+    }
+
+    @Test
+    public void aStandingStillChainIsAtRest() {
+        int total = CapeGeometry.SEGMENT_COUNT;
+        for (int i = 1; i <= total; i++) {
+            assertEquals("segment " + i + " lean at rest", 0.0,
+                    CapeAnimationCurve.segmentLeanDegrees(i, total, 0.0, false, 0.0, 0.0), 1e-9);
+            assertEquals("segment " + i + " sway at rest", 0.0,
+                    CapeAnimationCurve.segmentSwayDegrees(i, total, 0.0, 0.0, 0.0), 1e-9);
+        }
+    }
+
+    @Test
+    public void theChainFoldsRatherThanSnappingAsOneRigidBody() {
+        // A single rigid bone rotates every part of the cloth by the same amount at the same
+        // instant. The phase lag must make the segments differ, or the cape is still a plank.
+        int total = CapeGeometry.SEGMENT_COUNT;
+        boolean anyDifference = false;
+        for (int i = 2; i <= total; i++) {
+            double above = CapeAnimationCurve.segmentLeanDegrees(i - 1, total, 1.0, false, 0.0, 0.5);
+            double here = CapeAnimationCurve.segmentLeanDegrees(i, total, 1.0, false, 0.0, 0.5);
+            if (Math.abs(above - here) > 1e-6) {
+                anyDifference = true;
+                break;
+            }
+        }
+        assertTrue("segments must not move in lockstep", anyDifference);
+    }
+
+    @Test
+    public void turningRipplesTheClothButTheYawTermStaysBounded() {
+        // The body yaw wraps, so the turn term is fed through a sine; it must never grow without
+        // bound as the player spins.
+        for (double yaw = -10000.0; yaw <= 10000.0; yaw += 37.0) {
+            double term = CapeAnimationCurve.turnSwayDegrees(1.0, yaw);
+            assertTrue("turn term bounded", Math.abs(term)
+                    <= CapeAnimationCurve.TURN_SWAY_DEG + 1e-9);
+        }
+        assertTrue("a quarter turn must move the cloth",
+                Math.abs(CapeAnimationCurve.turnSwayDegrees(1.0, 0.0)
+                        - CapeAnimationCurve.turnSwayDegrees(1.0, 90.0)) > 1e-6);
+        assertEquals("turning in place with no speed must not sway", 0.0,
+                CapeAnimationCurve.turnSwayDegrees(0.0, 90.0), 1e-9);
+    }
+
+    @Test
+    public void theSegmentExpressionsBakeInTheShareAndThePhaseLag() {
+        int total = CapeGeometry.SEGMENT_COUNT;
+        String first = CapeAnimationCurve.segmentLeanExpression(1, total);
+        String second = CapeAnimationCurve.segmentLeanExpression(2, total);
+        // The first segment's phase offset is zero, so its distance query is the bare one.
+        assertTrue("first segment uses the bare distance query",
+                first.contains("query.modified_distance_moved")
+                        && !first.contains("query.modified_distance_moved -"));
+        // The second subtracts one segment's worth of lag inside the sine.
+        assertTrue("second segment lags by the phase step",
+                second.contains("query.modified_distance_moved - 0.012"));
+        // The share literal is present in both.
+        assertTrue("first share literal", first.contains("0.007352941176470588")
+                || first.contains(String.valueOf(CapeAnimationCurve.segmentShare(1, total))));
+        assertTrue("sway uses the bounded body yaw",
+                CapeAnimationCurve.segmentSwayExpression(3, total).contains("query.body_y_rotation"));
+        assertTrue("turn sway constant is present",
+                CapeAnimationCurve.segmentSwayExpression(3, total).contains("4.0"));
+    }
 }

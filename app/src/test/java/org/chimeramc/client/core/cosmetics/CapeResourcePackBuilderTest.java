@@ -126,8 +126,12 @@ public class CapeResourcePackBuilderTest {
                 controller.contains("\"Texture.chimera_cape\""));
         assertTrue("controller uses the cape material",
                 controller.contains("\"Material.chimera_cape\""));
-        assertTrue("cape part is gated by visibility",
-                controller.contains("\"cape\": \"" + CapeResourcePackBuilder.capeVisibilityCondition() + "\""));
+        // Every segment bone is gated by the same visibility condition, not just the first.
+        assertTrue("first segment is gated by visibility",
+                controller.contains("\"cape_1\": \"" + CapeResourcePackBuilder.capeVisibilityCondition() + "\""));
+        assertTrue("last segment is gated too",
+                controller.contains("\"cape_" + CapeGeometry.SEGMENT_COUNT + "\": \""
+                        + CapeResourcePackBuilder.capeVisibilityCondition() + "\""));
     }
 
     /** The cape geometry is now a chain of thin bones spanning the vanilla cape box. */
@@ -206,8 +210,11 @@ public class CapeResourcePackBuilderTest {
                 .getAsJsonObject()
                 .getAsJsonObject("animations")
                 .getAsJsonObject(CapeResourcePackBuilder.CAPE_ANIMATION_ID);
-        assertTrue("animation drives the cape bone",
-                animation.getAsJsonObject("bones").has("cape"));
+        JsonObject capeBones = animation.getAsJsonObject("bones");
+        for (int i = 1; i <= CapeGeometry.SEGMENT_COUNT; i++) {
+            assertTrue("animation drives " + CapeGeometry.boneName(i),
+                    capeBones.has(CapeGeometry.boneName(i)));
+        }
 
         // The hat and pet controllers and the pet animation must parse too, for the same reason.
         JsonObject hatController = JsonParser.parseString(
