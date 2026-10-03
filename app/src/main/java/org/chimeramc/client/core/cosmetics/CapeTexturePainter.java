@@ -3,15 +3,23 @@ package org.chimeramc.client.core.cosmetics;
 /**
  * Paints the cloth of a Bedrock cape into a 64x32 texture.
  *
- * <p>Bedrock's cape and elytra share one 64x32 image. The area the player actually sees when a
- * cape hangs on their back is the 10x16 rectangle at x=12, y=1; around it sit the edge strips
- * (top y=0, bottom y=17..22, and the two 1px side columns) which are sampled when the cape
- * swings and folds. The right half of the image (x >= 32) is the elytra wings.
+ * <p>Bedrock's cape and elytra share one 64x32 image. The standard box UV for the cape
+ * (10 wide, 16 tall, 1 deep, {@code uv:[0,0]}) lays the faces out as
+ * {@code [left 1][front 10][right 1][back 10]} starting at x=0, so the face at <b>x=1..11 is the
+ * box "front" face</b> and the face at <b>x=12..22 is the box "back" face</b>.
  *
- * <p>This class fills the whole cape region including those strips, because a texture that only
- * paints the flat front shows unpainted black edges the moment the cape moves. For the elytra it
- * writes the same palette into the wing rectangle so a cape equipped over an elytra does not
- * flash a second, unrelated colour.
+ * <p><b>Orientation trap.</b> The vanilla cape bone carries {@code rotation:[0,180,0]}, which
+ * spins the box about its pivot so the box's <em>front</em> face ends up facing <em>away</em> from
+ * the player and the box's <em>back</em> face ends up pressed against their back. The player
+ * therefore sees the face painted at <b>x=1</b>. Painting the artwork at x=12 (the box back)
+ * hides it against the torso — the "cape texture on the wrong side" bug — so the visible panel
+ * is deliberately the one at {@link #VISIBLE_X}.
+ *
+ * <p>Around the visible panel sit the edge strips (top y=0, bottom y=17..22, and the two 1px side
+ * columns) which are sampled when the cape swings and folds. This class fills the whole cape
+ * region including those strips, because a texture that only paints the flat panel shows
+ * unpainted black edges the moment the cape moves. For the elytra it writes the same palette into
+ * the wing rectangle so a cape equipped over an elytra does not flash a second, unrelated colour.
  *
  * <p>Pure integer maths and {@link PngWriter}, so the output is byte-inspectable in a unit test
  * without Android or a device.
@@ -21,8 +29,13 @@ public final class CapeTexturePainter {
     public static final int TEXTURE_WIDTH = 64;
     public static final int TEXTURE_HEIGHT = 32;
 
+    /** The outward-facing panel the player sees; the box "front" face of the standard layout. */
+    static final int VISIBLE_X = 1;
+    /** The panel pressed against the player's back; the box "back" face. */
+    static final int INNER_X = 12;
+
     /** Visible cloth, and the strips the game samples when the cape sways. */
-    static final int CLOTH_X = 12;
+    static final int CLOTH_X = VISIBLE_X;
     static final int CLOTH_Y = 1;
     static final int CLOTH_WIDTH = 10;
     static final int CLOTH_HEIGHT = 16;
@@ -64,11 +77,12 @@ public final class CapeTexturePainter {
      * Fills the cape half of the sheet.
      *
      * <p>The cape is a thin 10x16 box, so the sheet is laid out as faces rather than one flat
-     * rectangle: the visible back panel is the 10x16 at (12,1); the front panel (against the
-     * player) is the 10x16 at (1,1); the side strips are the single columns at x=0 and x=11; and
-     * the top and bottom edges are the single rows at y=0. Every face the game can sample while
-     * the cape swings is painted, because leaving one transparent makes the cape show holes and
-     * read as a flapping paper sheet instead of cloth.
+     * rectangle. With {@code rotation:[0,180,0]} the box "front" face (painted at
+     * {@link #VISIBLE_X}) is what the player sees from behind; the box "back" face
+     * ({@link #INNER_X}) sits against their back. The side strips are the single columns at x=0
+     * and x=11; the top and bottom edges are the single rows at y=0 and y=17. Every face the game
+     * can sample while the cape swings is painted, because leaving one transparent makes the cape
+     * show holes and read as a flapping paper sheet instead of cloth.
      */
     private static void paintCapeRegion(int[] pixels, int baseColor, int trimColor,
                                         int accentColor, CosmeticCatalog.CapePattern pattern,
@@ -77,17 +91,17 @@ public final class CapeTexturePainter {
         // two side columns, which are only sampled at a glancing angle but are visible then.
         fillRect(pixels, 0, 0, 22, 17, shade(baseColor, 0.85f));
 
-        // Front panel, against the player's back: darker so the cape has two distinct sides.
-        fillRect(pixels, 1, 1, 10, 16, shade(baseColor, 0.72f));
+        // Inner panel, against the player's back: darker so the cape has two distinct sides.
+        fillRect(pixels, INNER_X, 1, 10, 16, shade(baseColor, 0.72f));
 
-        // Visible back panel: the main artwork the player sees on their character, now carrying
+        // Visible panel: the main artwork the player sees on their character, now carrying
         // the weave. Painting the pattern here rather than only the flat colour is what makes the
         // hundred-plus cape variants actually look different in-game.
-        fillRect(pixels, 12, 1, 10, 16, baseColor);
+        fillRect(pixels, VISIBLE_X, 1, 10, 16, baseColor);
         paintPattern(pixels, CLOTH_X, CLOTH_Y, CLOTH_WIDTH, CLOTH_HEIGHT, baseColor, accentColor,
                 pattern);
 
-        // Border band, inset by one pixel inside the back panel. The game's capes have their trim
+        // Border band, inset by one pixel inside the visible panel. The game's capes have their trim
         // just inside the silhouette, so painting the very edge would put the band where it is
         // never sampled.
         fillRect(pixels, CLOTH_X, CLOTH_Y, CLOTH_WIDTH, 1, trimColor);
