@@ -59,6 +59,21 @@ public class SkinModelTest {
     }
 
     @Test
+    public void theBodyHasAJacketOverlayLayer() {
+        // The 1.8 jacket/torso second layer lives at 16,32. Without it a skin whose shirt logo,
+        // jacket or armour trim is on the overlay renders as its bare base layer — the "my skin
+        // looks wrong in the preview" case. Pin the standard region.
+        SkinModel.Box body = boxById("body");
+        SkinModel.Uv front = body.overlayUv(SkinModel.Face.FRONT);
+        assertNotNull("the body must have a second-layer region", front);
+        assertEquals(20, front.u);
+        assertEquals(36, front.v);
+        assertEquals(8, front.w);
+        assertEquals(12, front.h);
+        assertTrue(SkinModel.uvWithinAtlas(front));
+    }
+
+    @Test
     public void modelIsThirtyTwoPixelsTall() {
         // 32 model pixels is 1.8 blocks, so the scale constant must follow.
         assertEquals(32f, SkinModel.heightPixels(), 1e-5f);

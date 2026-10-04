@@ -182,7 +182,16 @@ public final class SkinModel {
                 .base(Face.RIGHT, 16, 20, 4, 12)
                 .base(Face.FRONT, 20, 20, 8, 12)
                 .base(Face.LEFT, 28, 20, 4, 12)
-                .base(Face.BACK, 32, 20, 8, 12));
+                .base(Face.BACK, 32, 20, 8, 12)
+                // Jacket / torso second layer (standard 1.8 region at 16,32). Without it a skin
+                // whose jacket, shirt logo or armour trim lives on the overlay renders as its bare
+                // base layer, which is the "my skin looks wrong in the preview" case.
+                .over(Face.TOP, 20, 32, 8, 4)
+                .over(Face.BOTTOM, 28, 32, 8, 4)
+                .over(Face.RIGHT, 16, 36, 4, 12)
+                .over(Face.FRONT, 20, 36, 8, 12)
+                .over(Face.LEFT, 28, 36, 4, 12)
+                .over(Face.BACK, 32, 36, 8, 12));
 
         // Arms, 4x12x4, attached at the shoulders. Right is -x (the model's own right).
         boxes.add(new Box("arm_r", -6, 18, 0, 4, 12, 4)

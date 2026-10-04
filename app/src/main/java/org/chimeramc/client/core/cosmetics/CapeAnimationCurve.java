@@ -41,13 +41,13 @@ public final class CapeAnimationCurve {
     /** Lean added per unit of vertical speed, so rising and falling both stream the cloth. */
     public static final double VERTICAL_LEAN_DEG = 10.0;
     /** Amplitude of the travelling flutter. */
-    public static final double FLUTTER_AMPLITUDE_DEG = 7.0;
+    public static final double FLUTTER_AMPLITUDE_DEG = 9.0;
     /** Spatial frequency of the flutter, per block moved. */
-    public static final double FLUTTER_FREQUENCY = 55.0;
+    public static final double FLUTTER_FREQUENCY = 60.0;
     /** Amplitude of the secondary sideways sway. */
-    public static final double SWAY_AMPLITUDE_DEG = 5.0;
+    public static final double SWAY_AMPLITUDE_DEG = 7.0;
     /** Spatial frequency of the sway, per block moved. */
-    public static final double SWAY_FREQUENCY = 41.0;
+    public static final double SWAY_FREQUENCY = 44.0;
 
     /** Movement speed is treated as saturated at this value; a sprint reads as full extension. */
     public static final double MAX_MOVE_SPEED = 1.0;
@@ -61,7 +61,7 @@ public final class CapeAnimationCurve {
      * {@code SEGMENT_COUNT * SEGMENT_PHASE_LAG_BLOCKS} of travel; at a sprint that is roughly one
      * to two frames, which is the lag the hem should visibly trail the shoulders by.
      */
-    public static final double SEGMENT_PHASE_LAG_BLOCKS = 0.012;
+    public static final double SEGMENT_PHASE_LAG_BLOCKS = 0.022;
 
     /** Sideways sway contributed by turning, per unit of the bounded body-yaw term. */
     public static final double TURN_SWAY_DEG = 4.0;
