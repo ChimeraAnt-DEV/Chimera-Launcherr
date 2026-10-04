@@ -64,6 +64,89 @@ public class PreloaderInput {
 
     public static native void nativeConfigureSignatureRules(String rulesPath, String minecraftVersion);
 
+    // --- Bedrock Optifine Mode -------------------------------------------------------------
+
+    /**
+     * Applies a flat {@code key=value} optifine configuration blob. The blob is built by
+     * {@code OptifineConfigBlob}; the preloader parses it so the two sides share one grammar.
+     */
+    public static native void nativeConfigureOptifineMode(String blob);
+
+    /**
+     * The current state of every optifine item as a flat string array, six entries per item:
+     * {@code {id, enabled, tier2, status, detail, needsRestart}}. Null when the native library is
+     * absent.
+     */
+    public static native String[] nativeReadOptifineState();
+
+    /** True when the master switch is on and at least one item is active. */
+    public static native boolean nativeIsOptifineModeActive();
+
+    /** Records the refresh rate the launcher resolved, for the refresh-rate item's report. */
+    public static native void nativeSetOptifineRefreshTarget(int hz);
+
+    /** Configures the dynamic-render-distance governor bounds. */
+    public static native void nativeConfigureRenderDistance(int minDistance, int maxDistance, int fpsThreshold);
+
+    /** The tick count the callback-trimming hook has observed. */
+    public static native long nativeOptifineTickCount();
+
+    /** The HUD update count the OreUI-stripping hook has observed. */
+    public static native long nativeOptifineHudUpdateCount();
+
+    public static void configureOptifineMode(String blob) {
+        try {
+            nativeConfigureOptifineMode(blob == null ? "" : blob);
+        } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    public static String[] readOptifineState() {
+        try {
+            return nativeReadOptifineState();
+        } catch (UnsatisfiedLinkError e) {
+            return null;
+        }
+    }
+
+    public static boolean isOptifineModeActive() {
+        try {
+            return nativeIsOptifineModeActive();
+        } catch (UnsatisfiedLinkError e) {
+            return false;
+        }
+    }
+
+    public static void setOptifineRefreshTarget(int hz) {
+        try {
+            nativeSetOptifineRefreshTarget(hz);
+        } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    public static void configureRenderDistance(int minDistance, int maxDistance, int fpsThreshold) {
+        try {
+            nativeConfigureRenderDistance(minDistance, maxDistance, fpsThreshold);
+        } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    public static long optifineTickCount() {
+        try {
+            return nativeOptifineTickCount();
+        } catch (UnsatisfiedLinkError e) {
+            return 0L;
+        }
+    }
+
+    public static long optifineHudUpdateCount() {
+        try {
+            return nativeOptifineHudUpdateCount();
+        } catch (UnsatisfiedLinkError e) {
+            return 0L;
+        }
+    }
+
     public static void configureSignatureRules(File rulesFile, String minecraftVersion) {
         try {
             nativeConfigureSignatureRules(

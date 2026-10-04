@@ -15,6 +15,26 @@ public class FeatureSettings {
     private boolean reduceNetworkLatencyEnabled = false;
     private boolean fpsOptimizerEnabled = false;
 
+    // --- Bedrock Optifine Mode -------------------------------------------------------------
+    // The master switch plus one toggle per optimization, so a user can isolate an item that
+    // misbehaves on their device. Tier-1 (host) items default on; Tier-2 (game hook) items
+    // default off, because a hook that resolves wrong can change how the game renders.
+    private boolean optifineModeEnabled = false;
+    private boolean optifineAllocatorEnabled = true;
+    private boolean optifineRenderPriorityEnabled = true;
+    private boolean optifineCpuAffinityEnabled = true;
+    private boolean optifineRefreshRateEnabled = true;
+    private boolean optifineEntityCullingEnabled = false;
+    private boolean optifineParticleCullingEnabled = false;
+    private boolean optifineRenderDistanceEnabled = false;
+    private boolean optifineCallbackTrimmingEnabled = false;
+    private boolean optifineOreUiStrippingEnabled = false;
+    /**
+     * Consecutive launches that ended before a session started, keyed by optifine item id.
+     * Managed by {@code OptifineModeManager}; an item is auto-disabled at three.
+     */
+    private java.util.Map<String, Integer> optifineCrashCounts = new java.util.HashMap<>();
+
     public enum StorageType {
         INTERNAL,
         EXTERNAL,
@@ -91,6 +111,76 @@ public class FeatureSettings {
      */
     public boolean isFpsOptimizerEnabled() { return fpsOptimizerEnabled; }
     public void setFpsOptimizerEnabled(boolean enabled) { this.fpsOptimizerEnabled = enabled; autoSave(); }
+
+    // --- Bedrock Optifine Mode accessors ---------------------------------------------------
+
+    public boolean isOptifineModeEnabled() { return optifineModeEnabled; }
+    public void setOptifineModeEnabled(boolean enabled) {
+        this.optifineModeEnabled = enabled;
+        autoSave();
+    }
+
+    /**
+     * Whether one optifine item's own toggle is on, by stable item id.
+     *
+     * <p>An unknown id reads as off, so a settings file written by a newer build cannot turn on
+     * an item this build does not implement.
+     */
+    public boolean isOptifineItemEnabled(String itemId) {
+        switch (itemId == null ? "" : itemId) {
+            case "allocator": return optifineAllocatorEnabled;
+            case "render_priority": return optifineRenderPriorityEnabled;
+            case "cpu_affinity": return optifineCpuAffinityEnabled;
+            case "refresh_rate": return optifineRefreshRateEnabled;
+            case "entity_culling": return optifineEntityCullingEnabled;
+            case "particle_culling": return optifineParticleCullingEnabled;
+            case "dynamic_render_distance": return optifineRenderDistanceEnabled;
+            case "callback_trimming": return optifineCallbackTrimmingEnabled;
+            case "oreui_stripping": return optifineOreUiStrippingEnabled;
+            default: return false;
+        }
+    }
+
+    public void setOptifineItemEnabled(String itemId, boolean enabled) {
+        switch (itemId == null ? "" : itemId) {
+            case "allocator": optifineAllocatorEnabled = enabled; break;
+            case "render_priority": optifineRenderPriorityEnabled = enabled; break;
+            case "cpu_affinity": optifineCpuAffinityEnabled = enabled; break;
+            case "refresh_rate": optifineRefreshRateEnabled = enabled; break;
+            case "entity_culling": optifineEntityCullingEnabled = enabled; break;
+            case "particle_culling": optifineParticleCullingEnabled = enabled; break;
+            case "dynamic_render_distance": optifineRenderDistanceEnabled = enabled; break;
+            case "callback_trimming": optifineCallbackTrimmingEnabled = enabled; break;
+            case "oreui_stripping": optifineOreUiStrippingEnabled = enabled; break;
+            default: return;
+        }
+        autoSave();
+    }
+
+    /** Consecutive-crash count for an optifine item, 0 when it has not crashed. */
+    public int getOptifineCrashCount(String itemId) {
+        if (itemId == null || optifineCrashCounts == null) return 0;
+        Integer value = optifineCrashCounts.get(itemId);
+        return value == null ? 0 : value;
+    }
+
+    public void setOptifineCrashCount(String itemId, int count) {
+        if (itemId == null) return;
+        if (optifineCrashCounts == null) optifineCrashCounts = new java.util.HashMap<>();
+        if (count <= 0) {
+            optifineCrashCounts.remove(itemId);
+        } else {
+            optifineCrashCounts.put(itemId, count);
+        }
+        autoSave();
+    }
+
+    /** Clears every optifine crash counter, e.g. after the user re-enables an item by hand. */
+    public void clearOptifineCrashCounts() {
+        if (optifineCrashCounts == null || optifineCrashCounts.isEmpty()) return;
+        optifineCrashCounts.clear();
+        autoSave();
+    }
 
     public boolean isReduceNetworkLatencyEnabled() { return reduceNetworkLatencyEnabled; }
     public void setReduceNetworkLatencyEnabled(boolean enabled) {
