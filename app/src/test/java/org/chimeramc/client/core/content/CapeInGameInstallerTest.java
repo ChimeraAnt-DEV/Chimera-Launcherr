@@ -39,6 +39,67 @@ public class CapeInGameInstallerTest {
     }
 
     @Test
+    public void applyingACosmeticNeverRelaunchesTheSession() throws Exception {
+        // Relaunching the instance disconnects the player from their world and server, which is
+        // exactly the friction a cosmetic must not cause. Even with a relaunch hook installed, a
+        // cosmetic apply must only ever ask for a non-disruptive reload, never a restart.
+        File staging = temp.newFolder("staging_norestart");
+        File root = temp.newFolder("root_norestart");
+
+        final boolean[] restarted = {false};
+        final boolean[] reloaded = {false};
+        InGamePackChanger.setReloader(() -> {
+            reloaded[0] = true;
+            return false; // this build has no in-place refresh
+        });
+        InGamePackChanger.setRestarter(() -> {
+            restarted[0] = true;
+            return true;
+        });
+        try {
+            InGamePackChanger.ApplyOutcome outcome =
+                    CapeInGameInstaller.install(staging, Collections.singletonList(root), cape());
+            assertTrue("a reload may be attempted", reloaded[0]);
+            assertFalse("a cosmetic apply must never relaunch the session", restarted[0]);
+            assertEquals("with no live reload the change waits for the next world load",
+                    InGamePackChanger.ApplyOutcome.NEXT_LOAD, outcome);
+        } finally {
+            InGamePackChanger.setReloader(null);
+            InGamePackChanger.setRestarter(null);
+        }
+    }
+
+    @Test
+    public void aSecondApplyToAnAlreadyActiveInstanceDoesNotTouchTheSession() throws Exception {
+        // Rewriting the same pack under its stable uuid does not change the pack list, so a swap
+        // after the first apply needs no session action at all.
+        File staging = temp.newFolder("staging_reswap");
+        File root = temp.newFolder("root_reswap");
+        assertTrue(CapeInGameInstaller.install(staging, Collections.singletonList(root), cape())
+                != InGamePackChanger.ApplyOutcome.FAILED);
+        assertTrue(CapeInGameInstaller.isInstalled(root));
+
+        final boolean[] touched = {false};
+        InGamePackChanger.setReloader(() -> {
+            touched[0] = true;
+            return true;
+        });
+        InGamePackChanger.setRestarter(() -> {
+            touched[0] = true;
+            return true;
+        });
+        try {
+            InGamePackChanger.ApplyOutcome outcome =
+                    CapeInGameInstaller.install(staging, Collections.singletonList(root), cape());
+            assertFalse("an in-place swap must not relaunch or reload", touched[0]);
+            assertEquals(InGamePackChanger.ApplyOutcome.NEXT_LOAD, outcome);
+        } finally {
+            InGamePackChanger.setReloader(null);
+            InGamePackChanger.setRestarter(null);
+        }
+    }
+
+    @Test
     public void installsToEveryCandidateRoot() throws Exception {
         File staging = temp.newFolder("staging");
         File rootA = temp.newFolder("root_a");

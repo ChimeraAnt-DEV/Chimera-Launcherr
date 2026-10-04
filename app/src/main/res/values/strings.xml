@@ -857,7 +857,7 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="cosmetics_gait_swim">Swim</string>
     <string name="cosmetics_none">None</string>
     <string name="cosmetics_equipped">Equipped %1$s</string>
-    <string name="cosmetics_scope_note">Capes, accessories and pets are launcher-side looks. The preview shows your own skin wearing the equipped cape, accessory and pet, and pets animate their walk, run, crouch, fly and swim gaits here. All three can reach the running game: Apply in game installs a resource pack that draws a cape, a hat and a pet on the player entity for the selected instance, and cosmetic sync shows them to other Chimera users in the same world. Vanilla players do not see them — Bedrock gives an app no way to push a cosmetic onto someone else\'s account — and the pet is drawn on your own player rather than spawned as an entity, so it needs no server command and cannot trip a server check. Cape movement is drawn in the preview with a full cloth simulation; in-game the pack supplies a 16-segment cape that folds and ripples from your movement (speed, jumping, falling and turning), plus a gentle idle bob for the pet.</string>
+    <string name="cosmetics_scope_note">Capes, accessories and pets are launcher-side looks. The preview shows your own skin wearing the equipped cape, accessory and pet, and pets animate their walk, run, crouch, fly and swim gaits here. All three can reach the running game: Apply in game installs a resource pack that draws a cape, a hat and a pet on the player entity for the selected instance, and it is re-synced before every launch so it shows as soon as you enter a world — you never have to close the instance or leave your world or server. Cosmetic sync shows them to other Chimera users in the same world. Vanilla players do not see them — Bedrock gives an app no way to push a cosmetic onto someone else\'s account — and the pet is drawn on your own player rather than spawned as an entity, so it needs no server command and cannot trip a server check. Cape movement is drawn in the preview with a full cloth simulation; in-game the pack supplies a 16-segment cape that folds and ripples from your movement (speed, jumping, falling and turning), plus a gentle idle bob for the pet.</string>
     <string name="accessory_style_note">Each style is a real, different mesh — a cap, a beanie, a crown, horns, a halo and so on are separate geometry. Every palette then tints those meshes, so "Prism Crown" and "Ember Circlet" share a shape in different colours while "Prism Crown" and "Geode Beret" are different shapes. Names are individual to each piece, not one palette word repeated down the list.</string>
     <string name="cosmetics_in_game">On your character in-game</string>
     <string name="cosmetics_apply_in_game">Apply in game</string>
@@ -870,12 +870,12 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="cosmetics_sync_manual_hint">Peer address (host:port)</string>
     <string name="cosmetics_sync_manual_save">Save peer</string>
     <string name="cosmetics_sync_manual_saved">Manual peer saved — cosmetics are sent to it while no relay is set.</string>
-    <string name="cosmetics_in_game_installed">Applied to the selected instance. If a session is running it reloads or relaunches to show it.</string>
+    <string name="cosmetics_in_game_installed">Applied to the selected instance. It is written before every launch, so it shows as soon as you enter a world — no need to close the instance or leave your world.</string>
     <string name="cosmetics_in_game_not_installed">Not applied yet. Apply it to wear this cape in the selected instance.</string>
     <string name="cosmetics_applied_in_game">Cape applied — launch the instance to see it</string>
-    <string name="cosmetics_applied_live">Cape applied — Minecraft reloaded its packs</string>
-    <string name="cosmetics_applied_restarting">Cape applied — Minecraft is reloading the world…</string>
-    <string name="cosmetics_applied_next_load">Cape applied — it appears next time the world loads</string>
+    <string name="cosmetics_applied_live">Cape applied — Minecraft refreshed its packs</string>
+    <string name="cosmetics_applied_restarting">Cape applied — it appears the next time you enter a world</string>
+    <string name="cosmetics_applied_next_load">Cape applied — it appears the next time you enter a world, with no need to leave your world or server</string>
     <string name="cosmetics_removed_in_game">Cape removed from the instance</string>
     <string name="cosmetics_apply_failed">Could not apply the cape to this instance</string>
     <string name="cosmetics_remove_failed">Could not remove the cape from this instance</string>

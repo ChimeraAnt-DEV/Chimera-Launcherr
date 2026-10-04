@@ -126,13 +126,13 @@ public class CapeAnimationCurveTest {
         assertTrue("walk lean", lean.contains("28.0"));
         assertTrue("jump flare", lean.contains("12.0"));
         assertTrue("vertical lean", lean.contains("10.0"));
-        assertTrue("flutter", lean.contains("7.0"));
-        assertTrue("flutter frequency", lean.contains("55.0"));
+        assertTrue("flutter", lean.contains("9.0"));
+        assertTrue("flutter frequency", lean.contains("60.0"));
         assertTrue("speed is clamped", lean.contains("math.clamp(query.modified_move_speed"));
 
         String sway = CapeAnimationCurve.swayExpression();
-        assertTrue("sway amplitude", sway.contains("5.0"));
-        assertTrue("sway frequency", sway.contains("41.0"));
+        assertTrue("sway amplitude", sway.contains("7.0"));
+        assertTrue("sway frequency", sway.contains("44.0"));
         assertTrue("sway distance query", sway.contains("query.modified_distance_moved"));
     }
 
@@ -209,7 +209,7 @@ public class CapeAnimationCurveTest {
                         && !first.contains("query.modified_distance_moved -"));
         // The second subtracts one segment's worth of lag inside the sine.
         assertTrue("second segment lags by the phase step",
-                second.contains("query.modified_distance_moved - 0.012"));
+                second.contains("query.modified_distance_moved - 0.022"));
         // The share literal is present in both.
         assertTrue("first share literal", first.contains("0.007352941176470588")
                 || first.contains(String.valueOf(CapeAnimationCurve.segmentShare(1, total))));

@@ -22,7 +22,7 @@ public final class PreviewLighting {
     private static final double LZ = 0.78;
 
     /** How bright an unlit face still is; below this a back face goes flat black. */
-    public static final double AMBIENT = 0.42;
+    public static final double AMBIENT = 0.52;
 
     /**
      * A soft fill light from the opposite side, as a fraction of the key. A single directional
@@ -32,10 +32,16 @@ public final class PreviewLighting {
      * form. Kept below the gap that separates the front from the back, so the front stays the
      * brighter of the two.
      */
-    public static final double FILL = 0.15;
+    public static final double FILL = 0.20;
 
-    /** Alpha of a black overlay at the darkest a face ever gets. */
-    public static final int MAX_DARKEN_ALPHA = 140;
+    /**
+     * Alpha of a black overlay at the darkest a face ever gets.
+     *
+     * <p>Kept moderate on purpose: a heavy black overlay on the shadow side reads as grime or a
+     * hard facet seam rather than shade. A lighter, wider ramp keeps the model reading as one
+     * continuous lit surface, which is the "smooth, not plastic" property.
+     */
+    public static final int MAX_DARKEN_ALPHA = 104;
 
     /** How much of the light ramp a skin's overlay layer takes, so hats and eyes stay readable. */
     public static final double OVERLAY_SHARE = 0.35;
@@ -64,7 +70,7 @@ public final class PreviewLighting {
     public static int shadeColor(int color, SkinModel.Face face, float perspective) {
         double intensity = intensityFor(face, perspective);
         // Keep a floor so a flat quad on a back face is shaded, not turned into a silhouette.
-        double factor = 0.55 + 0.45 * intensity;
+        double factor = 0.60 + 0.40 * intensity;
         int a = (color >>> 24) & 0xFF;
         int r = (int) Math.round(((color >>> 16) & 0xFF) * factor);
         int g = (int) Math.round(((color >>> 8) & 0xFF) * factor);
@@ -104,7 +110,7 @@ public final class PreviewLighting {
     /** A flat colour for an arbitrary normal, multiplied toward black by the surface's shadow. */
     public static int shadeColorForNormal(int color, double nx, double ny, double nz) {
         double intensity = intensityForNormal(nx, ny, nz);
-        double factor = 0.55 + 0.45 * intensity;
+        double factor = 0.60 + 0.40 * intensity;
         int a = (color >>> 24) & 0xFF;
         int r = (int) Math.round(((color >>> 16) & 0xFF) * factor);
         int g = (int) Math.round(((color >>> 8) & 0xFF) * factor);

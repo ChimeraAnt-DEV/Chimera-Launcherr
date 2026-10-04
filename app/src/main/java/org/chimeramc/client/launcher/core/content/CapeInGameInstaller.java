@@ -83,16 +83,53 @@ public final class CapeInGameInstaller {
                                                          CosmeticCatalog.Accessory accessory,
                                                          CosmeticCatalog.Pet pet,
                                                          AuthoredGeometry.AssetOpener assets) {
+        // Captured before the write: if the pack is already in every root, this call only rewrote
+        // its contents under the same stable uuid, so the pack *list* is unchanged and the running
+        // world already has it — no reload or relaunch is needed. Capturing after the write would
+        // misread the first apply as already-active.
+        final boolean alreadyActive = wasActiveInAllRoots(gameDataDirs);
+
         if (!writePack(stagingRoot, gameDataDirs, cape, accessory, pet, assets)) {
             return InGamePackChanger.ApplyOutcome.FAILED;
         }
 
-        // The files are written to the global list and every running world's own list; now ask the
-        // live session to pick them up. reload -> restart -> next load, exactly like the pack
-        // changer, so the player does not have to leave the world for the cape to appear.
+        if (alreadyActive) {
+            // The pack files were rewritten in place and the world already lists the pack. The
+            // build caches its pack stack, so the sampled textures update on the next world load;
+            // there is nothing to push and, importantly, nothing to relaunch.
+            return InGamePackChanger.ApplyOutcome.NEXT_LOAD;
+        }
+
+        // A newly activated pack: ask for a live refresh if the build supports one. Deliberately
+        // no requestRestart() here — relaunching the instance tears the player out of their world
+        // and off any server they are on, which is the exact friction a cosmetic must not cause.
+        // The honest, non-disruptive outcome is: files written now, the cosmetic appears the next
+        // time a world loads, and the player is never disconnected. Equipping before launch (the
+        // common path) is already synced by MinecraftRuntimePreparer, so it shows immediately on
+        // entering the world with no reload at all.
         if (InGamePackChanger.requestReload()) return InGamePackChanger.ApplyOutcome.RELOADED;
-        if (InGamePackChanger.requestRestart()) return InGamePackChanger.ApplyOutcome.RESTARTING;
         return InGamePackChanger.ApplyOutcome.NEXT_LOAD;
+    }
+
+    /**
+     * Whether the cape pack is already active in every candidate root.
+     *
+     * <p>Used to tell "the pack files changed but the pack list did not" (no session action
+     * needed) from "the pack was newly activated" (the session must pick up a changed list). A
+     * non-empty list where every root already has the pack is the in-place-swap case.
+     */
+    private static boolean wasActiveInAllRoots(List<File> gameDataDirs) {
+        if (gameDataDirs == null || gameDataDirs.isEmpty()) return false;
+        boolean any = false;
+        for (File gameDataDir : gameDataDirs) {
+            if (gameDataDir == null) continue;
+            any = true;
+            if (!InGamePackChanger.activeUuids(gameDataDir)
+                    .contains(CapeResourcePackBuilder.PACK_UUID)) {
+                return false;
+            }
+        }
+        return any;
     }
 
     /** Backwards-compatible single-root install. */
