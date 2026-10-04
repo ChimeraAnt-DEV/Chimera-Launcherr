@@ -232,7 +232,9 @@ public class CapeResourcePackBuilderTest {
                 .getAsJsonObject(CapeResourcePackBuilder.PET_CONTROLLER_ID);
         assertEquals("Geometry.chimera_pet", petController.get("geometry").getAsString());
 
-        JsonParser.parseString(CapeResourcePackBuilder.petAnimationJson()).getAsJsonObject();
+        JsonParser.parseString(CapeResourcePackBuilder.petAnimationsJson()).getAsJsonObject();
+        JsonParser.parseString(CapeResourcePackBuilder.petAnimationControllerJson())
+                .getAsJsonObject();
     }
 
     /**

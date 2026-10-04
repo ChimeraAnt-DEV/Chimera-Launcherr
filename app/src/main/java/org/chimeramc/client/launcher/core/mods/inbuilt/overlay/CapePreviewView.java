@@ -13,6 +13,7 @@ import org.chimeramc.client.core.cosmetics.CapePatterns;
 import org.chimeramc.client.core.cosmetics.CapeSimulator;
 import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
 import org.chimeramc.client.core.cosmetics.CosmeticLayering;
+import org.chimeramc.client.core.cosmetics.PetModel;
 import org.chimeramc.client.core.cosmetics.PetPose;
 import org.chimeramc.client.core.cosmetics.PlayerSkinProvider;
 import org.chimeramc.client.core.cosmetics.PreviewLighting;
@@ -65,6 +66,8 @@ public class CapePreviewView extends View {
     private final Path path = new Path();
     private final float[] projected = new float[3];
     private final float[] corners = new float[8];
+    /** Soft contact-shadow gradient, built once and reused for every frame. */
+    private android.graphics.RadialGradient shadowGradient;
 
     /** Per-face cropped textures, indexed by box then face. Built once per skin. */
     private Bitmap[][] baseFaceCrops;
@@ -345,151 +348,149 @@ public class CapePreviewView extends View {
     /**
      * Draws the equipped pet beside the character.
      *
-     * <p>The pet is a blocky Minecraft-style animal built from the same {@link SkinModel.Box}
-     * primitive the player model uses, so it belongs to the same visual language. Its pose comes
-     * from {@link PetPose}, which decides the gait: legs swing for a walk or run, wings beat for a
-     * flyer (crawlers get their own elytra), a swimmer paddles with a dedicated set, and a crouch
-     * sinks the body. The pet stands on the character's right, scaled by its own size trait.
+     * <p>The pet's mesh comes from {@link PetModel}, the same vanilla-grounded body plan the in-game
+     * geometry uses, so the preview and the game cannot drift. The pose comes from {@link PetPose},
+     * which now animates per-bone: legs swing for a walk or run, a bird flaps and bobs, a serpent
+     * undulates, a swimmer paddles. When the player is running, crouching, flying or swimming, the
+     * crawling bugs switch to their contextual behaviour (riding the head, looking around, clinging
+     * against the wind or the water) exactly as the in-game controller does.
      */
     private void drawPet(Canvas canvas, float originX, float originY, float scale) {
         if (pet == null) return;
         float ps = scale * pet.scale;
-        // Ground the pet on the same baseline as the character, a little to the right. The ground
-        // line is the projected model origin, since the camera orbits above the feet.
+
+        // The ground line is the projected model origin, since the camera orbits above the feet.
         camera.project(0f, 0f, 0f, scale, originX, originY, projected);
         float groundY = projected[1];
-        float px = originX + 20f * scale;
-        float py = groundY + 0.5f * scale;
 
-        CosmeticCatalog.PetSpecies species = pet.species;
-        int body = pet.color;
-        int accent = pet.accentColor;
-        int dark = darker(body);
-
-        // Body dimensions per species, in model pixels, so a bee is small and a dragon is long.
-        float bodyW, bodyH, bodyD, legLen;
-        switch (species) {
-            case BEE:
-            case BUTTERFLY:
-            case DRAGONFLY:
-                bodyW = 4f; bodyH = 3f; bodyD = 6f; legLen = 1.5f;
-                break;
-            case SPIDER:
-            case ANT:
-                bodyW = 5f; bodyH = 2.5f; bodyD = 7f; legLen = 2.5f;
-                break;
-            case FROG:
-            case AXOLOTL:
-            case LIZARD:
-                bodyW = 5f; bodyH = 3f; bodyD = 7f; legLen = 2f;
-                break;
-            case SNAKE:
-                bodyW = 3.5f; bodyH = 3f; bodyD = 10f; legLen = 0.5f;
-                break;
-            case DRAGON:
-                bodyW = 7f; bodyH = 5f; bodyD = 11f; legLen = 3.5f;
-                break;
-            case PARROT:
-                bodyW = 4f; bodyH = 5f; bodyD = 5f; legLen = 2.5f;
-                break;
-            case TURTLE:
-                bodyW = 7f; bodyH = 3.5f; bodyD = 9f; legLen = 1.5f;
-                break;
-            case RABBIT:
-                bodyW = 4f; bodyH = 4f; bodyD = 6f; legLen = 2f;
-                break;
-            default:
-                bodyW = 5f; bodyH = 4f; bodyD = 8f; legLen = 3f;
-                break;
-        }
-
-        // Crouch sinks the whole body; flying lifts it and adds a hover bob.
-        float lift = 0f;
-        if (petLocomotion == CosmeticCatalog.PetLocomotion.FLY) {
-            lift = 5f + petPose.bodyBob * 0.6f;
-        } else if (petLocomotion == CosmeticCatalog.PetLocomotion.SWIM) {
-            lift = 1.5f;
-        }
-        float bodyCenterY = legLen + bodyH / 2f + lift - petPose.crouchDrop;
-
-        // Legs first (behind the body), swinging opposite each other so the gait reads.
-        if (species != CosmeticCatalog.PetSpecies.SNAKE) {
-            int legs = (species == CosmeticCatalog.PetSpecies.SPIDER
-                    || species == CosmeticCatalog.PetSpecies.ANT) ? 3 : 2;
-            for (int i = 0; i < legs; i++) {
-                float along = legs == 1 ? 0f : (i / (float) (legs - 1) - 0.5f) * bodyD * 0.7f;
-                float swing = petPose.legSwing * ((i % 2 == 0) ? 1f : -1f);
-                float lx = px + swing * 1.4f;
-                float lz = along + swing * 0.8f;
-                int legColor = darker(body);
-                drawPetBox(canvas, lx, py + legLen / 2f, lz,
-                        1.6f, legLen, 1.6f, ps, originX, originY, legColor);
-            }
+        // Crawling bugs ride the player's head once the player is moving, crouching, flying or
+        // swimming; otherwise they trot at the feet like any other pet. The state comes from the
+        // pose, which derives it from the same rules the in-game controller uses.
+        if (petPose.ridesHead) {
+            camera.project(0f, 32f, 0f, scale, originX, originY, projected);
+            drawPetModel(canvas, projected[0] + petPose.crawlLoopX * ps,
+                    projected[1] + petPose.crawlLoopZ * ps * 0.2f, ps * 0.5f,
+                    originX, originY, petPose.leanX, 0f, 0f, true);
         } else {
-            // A snake gets a segmented tail that ripples with the swim/walk stroke.
-            for (int seg = 1; seg <= 4; seg++) {
-                float segZ = -bodyD / 2f - seg * 1.6f;
-                float wobble = petPose.swimStroke * seg * 0.5f;
-                drawPetBox(canvas, px + wobble, py + legLen + bodyH / 2f, segZ,
-                        2.4f - seg * 0.3f, 2.4f - seg * 0.3f, 1.6f, ps, originX, originY,
-                        seg % 2 == 0 ? body : dark);
+            float px = originX + 20f * scale;
+            float py = groundY + 0.5f * scale;
+            float lift = 0f;
+            if (petLocomotion == CosmeticCatalog.PetLocomotion.FLY) {
+                lift = 5f + petPose.bodyBob * 0.6f;
+            } else if (petLocomotion == CosmeticCatalog.PetLocomotion.SWIM) {
+                lift = 1.5f;
+            }
+            drawPetModel(canvas, px, py + lift, ps, originX, originY,
+                    0f, -petPose.crouchDrop, 0f, false);
+        }
+    }
+
+    /**
+     * Paints every box of the pet's {@link PetModel} plan, grouped by bone so the pose can move the
+     * head, tail, wings and legs independently.
+     *
+     * <p>Each bone's transform is a rotation about its own pivot (the joint), which is what makes a
+     * leg swing from the hip and a tail wag from the rump rather than the whole animal tilting.
+     */
+    private void drawPetModel(Canvas canvas, float px, float py, float scale,
+                              float originX, float originY,
+                              float extraRotX, float extraDY, float extraDZ, boolean riding) {
+        List<PetModel.Part> parts = PetModel.parts(pet.species, pet.scale);
+        PetModel.Body body = PetModel.body(pet.species, pet.scale);
+
+        int bodyColor = pet.color;
+        int accent = pet.accentColor;
+        int dark = darker(bodyColor);
+
+        // A stable bone order so the painter's algorithm sees a consistent grouping.
+        String[] bones = {PetModel.BONE_ROOT, PetModel.BONE_TAIL, PetModel.BONE_WING_L,
+                PetModel.BONE_WING_R, PetModel.BONE_LEG_A, PetModel.BONE_LEG_B,
+                PetModel.BONE_LEG_C, PetModel.BONE_HEAD};
+
+        for (String bone : bones) {
+            float[] pivot = PetModel.pivot(bone, body);
+            // Per-bone rotation, in degrees, from the pose. The riding bugs use the contextual
+            // rotations the in-game controller plays, so the two views agree.
+            float rotX = extraRotX;
+            float rotY = 0f;
+            float rotZ = 0f;
+            float legPhase = 0f;
+            if (PetModel.BONE_HEAD.equals(bone)) {
+                rotY = petPose.headYaw;
+                rotX += petPose.headPitch;
+            } else if (PetModel.BONE_TAIL.equals(bone)) {
+                rotY = petPose.tailWag * 16f;
+            } else if (bone.startsWith("leg_")) {
+                int idx = bone.equals(PetModel.BONE_LEG_A) ? 0
+                        : bone.equals(PetModel.BONE_LEG_B) ? 1 : 2;
+                legPhase = petPose.legSwing * (idx == 1 ? -1f : 1f);
+                rotZ = legPhase * 30f;
+            } else if (bone.startsWith("wing_")) {
+                rotZ = petPose.wingFlap * 55f * (bone.equals(PetModel.BONE_WING_R) ? -1f : 1f);
+            }
+
+            for (PetModel.Part part : parts) {
+                if (!part.bone.equals(bone)) continue;
+                int color = part.accent ? accent : bodyColor;
+                // Legs are darker so they read as under the body; a shadowed variant, not a
+                // separate material.
+                if (part.role == PetModel.Role.LEG) color = dark;
+
+                // Rotate the cube about the bone pivot.
+                float lx = part.x - pivot[0];
+                float ly = part.y - pivot[1];
+                float lz = part.z - pivot[2];
+                float[] r = rotate(lx, ly, lz, rotX, rotY, rotZ);
+                float cx = pivot[0] + r[0];
+                float cy = pivot[1] + r[1] + extraDY;
+                float cz = pivot[2] + r[2] + extraDZ;
+                drawPetBox(canvas, px + cx, py + cy, cz,
+                        part.sx, part.sy, part.sz, scale, originX, originY, color,
+                        rotX, rotY, rotZ);
             }
         }
+    }
 
-        // Tail behind the body, wagging.
-        if (species != CosmeticCatalog.PetSpecies.SNAKE
-                && species != CosmeticCatalog.PetSpecies.BEE
-                && species != CosmeticCatalog.PetSpecies.BUTTERFLY
-                && species != CosmeticCatalog.PetSpecies.DRAGONFLY
-                && species != CosmeticCatalog.PetSpecies.ANT
-                && species != CosmeticCatalog.PetSpecies.SPIDER) {
-            float tailZ = -bodyD / 2f - 1.2f;
-            float wag = petPose.tailWag * 1.6f;
-            drawPetBox(canvas, px + wag, py + legLen + bodyH * 0.7f, tailZ,
-                    1.4f, 1.4f, 3.2f, ps, originX, originY, body);
-        }
-
-        // The body itself.
-        drawPetBox(canvas, px, py + legLen + bodyH / 2f - petPose.crouchDrop,
-                petPose.bodyBob * 0.2f, bodyW, bodyH, bodyD, ps, originX, originY, body);
-
-        // Head at the front of the body, bobbing.
-        float headSize = Math.min(bodyH, 5f) + 1f;
-        float headZ = bodyD / 2f + headSize * 0.3f;
-        drawPetBox(canvas, px, py + legLen + bodyH + headSize * 0.3f - petPose.crouchDrop
-                        + petPose.headBob, headZ, headSize, headSize, headSize,
-                ps, originX, originY, body);
-
-        // Ears / antennae per species.
-        drawPetHeadgear(canvas, species, px, py + legLen + bodyH + headSize * 0.3f
-                - petPose.crouchDrop, headZ, headSize, ps, originX, originY, accent);
-
-        // Wings: flyers beat them; crawlers get a smaller elytra shell (their own flight set).
-        if (petLocomotion == CosmeticCatalog.PetLocomotion.FLY) {
-            if (species.isCrawler()) {
-                // Crawlers cannot have feathered wings, so they carry a hard elytra shell.
-                drawElytra(canvas, px, py + legLen + bodyH, ps, originX, originY,
-                        accent, petPose.wingFlap);
-            } else {
-                drawWings(canvas, px, py + legLen + bodyH, ps, originX, originY,
-                        accent, petPose.wingFlap, bodyW, bodyD);
-            }
-        }
-
-        // A swimmer gets a dedicated swim set: a snorkel mask and fins, so swimming looks
-        // intentional rather than the pet just floating.
-        if (petLocomotion == CosmeticCatalog.PetLocomotion.SWIM && species.isSwimmer()) {
-            drawSwimSet(canvas, species, px, py + legLen + bodyH + headSize * 0.3f - petPose.crouchDrop,
-                    headZ, headSize, ps, originX, originY, accent);
-        }
+    /** Rotates a point by the bone's X/Y/Z degrees (Z, then Y, then X), in model space. */
+    private static float[] rotate(float x, float y, float z, float rotX, float rotY, float rotZ) {
+        double rx = Math.toRadians(rotX);
+        double ry = Math.toRadians(rotY);
+        double rz = Math.toRadians(rotZ);
+        // Z
+        double x1 = x * Math.cos(rz) - y * Math.sin(rz);
+        double y1 = x * Math.sin(rz) + y * Math.cos(rz);
+        // Y
+        double x2 = x1 * Math.cos(ry) + z * Math.sin(ry);
+        double z2 = -x1 * Math.sin(ry) + z * Math.cos(ry);
+        // X
+        double y3 = y1 * Math.cos(rx) - z2 * Math.sin(rx);
+        double z3 = y1 * Math.sin(rx) + z2 * Math.cos(rx);
+        return new float[]{(float) x2, (float) y3, (float) z3};
     }
 
     /** A single shaded pet box, projected with the same camera as the character. */
     private void drawPetBox(Canvas canvas, float cx, float cy, float cz,
                             float w, float h, float d, float scale,
                             float originX, float originY, int color) {
+        drawPetBox(canvas, cx, cy, cz, w, h, d, scale, originX, originY, color, 0f, 0f, 0f);
+    }
+
+    /**
+     * A single shaded pet box whose shading follows the bone's rotation.
+     *
+     * <p>Shading the face from its <em>rotated</em> normal is what makes an animated limb read as
+     * three-dimensional: a leg swinging through its arc brightens and darkens with the swing, the
+     * way a lit surface does, instead of staying at a constant shade while the geometry moves. The
+     * rotation is the same one the box's centre was rotated by, so the light and the geometry
+     * cannot disagree.
+     */
+    private void drawPetBox(Canvas canvas, float cx, float cy, float cz,
+                            float w, float h, float d, float scale,
+                            float originX, float originY, int color,
+                            float rotX, float rotY, float rotZ) {
         SkinModel.Box box = SkinModel.Box.of("pet", cx, cy, cz, w, h, d);
         paint.setShader(null);
+        float persp = camera.perspectiveAt(cx, cy, cz);
         for (SkinModel.Face face : SkinModel.Face.values()) {
             if (!camera.faceVisible(face)) continue;
             float[][] c = box.faceCorners(face);
@@ -498,131 +499,50 @@ public class CapePreviewView extends View {
                 corners[i * 2] = projected[0];
                 corners[i * 2 + 1] = projected[1];
             }
-            paint.setColor(shadeFace(color, face));
+            paint.setColor(shadeRotated(color, face, persp, rotX, rotY, rotZ));
             drawQuad(canvas, corners);
         }
     }
 
-    private void drawPetHeadgear(Canvas canvas, CosmeticCatalog.PetSpecies species,
-                                 float px, float headBaseY, float headZ, float headSize,
-                                 float scale, float originX, float originY, int accent) {
-        float topY = headBaseY + headSize * 0.4f;
-        switch (species) {
-            case CAT:
-            case DOG:
-            case FOX:
-            case WOLF:
-                // Pointed ears: two small boxes angled by a per-species amount.
-                for (int side = -1; side <= 1; side += 2) {
-                    drawPetBox(canvas, px + side * headSize * 0.28f, topY + 1.2f, headZ,
-                            1.2f, 1.6f, 1.2f, scale, originX, originY, accent);
-                }
-                break;
-            case RABBIT:
-                for (int side = -1; side <= 1; side += 2) {
-                    drawPetBox(canvas, px + side * headSize * 0.2f, topY + 2.4f, headZ,
-                            1.0f, 4.0f, 1.0f, scale, originX, originY, accent);
-                }
-                break;
-            case BEE:
-            case BUTTERFLY:
-            case DRAGONFLY:
-                // Antennae: thin stalks with a lit tip.
-                for (int side = -1; side <= 1; side += 2) {
-                    drawPetBox(canvas, px + side * 1.0f, topY + 1.8f, headZ + 0.5f,
-                            0.6f, 2.6f, 0.6f, scale, originX, originY, accent);
-                }
-                break;
-            case DRAGON:
-                for (int side = -1; side <= 1; side += 2) {
-                    drawPetBox(canvas, px + side * headSize * 0.3f, topY + 1.6f, headZ - 0.4f,
-                            1.0f, 2.2f, 1.0f, scale, originX, originY, accent);
-                }
-                break;
-            default:
-                break;
-        }
+    private int shadeFace(int color, SkinModel.Face face, float perspective) {
+        return PreviewLighting.shadeColor(color, face, perspective);
     }
 
-    private void drawWings(Canvas canvas, float px, float bodyTopY, float scale,
-                           float originX, float originY, int accent, float flap,
-                           float bodyW, float bodyD) {
-        // A wing is a fan of three feather quads per side; the flap raises them about the shoulder.
-        float rise = flap * 3.2f;
-        float spread = 3.0f + flap * 1.5f;
-        for (int side = -1; side <= 1; side += 2) {
-            for (int f = 0; f < 3; f++) {
-                float t = 0.3f + f * 0.3f;
-                float[][] pts = {
-                        {px + side * bodyW * 0.3f, bodyTopY, 0f},
-                        {px + side * (bodyW * 0.3f + spread * t), bodyTopY + rise - f * 0.6f, -t * bodyD * 0.4f},
-                        {px + side * (bodyW * 0.3f + spread * (t + 0.3f)), bodyTopY + rise * 0.4f, -bodyD * 0.2f},
-                };
-                paint.setShader(null);
-                paint.setColor(shadeFace(accent, SkinModel.Face.FRONT));
-                path.reset();
-                boolean first = true;
-                for (float[] p : pts) {
-                    projectPoint(p[0], p[1], p[2], scale, originX, originY);
-                    if (first) { path.moveTo(projected[0], projected[1]); first = false; }
-                    else path.lineTo(projected[0], projected[1]);
-                }
-                path.close();
-                canvas.drawPath(path, paint);
-            }
+    /** Shades a face using its normal rotated by the bone's own rotation. */
+    private static int shadeRotated(int color, SkinModel.Face face, float perspective,
+                                    float rotX, float rotY, float rotZ) {
+        if (rotX == 0f && rotY == 0f && rotZ == 0f) {
+            return PreviewLighting.shadeColor(color, face, perspective);
         }
-    }
-
-    /** A hard elytra shell for crawling flyers: no feathers, just two domed wing cases. */
-    private void drawElytra(Canvas canvas, float px, float bodyTopY, float scale,
-                            float originX, float originY, int accent, float flap) {
-        float lift = 1.5f + flap * 2.5f;
-        paint.setShader(null);
-        paint.setColor(darker(accent));
-        for (int side = -1; side <= 1; side += 2) {
-            drawPetBox(canvas, px + side * 2.2f, bodyTopY + lift, -1.5f,
-                    3.4f, 1.4f, 5.0f, scale, originX, originY, darker(accent));
-        }
-    }
-
-    /** A swim set: a snorkel mask over the eyes and a fin on each leg. */
-    private void drawSwimSet(Canvas canvas, CosmeticCatalog.PetSpecies species,
-                             float px, float headBaseY, float headZ, float headSize,
-                             float scale, float originX, float originY, int accent) {
-        // Mask band across the front of the head.
-        drawPetBox(canvas, px, headBaseY + headSize * 0.1f, headZ + headSize * 0.5f,
-                headSize * 1.05f, 1.0f, 0.6f, scale, originX, originY, accent);
-        // Snorkel tube rising from one side of the mask.
-        drawPetBox(canvas, px + headSize * 0.5f, headBaseY + headSize * 0.6f, headZ,
-                0.7f, 2.4f, 0.7f, scale, originX, originY, accent);
-        // Fins on the front legs.
-        for (int side = -1; side <= 1; side += 2) {
-            drawPetBox(canvas, px + side * 1.4f, 0.9f, 2.6f,
-                    1.4f, 1.2f, 2.4f, scale, originX, originY, accent);
-        }
-    }
-
-    /**
-     * Per-face shading for a flat-coloured pet/accessory box, via {@link PreviewLighting}.
-     *
-     * <p>A colour multiply rather than the character's alpha overlay, because these quads are solid
-     * fills, not bitmaps. Sharing the light model is what keeps a pet's shading consistent with the
-     * character it stands beside.
-     */
-    private int shadeFace(int color, SkinModel.Face face) {
-        return PreviewLighting.shadeColor(color, face, 1f);
+        float[] n = rotate(face.nx, face.ny, face.nz, rotX, rotY, rotZ);
+        return PreviewLighting.shadeColorForNormal(color, n[0], n[1], n[2]);
     }
 
     private void drawGroundShadow(Canvas canvas, float originX, float originY, float scale) {
-        paint.setShader(null);
-        paint.setColor(0x33000000);
-        // The camera orbits the body's centre, so the feet no longer sit at originY; project the
-        // model origin to find the real ground line, or the shadow floats at the character's waist.
+        // A soft radial contact shadow rather than a flat disc: the gradient fades to nothing at
+        // the rim so the character reads as standing on the surface instead of over a dark oval.
+        // The shader is built once at unit radius and the canvas is scaled, so an ellipse costs no
+        // per-frame allocation and the softness scales with the character.
+        paint.setShader(shadowGradient());
         camera.project(0f, 0f, 0f, scale, originX, originY, projected);
         float groundY = projected[1];
-        float rx = 14f * scale;
-        float ry = 3.2f * scale;
-        canvas.drawOval(originX - rx, groundY - ry, originX + rx, groundY + ry, paint);
+        float rx = 15f * scale;
+        float ry = 3.4f * scale;
+        canvas.save();
+        canvas.translate(originX, groundY);
+        canvas.scale(rx, ry);
+        canvas.drawCircle(0f, 0f, 1f, paint);
+        canvas.restore();
+        paint.setShader(null);
+    }
+
+    private android.graphics.RadialGradient shadowGradient() {
+        if (shadowGradient == null) {
+            shadowGradient = new android.graphics.RadialGradient(0f, 0f, 1f,
+                    new int[]{0x48000000, 0x20000000, 0x00000000},
+                    new float[]{0f, 0.55f, 1f}, android.graphics.Shader.TileMode.CLAMP);
+        }
+        return shadowGradient;
     }
 
     private void projectPoint(float x, float y, float z, float scale,
@@ -1206,6 +1126,74 @@ public class CapePreviewView extends View {
                 drawBox(canvas, 2.4f, 34.8f, 0.9f, 1.2f, 2.2f, 0.6f, scale, originX, originY);
                 break;
             }
+            case VEIL: {
+                // A hood crown with a soft shroud falling behind the head and neck.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 33.2f, 0f, 8.8f, 2.4f, 8.8f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 31.5f, -4.6f, 8.4f, 2.2f, 1.2f, scale, originX, originY);
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 28.6f, -4.6f, 7.6f, 4.0f, 1.0f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 25.4f, -4.6f, 6.4f, 2.8f, 0.9f, scale, originX, originY);
+                break;
+            }
+            case MONOCLE: {
+                // One rimmed lens over the right eye, with a chain to the cheek.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 2.5f, 29.9f, 4.2f, 3.0f, 3.0f, 0.6f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 2.5f, 29.9f, 4.4f, 3.8f, 3.8f, 0.3f, scale, originX, originY);
+                drawBox(canvas, 2.5f, 27.4f, 4.2f, 0.5f, 2.0f, 0.5f, scale, originX, originY);
+                break;
+            }
+            case ANTLERS: {
+                // Branching antlers: a stem then two tines each.
+                paint.setColor(accessory.color);
+                drawBox(canvas, -2.6f, 34.2f, 0f, 1.2f, 4.5f, 1.2f, scale, originX, originY);
+                drawBox(canvas, 2.6f, 34.2f, 0f, 1.2f, 4.5f, 1.2f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, -3.8f, 36.4f, 0f, 1.2f, 1.2f, 1.2f, scale, originX, originY);
+                drawBox(canvas, 3.8f, 36.4f, 0f, 1.2f, 1.2f, 1.2f, scale, originX, originY);
+                paint.setColor(accessory.color);
+                drawBox(canvas, -3.1f, 38.4f, 0f, 1.0f, 2.0f, 1.0f, scale, originX, originY);
+                drawBox(canvas, 3.1f, 38.4f, 0f, 1.0f, 2.0f, 1.0f, scale, originX, originY);
+                break;
+            }
+            case PLUME: {
+                // A feathered crest fanning up from a headband.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 32.6f, 0f, 8.4f, 1.2f, 8.4f, scale, originX, originY);
+                for (int i = -2; i <= 2; i++) {
+                    paint.setColor(i % 2 == 0 ? accessory.accentColor : accessory.color);
+                    float h = 3.4f - Math.abs(i) * 0.4f;
+                    drawBox(canvas, i * 0.7f, 33.2f + h / 2f, 0f, 0.8f, h, 0.8f,
+                            scale, originX, originY);
+                }
+                break;
+            }
+            case TRICORN: {
+                // A broad brim turned up at three points, over a low crown.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 32.5f, 0f, 12.0f, 0.9f, 12.0f, scale, originX, originY);
+                drawBox(canvas, 0f, 34.2f, 0f, 8.4f, 2.6f, 8.4f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 33.6f, 5.3f, 10.8f, 2.4f, 1.4f, scale, originX, originY);
+                drawBox(canvas, 0f, 33.6f, -5.3f, 10.8f, 2.4f, 1.4f, scale, originX, originY);
+                drawBox(canvas, 5.3f, 33.6f, 0f, 1.4f, 2.4f, 10.8f, scale, originX, originY);
+                drawBox(canvas, -5.3f, 33.6f, 0f, 1.4f, 2.4f, 10.8f, scale, originX, originY);
+                break;
+            }
+            case MORTARBOARD: {
+                // A flat board on a skullcap, with a tassel hanging at one corner.
+                paint.setColor(accessory.color);
+                drawBox(canvas, 0f, 32.4f, 0f, 8.4f, 1.6f, 8.4f, scale, originX, originY);
+                drawBox(canvas, 0f, 33.6f, 0f, 12.8f, 0.8f, 12.8f, scale, originX, originY);
+                paint.setColor(accessory.accentColor);
+                drawBox(canvas, 0f, 33.6f, 0f, 0.8f, 0.8f, 0.8f, scale, originX, originY);
+                drawBox(canvas, 6f, 32.8f, 0f, 0.6f, 2.4f, 0.6f, scale, originX, originY);
+                break;
+            }
             default:
                 break;
         }
@@ -1215,6 +1203,11 @@ public class CapePreviewView extends View {
                          float w, float h, float d, float scale,
                          float originX, float originY) {
         SkinModel.Box box = SkinModel.Box.of("acc", cx, cy, cz, w, h, d);
+        // The fill is shaded per face from the shared light, so an accessory box reads as a solid
+        // object with a lit side and a shaded side instead of a flat silhouette. The colour is
+        // taken from the paint the caller set, so a piece keeps its own palette.
+        int base = paint.getColor();
+        float persp = camera.perspectiveAt(cx, cy, cz);
         for (SkinModel.Face face : SkinModel.Face.values()) {
             if (!camera.faceVisible(face)) continue;
             float[][] c = box.faceCorners(face);
@@ -1223,8 +1216,10 @@ public class CapePreviewView extends View {
                 corners[i * 2] = projected[0];
                 corners[i * 2 + 1] = projected[1];
             }
+            paint.setColor(PreviewLighting.shadeColor(base, face, persp));
             drawQuad(canvas, corners);
         }
+        paint.setColor(base);
     }
 
     // ---- Face texture crops --------------------------------------------------------------

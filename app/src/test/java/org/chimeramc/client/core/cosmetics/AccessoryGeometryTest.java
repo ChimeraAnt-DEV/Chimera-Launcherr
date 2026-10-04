@@ -39,7 +39,13 @@ public class AccessoryGeometryTest {
             CosmeticCatalog.AccessoryKind.TOPHAT,
             CosmeticCatalog.AccessoryKind.WIZARD_HAT,
             CosmeticCatalog.AccessoryKind.TIARA,
-            CosmeticCatalog.AccessoryKind.BEARD
+            CosmeticCatalog.AccessoryKind.BEARD,
+            CosmeticCatalog.AccessoryKind.VEIL,
+            CosmeticCatalog.AccessoryKind.MONOCLE,
+            CosmeticCatalog.AccessoryKind.ANTLERS,
+            CosmeticCatalog.AccessoryKind.PLUME,
+            CosmeticCatalog.AccessoryKind.TRICORN,
+            CosmeticCatalog.AccessoryKind.MORTARBOARD
     };
 
     @Test

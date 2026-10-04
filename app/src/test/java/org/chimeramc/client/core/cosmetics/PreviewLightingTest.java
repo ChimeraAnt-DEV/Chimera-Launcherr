@@ -73,4 +73,28 @@ public class PreviewLightingTest {
         double intensity = PreviewLighting.intensityFor(SkinModel.Face.FRONT, Float.POSITIVE_INFINITY);
         assertTrue(Double.isFinite(intensity));
     }
+
+    /**
+     * An animated limb shades from its rotated normal, so the same face at a different bone
+     * rotation must come out a different brightness. If it did not, a swinging leg would slide
+     * through its arc at a constant shade and read as a flat sticker.
+     */
+    @Test
+    public void aRotatedNormalShadesDifferentlyFromTheRestingNormal() {
+        int color = 0xFF3366CC;
+        int resting = PreviewLighting.shadeColorForNormal(color, 0, 0, 1);
+        int swung = PreviewLighting.shadeColorForNormal(color, 0, -0.9, 0.44);
+        assertTrue("a rotated normal must change the shade", resting != swung);
+    }
+
+    @Test
+    public void aRotatedNormalStaysInRangeAndPreservesAlpha() {
+        for (double angle = -Math.PI; angle <= Math.PI; angle += Math.PI / 8) {
+            double nx = Math.sin(angle);
+            double ny = -Math.cos(angle);
+            int shaded = PreviewLighting.shadeColorForNormal(0xFF3366CC, nx, ny, 0);
+            assertEquals("alpha preserved", 0xFF, shaded >>> 24);
+            assertTrue("channels in range", (shaded & 0xFF) <= 0xCC);
+        }
+    }
 }

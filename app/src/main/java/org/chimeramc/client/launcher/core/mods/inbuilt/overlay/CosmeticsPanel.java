@@ -32,6 +32,8 @@ import org.chimeramc.client.util.LauncherStorage;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * The Cosmetics section of the in-game Mod Menu: the player's character wearing the equipped
@@ -73,6 +75,19 @@ final class CosmeticsPanel {
 
     /** True while the panel is programmatically setting a spinner, so its callback is ignored. */
     private boolean suppressSelection;
+
+    /**
+     * Serialises pack writes off the UI thread. Every dropdown pick re-applies the pack, and a
+     * write copies the pack into {@code resource_packs/} and rewrites the world pack lists — too
+     * much to do inside a click handler. One process-wide thread keeps the writes ordered (so a
+     * fast run of picks lands in the order the player made them) and daemon so it never holds the
+     * process open.
+     */
+    private static final ExecutorService WRITE_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "cosmetics-pack-writer");
+        t.setDaemon(true);
+        return t;
+    });
 
     CosmeticsPanel(Activity activity, boolean compact) {
         this.activity = activity;
@@ -209,10 +224,46 @@ final class CosmeticsPanel {
     /**
      * Tells the running sync module to re-advertise now, so a peer sees a cape/accessory/pet swap
      * without waiting for the slow timer, and refreshes the peer count line.
+     *
+     * <p>It also re-applies the pack to any installed instance <em>quietly</em>, so a swap shows
+     * up without the player closing the instance or leaving their world. The explicit Apply button
+     * is still there for a full reload/restart, but the common case (changing a cosmetic while
+     * playing) no longer needs it.
      */
     private void onCosmeticChanged() {
         CosmeticSyncModule.requestAnnounce();
+        applyInGameQuietly();
         refreshSyncStatus();
+    }
+
+    /**
+     * Writes the equipped cosmetics into every installed instance without asking a session to
+     * reload. It writes the pack folder, the global list and every running world's own pack list
+     * (the file the loaded world reads), so a swap lands without the player closing the instance or
+     * leaving their world. On a build that caches its pack stack the change still needs a world
+     * reload to be sampled, which is the documented limit of the mechanism. Runs off the UI thread
+     * (a pack write is a directory copy plus several file rewrites) and is silent on failure (there
+     * may simply be no instance installed yet) — the Apply button reports errors.
+     */
+    private void applyInGameQuietly() {
+        final List<File> gameDataDirs = resolveGameDataDirs();
+        if (gameDataDirs.isEmpty()) return;
+        final CosmeticCatalog.Cape cape = store.getEquippedCape();
+        final CosmeticCatalog.Accessory accessory = store.getEquippedAccessory();
+        final CosmeticCatalog.Pet pet = store.getEquippedPet();
+        final Activity target = activity;
+        WRITE_EXECUTOR.execute(() -> {
+            if (cape == null && accessory == null && pet == null) {
+                // Nothing equipped: drop the pack rather than installing a blank one, so the
+                // player's own packs are left clean.
+                CapeInGameInstaller.uninstallQuietly(gameDataDirs);
+            } else {
+                CapeInGameInstaller.installQuietly(new File(target.getFilesDir(), "cape"),
+                        gameDataDirs, cape, accessory, pet,
+                        path -> target.getAssets().open(path));
+            }
+            target.runOnUiThread(this::refreshGameStatus);
+        });
     }
 
     private void refreshSyncStatus() {
@@ -406,6 +457,7 @@ final class CosmeticsPanel {
 
     private String gaitName(CosmeticCatalog.PetLocomotion gait) {
         switch (gait) {
+            case IDLE: return activity.getString(R.string.cosmetics_gait_idle);
             case RUN: return activity.getString(R.string.cosmetics_gait_run);
             case CROUCH: return activity.getString(R.string.cosmetics_gait_crouch);
             case FLY: return activity.getString(R.string.cosmetics_gait_fly);

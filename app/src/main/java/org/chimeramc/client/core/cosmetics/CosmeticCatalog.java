@@ -60,11 +60,19 @@ public final class CosmeticCatalog {
         TOPHAT,
         WIZARD_HAT,
         TIARA,
-        BEARD
+        BEARD,
+        // Added shapes: genuinely new silhouettes, not recolours of the above.
+        VEIL,
+        MONOCLE,
+        ANTLERS,
+        PLUME,
+        TRICORN,
+        MORTARBOARD
     }
 
     /** What a pet can do; a species advertises which of these it animates for. */
     public enum PetLocomotion {
+        IDLE,
         WALK,
         RUN,
         CROUCH,
@@ -153,37 +161,46 @@ public final class CosmeticCatalog {
      * rather than special cases scattered through the renderer.
      */
     public enum PetSpecies {
-        CAT("Cat", PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH, PetLocomotion.SWIM),
-        DOG("Dog", PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH, PetLocomotion.SWIM),
-        FOX("Fox", PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH),
-        WOLF("Wolf", PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH),
-        RABBIT("Rabbit", PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH),
-        PARROT("Parrot", PetLocomotion.WALK, PetLocomotion.FLY),
-        BEE("Bee", PetLocomotion.WALK, PetLocomotion.FLY),
-        BUTTERFLY("Butterfly", PetLocomotion.WALK, PetLocomotion.FLY),
-        DRAGONFLY("Dragonfly", PetLocomotion.WALK, PetLocomotion.FLY),
-        BEETLE("Beetle", PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH,
+        CAT("Cat", 0xFF6B6B6B, 0xFFEDE7DC, PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH, PetLocomotion.SWIM),
+        DOG("Dog", 0xFFB58B5A, 0xFFE8D9C0, PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH, PetLocomotion.SWIM),
+        FOX("Fox", 0xFFD2703A, 0xFFF3E2D0, PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH),
+        WOLF("Wolf", 0xFF8C9199, 0xFFE7EAEE, PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH),
+        RABBIT("Rabbit", 0xFFD8CFC2, 0xFFFFF6EE, PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH),
+        PARROT("Parrot", 0xFFD64545, 0xFF3FB6D8, PetLocomotion.WALK, PetLocomotion.FLY),
+        BEE("Bee", 0xFFE8B93A, 0xFF2E2A22, PetLocomotion.WALK, PetLocomotion.FLY),
+        BUTTERFLY("Butterfly", 0xFF7B5BD6, 0xFFFFC94D, PetLocomotion.WALK, PetLocomotion.FLY),
+        DRAGONFLY("Dragonfly", 0xFF3FB6A8, 0xFF9CE8E0, PetLocomotion.WALK, PetLocomotion.FLY),
+        BEETLE("Beetle", 0xFF4A3B6B, 0xFF8E7BC4, PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH,
                 PetLocomotion.FLY),
-        SPIDER("Spider", PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH),
-        ANT("Ant", PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH),
-        FROG("Frog", PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.SWIM),
-        AXOLOTL("Axolotl", PetLocomotion.WALK, PetLocomotion.SWIM),
-        TURTLE("Turtle", PetLocomotion.WALK, PetLocomotion.CROUCH, PetLocomotion.SWIM),
-        SNAKE("Snake", PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH,
+        SPIDER("Spider", 0xFF3A2E2A, 0xFFB0452F, PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH),
+        ANT("Ant", 0xFF5A3520, 0xFF8A5A34, PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH),
+        FROG("Frog", 0xFF4E9B3E, 0xFFB7E36B, PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.SWIM),
+        AXOLOTL("Axolotl", 0xFFE68AA8, 0xFFFFD1E0, PetLocomotion.WALK, PetLocomotion.SWIM),
+        TURTLE("Turtle", 0xFF4E7A3E, 0xFF8FBF6A, PetLocomotion.WALK, PetLocomotion.CROUCH, PetLocomotion.SWIM),
+        SNAKE("Snake", 0xFF4C7A2E, 0xFFC7D96B, PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH,
                 PetLocomotion.SWIM),
-        LIZARD("Lizard", PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH),
-        DRAGON("Dragon", PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH,
+        LIZARD("Lizard", 0xFF7A8A4E, 0xFFD6C46A, PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH),
+        DRAGON("Dragon", 0xFF5A2E8C, 0xFFD6A84A, PetLocomotion.WALK, PetLocomotion.RUN, PetLocomotion.CROUCH,
                 PetLocomotion.FLY, PetLocomotion.SWIM);
 
         public final String displayName;
+        /** The species' natural body colour, used as the default pet tint. */
+        public final int baseColor;
+        /** The species' natural accent (belly, wings, spots), used as the default accent. */
+        public final int accentColor;
         private final PetLocomotion[] gaits;
 
-        PetSpecies(String displayName, PetLocomotion... gaits) {
+        PetSpecies(String displayName, int baseColor, int accentColor, PetLocomotion... gaits) {
             this.displayName = displayName;
+            this.baseColor = baseColor;
+            this.accentColor = accentColor;
             this.gaits = gaits;
         }
 
         public boolean supports(PetLocomotion locomotion) {
+            // Idle is the universal resting state: every pet can stand still, so it is supported
+            // even though no species lists it in its gait set.
+            if (locomotion == PetLocomotion.IDLE) return true;
             for (PetLocomotion g : gaits) {
                 if (g == locomotion) return true;
             }
@@ -228,6 +245,44 @@ public final class CosmeticCatalog {
             "Gilded", "Graphite", "Rosewood", "Lagoon", "Amethyst", "Creeper"
     };
 
+    /**
+     * Evocative name stems per palette, used to compose a cape's name from its palette and pattern
+     * so a generated cape reads as a designed piece ("Emberdusk Aurora") rather than a catalogue
+     * entry ("Ember Gradient"). Index-aligned with {@link #PALETTES}.
+     */
+    private static final String[] CAPE_STEMS = {
+            "Chimera", "Umbral", "Fluxweave", "Wildwood", "Emberdusk", "Abyssal",
+            "Gilded", "Obsidian", "Rosewood", "Tidal", "Amethyst", "Creeping"
+    };
+
+    /** Evocative names per cape pattern, used with {@link #CAPE_STEMS}. Index-aligned with
+     *  {@link CapePattern}; a shorter array falls back to "Weave". */
+    private static final String[] CAPE_PATTERN_NAMES = {
+            "Sovereign", "Tapestry", "Ribbon", "Aurora", "Starburst", "Lattice",
+            "Chequered", "Chevron", "Horizon", "Riptide", "Wilds", "Celestial"
+    };
+
+    /**
+     * Per-palette accessory names, one per {@link #ACCESSORY_KINDS} entry. Hand-written rather than
+     * composed so an accessory reads like a themed item ("Ember Circlet") instead of a swatch name
+     * ("Ember Tiara"). Index-aligned with {@link #PALETTES}.
+     */
+    private static final String[][] ACCESSORY_NAMES = {
+            //        CAP            BEANIE        CROWN         GLASSES      MASK          SCARF        BACKPACK     HORNS        FLOWER       BOWTIE       EAR          TOPHAT       WIZARD_HAT   TIARA        BEARD        VEIL         MONOCLE      ANTLERS      PLUME        TRICORN      MORTARBOARD
+            {"Chimera Crest", "Chimera Knit", "Chimera Circlet", "Chimera Visor", "Chimera Veil", "Chimera Stole", "Chimera Satchel", "Chimera Horns", "Chimera Bloom", "Chimera Knot", "Chimera Ears", "Chimera Stovepipe", "Chimera Arcanist", "Chimera Diadem", "Chimera Mane", "Chimera Shroud", "Chimera Lens", "Chimera Antlers", "Chimera Plume", "Chimera Corsair", "Chimera Scholar"},
+            {"Void Cap", "Void Watchcap", "Void Diadem", "Void Shades", "Void Cowl", "Void Wrap", "Void Pack", "Void Spikes", "Void Nightshade", "Void Cravat", "Void Bat Ears", "Void Chimney", "Void Occultist", "Void Tiara", "Void Growth", "Void Shroud", "Void Monocle", "Void Bramble", "Void Quill", "Void Freebooter", "Void Dean"},
+            {"Flux Beret", "Flux Beanie", "Flux Crown", "Flux Goggles", "Flux Mask", "Flux Scarf", "Flux Rucksack", "Flux Horns", "Flux Blossom", "Flux Bow", "Flux Ears", "Flux Top Hat", "Flux Hexer", "Flux Tiara", "Flux Beard", "Flux Veil", "Flux Lens", "Flux Antlers", "Flux Feather", "Flux Captain", "Flux Graduate"},
+            {"Verdant Cap", "Verdant Beanie", "Verdant Crown", "Verdant Specs", "Verdant Mask", "Verdant Scarf", "Verdant Pack", "Verdant Bramble", "Verdant Daisy", "Verdant Knot", "Verdant Ears", "Verdant Tall Hat", "Verdant Druid", "Verdant Tiara", "Verdant Mossbeard", "Verdant Veil", "Verdant Monocle", "Verdant Antlers", "Verdant Frond", "Verdant Explorer", "Verdant Scholar"},
+            {"Ember Cap", "Ember Beanie", "Ember Circlet", "Ember Goggles", "Ember Mask", "Ember Scarf", "Ember Pack", "Ember Horns", "Ember Lily", "Ember Bow", "Ember Ears", "Ember Stovepipe", "Ember Pyromancer", "Ember Tiara", "Ember Beard", "Ember Veil", "Ember Lens", "Ember Antlers", "Ember Plume", "Ember Corsair", "Ember Mortarboard"},
+            {"Abyss Cap", "Abyss Watchcap", "Abyss Crown", "Abyss Lenses", "Abyss Mask", "Abyss Scarf", "Abyss Pack", "Abyss Horns", "Abyss Coral", "Abyss Knot", "Abyss Fins", "Abyss Top Hat", "Abyss Tidecaller", "Abyss Tiara", "Abyss Beard", "Abyss Veil", "Abyss Monocle", "Abyss Antlers", "Abyss Plume", "Abyss Captain", "Abyss Scholar"},
+            {"Gilded Cap", "Gilded Beanie", "Gilded Crown", "Gilded Monocle", "Gilded Mask", "Gilded Scarf", "Gilded Coffer", "Gilded Horns", "Gilded Rose", "Gilded Bow", "Gilded Ears", "Gilded Stovepipe", "Gilded Archmage", "Gilded Diadem", "Gilded Mane", "Gilded Veil", "Gilded Lens", "Gilded Antlers", "Gilded Plume", "Gilded Corsair", "Gilded Graduate"},
+            {"Graphite Cap", "Graphite Watchcap", "Graphite Crown", "Graphite Shades", "Graphite Mask", "Graphite Scarf", "Graphite Pack", "Graphite Horns", "Graphite Bloom", "Graphite Bow", "Graphite Ears", "Graphite Chimney", "Graphite Occultist", "Graphite Tiara", "Graphite Beard", "Graphite Veil", "Graphite Monocle", "Graphite Antlers", "Graphite Quill", "Graphite Freebooter", "Graphite Dean"},
+            {"Rosewood Beret", "Rosewood Beanie", "Rosewood Circlet", "Rosewood Specs", "Rosewood Mask", "Rosewood Scarf", "Rosewood Pack", "Rosewood Horns", "Rosewood Camellia", "Rosewood Bow", "Rosewood Ears", "Rosewood Top Hat", "Rosewood Enchanter", "Rosewood Tiara", "Rosewood Beard", "Rosewood Veil", "Rosewood Monocle", "Rosewood Antlers", "Rosewood Plume", "Rosewood Corsair", "Rosewood Scholar"},
+            {"Tidal Cap", "Tidal Beanie", "Tidal Crown", "Tidal Goggles", "Tidal Mask", "Tidal Scarf", "Tidal Pack", "Tidal Horns", "Tidal Lotus", "Tidal Bow", "Tidal Fins", "Tidal Stovepipe", "Tidal Tidecaller", "Tidal Tiara", "Tidal Beard", "Tidal Veil", "Tidal Lens", "Tidal Antlers", "Tidal Plume", "Tidal Captain", "Tidal Graduate"},
+            {"Amethyst Beret", "Amethyst Beanie", "Amethyst Crown", "Amethyst Lenses", "Amethyst Mask", "Amethyst Scarf", "Amethyst Pack", "Amethyst Horns", "Amethyst Blossom", "Amethyst Bow", "Amethyst Ears", "Amethyst Top Hat", "Amethyst Arcanist", "Amethyst Diadem", "Amethyst Beard", "Amethyst Veil", "Amethyst Monocle", "Amethyst Antlers", "Amethyst Plume", "Amethyst Corsair", "Amethyst Scholar"},
+            {"Creeper Cap", "Creeper Beanie", "Creeper Crown", "Creeper Goggles", "Creeper Mask", "Creeper Scarf", "Creeper Pack", "Creeper Horns", "Creeper Bloom", "Creeper Bow", "Creeper Ears", "Creeper Stovepipe", "Creeper Hexer", "Creeper Tiara", "Creeper Beard", "Creeper Veil", "Creeper Monocle", "Creeper Antlers", "Creeper Plume", "Creeper Corsair", "Creeper Scholar"}
+    };
+
     static {
         List<Cape> capes = new ArrayList<>();
 
@@ -236,25 +291,28 @@ public final class CosmeticCatalog {
         capes.add(new Cape("chimera", "Chimera Cape", 0xFF6236E8, 0xFFA88CFF, 0xFFFFD86B,
                 CapePattern.SOLID, true, true));
 
-        // The classic solid ids are preserved verbatim so existing selections keep resolving.
-        capes.add(new Cape("void_black", "Void Black", 0xFF141418, 0xFF3A3A44, 0xFF8F979F,
+        // The classic ids are preserved verbatim so existing selections keep resolving. Their
+        // display names are upgraded to the designed naming the rest of the catalogue uses.
+        capes.add(new Cape("void_black", "Umbral Sovereign", 0xFF141418, 0xFF3A3A44, 0xFF8F979F,
                 CapePattern.SOLID, false, false));
-        capes.add(new Cape("magenta_flux", "Magenta Flux", 0xFFA82E9E, 0xFFE070C0, 0xFFFFE1F4,
+        capes.add(new Cape("magenta_flux", "Fluxweave Aurora", 0xFFA82E9E, 0xFFE070C0, 0xFFFFE1F4,
                 CapePattern.GRADIENT, false, false));
-        capes.add(new Cape("verdant", "Verdant", 0xFF1F7A4D, 0xFF63D69B, 0xFFE9FFF3,
+        capes.add(new Cape("verdant", "Wildwood Sovereign", 0xFF1F7A4D, 0xFF63D69B, 0xFFE9FFF3,
                 CapePattern.SOLID, false, false));
 
         // Generated families: every palette crossed with every pattern. The brand mark rides on
         // the "Chimera" palette's Split weave only, so the flagship stays special instead of every
-        // cape being branded.
+        // cape being branded. Names are composed from the palette's evocative stem and the
+        // pattern's own name so a cape reads as a designed piece.
         for (int p = 0; p < PALETTES.length; p++) {
             int[] pal = PALETTES[p];
             String stem = PALETTE_NAMES[p];
+            String nameStem = CAPE_STEMS[p];
             for (CapePattern pattern : CapePattern.values()) {
                 String id = slug(stem) + "_" + pattern.name().toLowerCase();
                 if (isHandAuthored(id)) continue;
                 boolean branded = "Chimera".equals(stem) && pattern == CapePattern.SPLIT;
-                capes.add(new Cape(id, stem + " " + patternName(pattern),
+                capes.add(new Cape(id, nameStem + " " + capePatternName(pattern),
                         pal[0], pal[1], pal[2], pattern, false, branded));
             }
         }
@@ -263,57 +321,56 @@ public final class CosmeticCatalog {
         List<Accessory> accessories = new ArrayList<>();
         accessories.add(new Accessory("none", "None", AccessoryKind.NONE, 0x00000000, 0x00000000));
         // Preserved classic ids so a stored selection keeps working.
-        accessories.add(new Accessory("headphones", "Headphones", AccessoryKind.HEADPHONES,
+        accessories.add(new Accessory("headphones", "Graphite Headphones", AccessoryKind.HEADPHONES,
                 0xFF2B2F36, 0xFF6C757D));
-        accessories.add(new Accessory("halo", "Halo", AccessoryKind.HALO, 0xFFFFD86B, 0xFFFFF3C4));
-        accessories.add(new Accessory("wings", "Wings", AccessoryKind.WINGS, 0xFFA88CFF, 0xFF6236E8));
+        accessories.add(new Accessory("halo", "Gilded Halo", AccessoryKind.HALO, 0xFFFFD86B, 0xFFFFF3C4));
+        accessories.add(new Accessory("wings", "Amethyst Wings", AccessoryKind.WINGS, 0xFFA88CFF, 0xFF6236E8));
 
-        // Generated accessories: every drawing kind crossed with a palette.
-        AccessoryKind[] kinds = {
+        // Generated accessories: every drawing kind crossed with a palette, using the hand-written
+        // per-palette names so each is a themed item rather than a swatch.
+        AccessoryKind[] accessoryKinds = {
                 AccessoryKind.CAP, AccessoryKind.BEANIE, AccessoryKind.CROWN,
                 AccessoryKind.GLASSES, AccessoryKind.MASK, AccessoryKind.SCARF,
                 AccessoryKind.BACKPACK, AccessoryKind.HORNS, AccessoryKind.FLOWER,
                 AccessoryKind.BOWTIE, AccessoryKind.EAR, AccessoryKind.TOPHAT,
-                AccessoryKind.WIZARD_HAT, AccessoryKind.TIARA, AccessoryKind.BEARD
-        };
-        String[] kindNames = {
-                "Cap", "Beanie", "Crown", "Glasses", "Mask", "Scarf",
-                "Backpack", "Horns", "Flower", "Bowtie", "Ear", "Top Hat",
-                "Wizard Hat", "Tiara", "Beard"
+                AccessoryKind.WIZARD_HAT, AccessoryKind.TIARA, AccessoryKind.BEARD,
+                AccessoryKind.VEIL, AccessoryKind.MONOCLE, AccessoryKind.ANTLERS,
+                AccessoryKind.PLUME, AccessoryKind.TRICORN, AccessoryKind.MORTARBOARD
         };
         for (int p = 0; p < PALETTES.length; p++) {
             int[] pal = PALETTES[p];
             String stem = PALETTE_NAMES[p];
-            for (int k = 0; k < kinds.length; k++) {
-                String id = slug(stem) + "_" + kinds[k].name().toLowerCase();
+            for (int k = 0; k < accessoryKinds.length; k++) {
+                String id = slug(stem) + "_" + accessoryKinds[k].name().toLowerCase();
                 if (isHandAuthoredAccessory(id)) continue;
-                accessories.add(new Accessory(id, stem + " " + kindNames[k], kinds[k],
+                accessories.add(new Accessory(id, ACCESSORY_NAMES[p][k], accessoryKinds[k],
                         pal[0], pal[1]));
             }
         }
         ACCESSORIES = Collections.unmodifiableList(accessories);
 
+        // Pets are the distinct species only. Each species is a separate authored model with its
+        // own rig and animations, so a pet's variety comes from the species itself rather than a
+        // palette recolour of a shared mesh — the earlier "Mini/Royal/Shadow" size recolours read
+        // as the same animal tinted, which is not what a cosmetics catalogue should be.
         List<Pet> pets = new ArrayList<>();
-        // A pet family: species crossed with palettes and a few size traits, so there are many
-        // distinct looks per species while each one still reads as its species.
-        String[] traitNames = {"", "Mini", "Royal", "Shadow"};
         for (PetSpecies species : PetSpecies.values()) {
-            for (int p = 0; p < PALETTES.length; p++) {
-                int[] pal = PALETTES[p];
-                String stem = PALETTE_NAMES[p];
-                for (int t = 0; t < traitNames.length; t++) {
-                    float scale = t == 1 ? 0.75f : (t == 2 ? 1.18f : 1f);
-                    int body = t == 3 ? darken(pal[0]) : pal[0];
-                    String trait = traitNames[t].isEmpty() ? "" : traitNames[t] + " ";
-                    String id = slug(species.displayName) + "_" + slug(stem)
-                            + (trait.isEmpty() ? "" : "_" + t);
-                    pets.add(new Pet(id, trait + stem + " " + species.displayName,
-                            species, body, pal[1], scale));
-                }
-            }
+            pets.add(new Pet(slug(species.displayName), species.displayName,
+                    species, species.baseColor, species.accentColor, 1f));
         }
         PETS = Collections.unmodifiableList(pets);
     }
+
+    /** The accessory silhouettes the catalogue generates, index-aligned with {@link #ACCESSORY_NAMES}. */
+    static final AccessoryKind[] ACCESSORY_KINDS = {
+            AccessoryKind.CAP, AccessoryKind.BEANIE, AccessoryKind.CROWN,
+            AccessoryKind.GLASSES, AccessoryKind.MASK, AccessoryKind.SCARF,
+            AccessoryKind.BACKPACK, AccessoryKind.HORNS, AccessoryKind.FLOWER,
+            AccessoryKind.BOWTIE, AccessoryKind.EAR, AccessoryKind.TOPHAT,
+            AccessoryKind.WIZARD_HAT, AccessoryKind.TIARA, AccessoryKind.BEARD,
+            AccessoryKind.VEIL, AccessoryKind.MONOCLE, AccessoryKind.ANTLERS,
+            AccessoryKind.PLUME, AccessoryKind.TRICORN, AccessoryKind.MORTARBOARD
+    };
 
     private static boolean isHandAuthored(String id) {
         return id.equals("chimera_solid") || id.equals("void_solid")
@@ -325,22 +382,10 @@ public final class CosmeticCatalog {
                 || id.equals("amethyst_wings");
     }
 
-    private static String patternName(CapePattern pattern) {
-        switch (pattern) {
-            case SOLID: return "Solid";
-            case VERTICAL_STRIPES: return "Stripes";
-            case HORIZONTAL_STRIPES: return "Bands";
-            case GRADIENT: return "Gradient";
-            case SPLIT: return "Split";
-            case GRID: return "Grid";
-            case CHECKER: return "Checker";
-            case CHEVRON: return "Chevron";
-            case HORIZON: return "Horizon";
-            case WAVE: return "Wave";
-            case CAMO: return "Camo";
-            case STAR: return "Star";
-            default: return "Solid";
-        }
+    /** The evocative name for a cape pattern, used with {@link #CAPE_STEMS}. */
+    private static String capePatternName(CapePattern pattern) {
+        int i = pattern.ordinal();
+        return i >= 0 && i < CAPE_PATTERN_NAMES.length ? CAPE_PATTERN_NAMES[i] : "Weave";
     }
 
     private static String slug(String value) {

@@ -849,6 +849,7 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="cosmetics_accessories">Accessories</string>
     <string name="cosmetics_pets">Pets</string>
     <string name="cosmetics_pet_gait">Gait</string>
+    <string name="cosmetics_gait_idle">Idle</string>
     <string name="cosmetics_gait_walk">Walk</string>
     <string name="cosmetics_gait_run">Run</string>
     <string name="cosmetics_gait_crouch">Crouch</string>

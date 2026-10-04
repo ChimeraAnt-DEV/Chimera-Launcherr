@@ -184,6 +184,53 @@ public final class AccessoryGeometry {
                 cube(cubes, -9.5f, 20f, -3.4f, 6f, 9f, 1f, false);
                 cube(cubes, 3.5f, 20f, -3.4f, 6f, 9f, 1f, false);
                 break;
+            case VEIL:
+                // A hood crown over a soft shroud falling down the back of the head and neck.
+                cube(cubes, -4.4f, 32f, -4.4f, 8.8f, 2.4f, 8.8f, false);
+                cube(cubes, -4.2f, 30.4f, -4.6f, 8.4f, 2.2f, 1.2f, true);
+                cube(cubes, -3.8f, 26.6f, -4.6f, 7.6f, 4f, 1f, false);
+                cube(cubes, -3.2f, 24f, -4.6f, 6.4f, 2.8f, 0.9f, true);
+                break;
+            case MONOCLE:
+                // A single rimmed lens over one eye with a chain sweeping to the cheek.
+                cube(cubes, 1f, 28.4f, 4.2f, 3f, 3f, 0.6f, false);
+                cube(cubes, 0.6f, 28f, 4.4f, 3.8f, 3.8f, 0.3f, true);
+                cube(cubes, 2.4f, 26.4f, 4.2f, 0.5f, 2f, 0.5f, true);
+                break;
+            case ANTLERS:
+                // Branching antlers: a stem then two tines each, so the silhouette reads as antler.
+                cube(cubes, -3.2f, 32f, -0.6f, 1.2f, 4.5f, 1.2f, false);
+                cube(cubes, -4.4f, 35f, -0.6f, 1.2f, 1.2f, 1.2f, true);
+                cube(cubes, -3.6f, 36.5f, -0.6f, 1f, 2f, 1f, false);
+                cube(cubes, 2f, 32f, -0.6f, 1.2f, 4.5f, 1.2f, false);
+                cube(cubes, 3.2f, 35f, -0.6f, 1.2f, 1.2f, 1.2f, true);
+                cube(cubes, 2.6f, 36.5f, -0.6f, 1f, 2f, 1f, false);
+                break;
+            case PLUME:
+                // A feathered crest standing up from a headband, fanned by graduated quills.
+                cube(cubes, -4.2f, 32f, -4.2f, 8.4f, 1.2f, 8.4f, false);
+                for (int i = -2; i <= 2; i++) {
+                    float lean = i * 0.7f;
+                    cube(cubes, lean - 0.4f, 33.2f, -0.6f, 0.8f, 3.4f - Math.abs(i) * 0.4f,
+                            0.8f, i % 2 == 0);
+                }
+                break;
+            case TRICORN:
+                // A broad brim turned up at three points — the classic tricorn silhouette.
+                cube(cubes, -6f, 32f, -6f, 12f, 0.9f, 12f, false);
+                cube(cubes, -4.2f, 32.9f, -4.2f, 8.4f, 2.6f, 8.4f, false);
+                cube(cubes, -5.4f, 32.4f, 4.6f, 10.8f, 2.4f, 1.4f, true);
+                cube(cubes, -5.4f, 32.4f, -6f, 10.8f, 2.4f, 1.4f, true);
+                cube(cubes, 4.6f, 32.4f, -5.4f, 1.4f, 2.4f, 10.8f, true);
+                cube(cubes, -6f, 32.4f, -5.4f, 1.4f, 2.4f, 10.8f, true);
+                break;
+            case MORTARBOARD:
+                // A flat, wide board on a low skullcap with a dangling tassel.
+                cube(cubes, -4.2f, 31.6f, -4.2f, 8.4f, 1.6f, 8.4f, false);
+                cube(cubes, -6.4f, 33.2f, -6.4f, 12.8f, 0.8f, 12.8f, false);
+                cube(cubes, -0.4f, 33.2f, -0.4f, 0.8f, 0.8f, 0.8f, true);
+                cube(cubes, 6f, 32.4f, 0f, 0.6f, 2.4f, 0.6f, true);
+                break;
             default:
                 return null;
         }

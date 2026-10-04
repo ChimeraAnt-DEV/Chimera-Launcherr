@@ -16,13 +16,17 @@ import org.junit.Test;
 public class CosmeticCatalogExpansionTest {
 
     @Test
-    public void everyFamilyHasMoreThanAHundredStyles() {
+    public void everyFamilyHasEnoughStylesToBeARealChoice() {
         assertTrue("capes should offer 100+ styles, had " + CosmeticCatalog.capes().size(),
                 CosmeticCatalog.capes().size() >= 100);
         assertTrue("accessories should offer 100+ styles, had " + CosmeticCatalog.accessories().size(),
                 CosmeticCatalog.accessories().size() >= 100);
-        assertTrue("pets should offer 100+ styles, had " + CosmeticCatalog.pets().size(),
-                CosmeticCatalog.pets().size() >= 100);
+        // Pets are the distinct authored species now, not palette recolours of a shared mesh: one
+        // entry per species, each its own rig and animation set. There are far more than a handful.
+        assertTrue("pets should offer a dozen or more species, had " + CosmeticCatalog.pets().size(),
+                CosmeticCatalog.pets().size() >= 12);
+        assertEquals("one pet entry per species",
+                CosmeticCatalog.PetSpecies.values().length, CosmeticCatalog.pets().size());
     }
 
     @Test

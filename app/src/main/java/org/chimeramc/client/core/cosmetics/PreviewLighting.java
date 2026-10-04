@@ -24,6 +24,16 @@ public final class PreviewLighting {
     /** How bright an unlit face still is; below this a back face goes flat black. */
     public static final double AMBIENT = 0.42;
 
+    /**
+     * A soft fill light from the opposite side, as a fraction of the key. A single directional
+     * light leaves every face turned away from it at the same flat ambient, which is what makes a
+     * render read as a lit cut-out. A weak counter-fill lifts the shadow side without inverting the
+     * key, so a box keeps a clear light side and shadow side while the shadow side still shows its
+     * form. Kept below the gap that separates the front from the back, so the front stays the
+     * brighter of the two.
+     */
+    public static final double FILL = 0.15;
+
     /** Alpha of a black overlay at the darkest a face ever gets. */
     public static final int MAX_DARKEN_ALPHA = 140;
 
@@ -84,7 +94,11 @@ public final class PreviewLighting {
         if (length < 1e-6 || Double.isNaN(length)) return AMBIENT;
         double dot = (nx * LX + ny * LY + nz * LZ) / length;
         double diffuse = Math.max(0.0, dot);
-        return clamp(AMBIENT + (1.0 - AMBIENT) * diffuse, 0.25, 1.0);
+        // A weak counter-fill opposite the key. It never turns a shadowed face brighter than a lit
+        // one, because its contribution is a fraction of the key's and the key is zero on the faces
+        // the fill lifts most.
+        double fill = Math.max(0.0, -dot) * FILL;
+        return clamp(AMBIENT + (1.0 - AMBIENT) * diffuse + fill, 0.25, 1.0);
     }
 
     /** A flat colour for an arbitrary normal, multiplied toward black by the surface's shadow. */
