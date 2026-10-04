@@ -66,6 +66,8 @@ public final class CapeResourcePackBuilder {
     public static final String CAPE_ANIMATION_ID = "animation.chimera_cape";
     /** Render controller that draws the worn accessory (hat/headwear). */
     public static final String HAT_CONTROLLER_ID = "controller.render.chimera_hat";
+    /** The animation that makes the worn headwear follow the head's yaw and pitch. */
+    public static final String HAT_ANIMATION_ID = "animation.chimera_hat";
     /** Render controller that draws the equipped pet. */
     public static final String PET_CONTROLLER_ID = "controller.render.chimera_pet";
     /** The animation that bobs the pet; played by the {@code pet} key. */
@@ -81,6 +83,7 @@ public final class CapeResourcePackBuilder {
     public static final String HAT_MODEL_PATH = "models/entity/chimera_hat.geo.json";
     public static final String HAT_RENDER_CONTROLLER_PATH =
             "render_controllers/chimera_hat.render_controllers.json";
+    public static final String HAT_ANIMATION_PATH = "animations/chimera_hat.animation.json";
     public static final String HAT_TEXTURE_PATH = "textures/entity/chimera_hat.png";
     public static final String PET_MODEL_PATH = "models/entity/chimera_pet.geo.json";
     public static final String PET_RENDER_CONTROLLER_PATH =
@@ -141,6 +144,22 @@ public final class CapeResourcePackBuilder {
     public static BuiltPack build(File targetDir, CosmeticCatalog.Cape cape,
                                   CosmeticCatalog.Accessory accessory,
                                   CosmeticCatalog.Pet pet) throws IOException {
+        return build(targetDir, cape, accessory, pet, null);
+    }
+
+    /**
+     * As {@link #build(File, CosmeticCatalog.Cape, CosmeticCatalog.Accessory, CosmeticCatalog.Pet)},
+     * but preferring a hand-authored Blockbench model when one is present in {@code assets}.
+     *
+     * <p>Authored {@code .geo.json} files (see {@link AuthoredGeometry}) replace the procedural mesh
+     * for the cape, the worn accessory and the pet. When {@code assets} is {@code null}, or a given
+     * model is absent or malformed, the procedural geometry is used as before — so this is a pure
+     * opt-in overlay and an empty asset directory changes nothing.
+     */
+    public static BuiltPack build(File targetDir, CosmeticCatalog.Cape cape,
+                                  CosmeticCatalog.Accessory accessory,
+                                  CosmeticCatalog.Pet pet,
+                                  AuthoredGeometry.AssetOpener assets) throws IOException {
         if (targetDir == null) throw new IOException("no target directory");
         if (!targetDir.exists() && !targetDir.mkdirs()) {
             throw new IOException("cannot create " + targetDir);
@@ -162,8 +181,11 @@ public final class CapeResourcePackBuilder {
 
         writeAt(targetDir, PLAYER_ENTITY_PATH,
                 playerEntityJson().getBytes(StandardCharsets.UTF_8));
+        String capeModel = AuthoredGeometry.loadFromAssets(assets, AuthoredGeometry.ASSET_DIR,
+                AuthoredGeometry.CAPE_FILE, CAPE_GEOMETRY_ID);
+        if (capeModel == null) capeModel = capeModelJson();
         writeAt(targetDir, CAPE_MODEL_PATH,
-                capeModelJson().getBytes(StandardCharsets.UTF_8));
+                capeModel.getBytes(StandardCharsets.UTF_8));
         writeAt(targetDir, CAPE_RENDER_CONTROLLER_PATH,
                 capeRenderControllerJson().getBytes(StandardCharsets.UTF_8));
         writeAt(targetDir, CAPE_ANIMATION_PATH,
@@ -175,11 +197,15 @@ public final class CapeResourcePackBuilder {
         // and a backpack are genuinely different meshes rather than one recoloured box. With none
         // equipped a resolving-but-empty geometry is written instead, because the entity always
         // names it and a missing identifier can fail the whole client entity.
-        String hatModel = AccessoryGeometry.geometryJson(accessoryKind(accessory));
+        String hatModel = AuthoredGeometry.loadFromAssets(assets, AuthoredGeometry.ASSET_DIR,
+                AuthoredGeometry.HAT_FILE, AccessoryGeometry.GEOMETRY_ID);
+        if (hatModel == null) hatModel = AccessoryGeometry.geometryJson(accessoryKind(accessory));
         if (hatModel == null) hatModel = AccessoryGeometry.emptyGeometryJson();
         writeAt(targetDir, HAT_MODEL_PATH, hatModel.getBytes(StandardCharsets.UTF_8));
         writeAt(targetDir, HAT_RENDER_CONTROLLER_PATH,
                 hatRenderControllerJson().getBytes(StandardCharsets.UTF_8));
+        writeAt(targetDir, HAT_ANIMATION_PATH,
+                hatAnimationJson().getBytes(StandardCharsets.UTF_8));
         writeAt(targetDir, HAT_TEXTURE_PATH,
                 accessory == null
                         ? FlatColorAtlas.paint(0x00000000, 0x00000000,
@@ -189,7 +215,9 @@ public final class CapeResourcePackBuilder {
 
         // The pet is written whenever one is equipped; its geometry is per-species. As with the
         // hat, an empty geometry is written when none is equipped so the reference resolves.
-        String petModel = PetGeometry.geometryJson(pet);
+        String petModel = AuthoredGeometry.loadFromAssets(assets, AuthoredGeometry.ASSET_DIR,
+                AuthoredGeometry.PET_FILE, PetGeometry.GEOMETRY_ID);
+        if (petModel == null) petModel = PetGeometry.geometryJson(pet);
         if (petModel == null) petModel = PetGeometry.emptyGeometryJson();
         writeAt(targetDir, PET_MODEL_PATH, petModel.getBytes(StandardCharsets.UTF_8));
         writeAt(targetDir, PET_RENDER_CONTROLLER_PATH,
@@ -316,6 +344,8 @@ public final class CapeResourcePackBuilder {
                 + "        ],\n"
                 + "        \"animate\": [\n"
                 + "          \"root\",\n"
+                + "          \"" + CAPE_ANIMATION_ID + "\",\n"
+                + "          \"" + HAT_ANIMATION_ID + "\",\n"
                 + "          \"" + PET_ANIMATION_ID + "\"\n"
                 + "        ],\n"
                 + "        \"variables\": {\n"
@@ -339,7 +369,7 @@ public final class CapeResourcePackBuilder {
                 + "        \"look_at_target_gliding\": \"animation.humanoid.look_at_target.gliding\",\n"
                 + "        \"look_at_target_swimming\": \"animation.humanoid.look_at_target.swimming\",\n"
                 + "        \"look_at_target_inverted\": \"animation.player.look_at_target.inverted\",\n"
-                + "        \"cape\": \"" + CAPE_ANIMATION_ID + "\",\n"
+                + "        \"cape\": \"animation.player.cape\",\n"
                 + "        \"move.arms\": \"animation.player.move.arms\",\n"
                 + "        \"move.legs\": \"animation.player.move.legs\",\n"
                 + "        \"swimming\": \"animation.player.swim\",\n"
@@ -467,17 +497,29 @@ public final class CapeResourcePackBuilder {
      * The cape's cloth animation: one rotation triple per segment, all driven from
      * {@link CapeAnimationCurve}.
      *
-     * <p>A geometry alone renders the cape as a rigid box: the vanilla player controller plays the
-     * {@code cape} animation key in third person and the paperdoll, and the pack points that key at
-     * this animation. Each of the {@link CapeGeometry#SEGMENT_COUNT} bones gets its own rotation,
-     * scaled by {@link CapeAnimationCurve#segmentShare} and phase-lagged down the chain, so the
-     * cloth folds and ripples rather than swinging as one plank. The queries are Bedrock's
-     * {@code modified_move_speed}, {@code is_jumping}, {@code vertical_speed},
-     * {@code modified_distance_moved} and {@code body_y_rotation}, all read from the expressions
-     * {@link CapeAnimationCurve} also implements in Java, so the amplitudes have one definition.
+     * <p><b>Why this is played from {@code animate} and not from the {@code cape} shortcut.</b>
+     * The vanilla {@code "cape"} animation key must stay pointed at {@code animation.player.cape}:
+     * it is played by {@code controller.animation.player.root} in third person and the paperdoll for
+     * <em>every</em> player, and it drives the vanilla cape bone on a player who has a vanilla or
+     * Persona cape equipped. Redirecting that key to this animation (the previous approach) replaced
+     * the vanilla swing globally, so a player wearing a plain vanilla cape — with no Chimera
+     * cosmetic at all — got this pack's animation instead and their cape froze. Playing this from
+     * the entity's own {@code animate} list instead scopes it: it only writes the {@code cape_1..N}
+     * bones, which exist only in this pack's geometry, so vanilla's cape bone and animation are left
+     * completely untouched.
      *
-     * <p>No {@code loop} key: the default (non-looping) is what vanilla uses for this bone, and the
-     * expression is a continuous function of the queries, so it tracks the player either way.
+     * <p>Each of the {@link CapeGeometry#SEGMENT_COUNT} bones gets its own rotation, scaled by
+     * {@link CapeAnimationCurve#segmentShare} and phase-lagged down the chain, so the cloth folds
+     * and ripples rather than swinging as one plank. The queries are Bedrock's
+     * {@code modified_move_speed}, {@code cape_flap_amount}, {@code is_jumping},
+     * {@code vertical_speed}, {@code modified_distance_moved} and {@code body_y_rotation}, all read
+     * from the expressions {@link CapeAnimationCurve} also implements in Java, so the amplitudes
+     * have one definition. {@code cape_flap_amount} is the 0..1 signal vanilla already computes for
+     * a cape; it is the primary driver so the cloth tracks real cape motion rather than the small,
+     * game-scaled {@code modified_move_speed} alone.
+     *
+     * <p>{@code loop: true} matches vanilla's own cape animation: the expression is a continuous
+     * function of the queries, so looping keeps it sampling every frame instead of playing once.
      */
     static String capeAnimationJson() {
         StringBuilder sb = new StringBuilder();
@@ -485,6 +527,7 @@ public final class CapeResourcePackBuilder {
         sb.append("  \"format_version\": \"1.8.0\",\n");
         sb.append("  \"animations\": {\n");
         sb.append("    \"").append(CAPE_ANIMATION_ID).append("\": {\n");
+        sb.append("      \"loop\": true,\n");
         sb.append("      \"bones\": {\n");
         for (int i = 1; i <= CapeGeometry.SEGMENT_COUNT; i++) {
             sb.append("        \"").append(CapeGeometry.boneName(i)).append("\": {\n");
@@ -615,6 +658,36 @@ public final class CapeResourcePackBuilder {
                 + "        \"g\": 0.0,\n"
                 + "        \"b\": 0.0,\n"
                 + "        \"a\": 0.0\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "}\n";
+    }
+
+    /**
+     * The worn headwear's animation: the {@code acc} bone follows the head's yaw and pitch.
+     *
+     * <p>An accessory is its own geometry rendered in entity space, so it already follows the
+     * player's position and body facing. What it does not inherit is the head's look rotation, so
+     * without this a hat stays bolt-upright while the player looks around and reads as a box glued
+     * to the shoulders rather than something worn on the head. This applies the same
+     * {@code query.target_x_rotation}/{@code query.target_y_rotation} the vanilla humanoid head uses,
+     * pivoted at the neck (0, 24, 0 — the vanilla {@code head} bone's pivot), so the accessory turns
+     * with the head.
+     *
+     * <p>Played from the entity's {@code animate} list, so it runs in every frame (first person
+     * included) and is scoped to the {@code acc} bone that only this pack's geometry defines.
+     */
+    static String hatAnimationJson() {
+        return "{\n"
+                + "  \"format_version\": \"1.8.0\",\n"
+                + "  \"animations\": {\n"
+                + "    \"" + HAT_ANIMATION_ID + "\": {\n"
+                + "      \"loop\": true,\n"
+                + "      \"bones\": {\n"
+                + "        \"acc\": {\n"
+                + "          \"rotation\": [\"query.target_x_rotation\", \"query.target_y_rotation\", 0.0]\n"
+                + "        }\n"
                 + "      }\n"
                 + "    }\n"
                 + "  }\n"

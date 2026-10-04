@@ -24,6 +24,18 @@ public final class CapeAnimationCurve {
 
     /** Lean at a full sprint. */
     public static final double WALK_LEAN_DEG = 28.0;
+    /**
+     * Lean at a full {@code query.cape_flap_amount}, i.e. the swing vanilla itself would apply.
+     *
+     * <p>This is the primary driver. Vanilla's own {@code animation.player.cape} is
+     * {@code math.lerp(0.0, -126.0, query.cape_flap_amount) - 6.0}, so a cape with a vanilla/Persona
+     * cape equipped already has a per-frame flap signal the game computes; reading it makes the
+     * Chimera cape track exactly the motion the player expects. {@code modified_move_speed} alone
+     * is a poor driver because it is a small, game-scaled value (a sprint saturates near 1.0 only
+     * at full tilt), so on its own the cloth barely moves at a walk. Deliberately short of
+     * vanilla's 126° so the cape reads as cloth rather than a flag snapping horizontal.
+     */
+    public static final double FLAP_LEAN_DEG = 42.0;
     /** Extra flare while airborne. */
     public static final double JUMP_FLARE_DEG = 12.0;
     /** Lean added per unit of vertical speed, so rising and falling both stream the cloth. */
@@ -80,9 +92,16 @@ public final class CapeAnimationCurve {
     public static double segmentLeanDegrees(int index, int total, double moveSpeed,
                                             boolean jumping, double verticalSpeed,
                                             double distanceMoved) {
+        return segmentLeanDegrees(index, total, moveSpeed, jumping, verticalSpeed, distanceMoved, 0.0);
+    }
+
+    /** As above, carrying the vanilla cape-flap term down the chain. */
+    public static double segmentLeanDegrees(int index, int total, double moveSpeed,
+                                            boolean jumping, double verticalSpeed,
+                                            double distanceMoved, double capeFlap) {
         double share = segmentShare(index, total);
         double phase = (index - 1) * SEGMENT_PHASE_LAG_BLOCKS;
-        return share * leanDegrees(moveSpeed, jumping, verticalSpeed, distanceMoved - phase);
+        return share * leanDegrees(moveSpeed, jumping, verticalSpeed, distanceMoved - phase, capeFlap);
     }
 
     /**
@@ -111,9 +130,21 @@ public final class CapeAnimationCurve {
     /** The cape bone's X rotation in degrees for the given movement state; negative leans back. */
     public static double leanDegrees(double moveSpeed, boolean jumping, double verticalSpeed,
                                      double distanceMoved) {
+        return leanDegrees(moveSpeed, jumping, verticalSpeed, distanceMoved, 0.0);
+    }
+
+    /**
+     * The cape bone's X rotation with vanilla's own {@code query.cape_flap_amount} as the primary
+     * driver. {@code capeFlap} is the 0..1 signal the game already computes for a vanilla cape; when
+     * the player has no cape equipped it is 0 and the {@code modified_move_speed} term still gives
+     * the cloth motion, so the cape animates either way.
+     */
+    public static double leanDegrees(double moveSpeed, boolean jumping, double verticalSpeed,
+                                     double distanceMoved, double capeFlap) {
         double speed = clamp(moveSpeed, 0.0, MAX_MOVE_SPEED);
+        double flap = clamp(capeFlap, 0.0, 1.0);
         double vertical = clamp(verticalSpeed, -MAX_VERTICAL, MAX_VERTICAL);
-        double lean = speed * WALK_LEAN_DEG;
+        double lean = speed * WALK_LEAN_DEG + flap * FLAP_LEAN_DEG;
         if (jumping) lean += JUMP_FLARE_DEG;
         lean += vertical * VERTICAL_LEAN_DEG;
         lean += Math.sin(distanceMoved * FLUTTER_FREQUENCY) * FLUTTER_AMPLITUDE_DEG * speed;
@@ -146,6 +177,7 @@ public final class CapeAnimationCurve {
         return "-("
                 + "math.clamp(query.modified_move_speed, 0.0, " + num(MAX_MOVE_SPEED) + ")"
                 + " * " + num(WALK_LEAN_DEG)
+                + " + math.clamp(query.cape_flap_amount, 0.0, 1.0) * " + num(FLAP_LEAN_DEG)
                 + " + (query.is_jumping ? " + num(JUMP_FLARE_DEG) + " : 0.0)"
                 + " + math.clamp(query.vertical_speed, -" + num(MAX_VERTICAL)
                 + ", " + num(MAX_VERTICAL) + ") * " + num(VERTICAL_LEAN_DEG)

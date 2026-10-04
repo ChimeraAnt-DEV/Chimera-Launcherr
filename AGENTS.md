@@ -430,7 +430,7 @@ only, like the other overlays.
 - `CosmeticsPanel` + `CapePreviewView` + `SkinModel` / `PlayerSkinProvider` / `CapeSimulator` (in `core/cosmetics`) render the player's character with their applied skin and the equipped cape, animated. The catalogue and selection are pure and unit-tested.
 - **In-game capes render through the player client entity, not a texture override.** The old pack replaced `textures/entity/cape_invisible.png`, but a cape equipped through Microsoft's Persona cosmetics system is fetched per-account (`PersonaNetworkHandlerDelegate`), so that static file is not what the renderer samples and nothing showed. `CapeResourcePackBuilder` now emits a resource pack that overrides `entity/player.entity.json` and adds a `chimera_cape` texture/geometry/material shortname plus a `controller.render.chimera_cape` render controller that draws the cape on the player's back in third person and the paperdoll. It is unconditional — no vanilla cape needs to be equipped. `CapeInGameInstaller` installs it via `SkinPackActivator` (the launcher's proven path into `resource_packs/` + `minecraftpe/global_resource_packs.json`); do not hand-write a second writer for those two files.
 - **The cape geometry is a chain of 16 thin bones, not one box, and the animation folds it.** A single bone swings as one rigid plank, so the cape reads as a hinged board. `CapeGeometry` builds `cape_1..cape_16`, each parented to the one above it, each 10x1x1, together spanning the same 10x16 box the single bone used; each segment samples its own texture row so the artwork is not stretched. `CapeResourcePackBuilder.capeAnimationJson()` gives every segment its own rotation, scaled by `CapeAnimationCurve.segmentShare` (a ramp from shoulders to hem whose shares sum to 1, so the total bend equals the single-bone lean) and phase-lagged down the chain by `SEGMENT_PHASE_LAG_BLOCKS`, so the hem visibly trails the shoulders instead of the whole chain moving in lockstep. Every dimension derives from `CapeGeometry.SEGMENT_COUNT`, so the `FALLBACK_SEGMENT_COUNT` (12) drop-in — the FPS fallback if a device measures a frame-rate drop — still spans the box and still samples the full texture. `CapeGeometryTest` pins the chain (contiguous, no overlap, each hangs from the one above, distinct UV rows, both counts reach the hem); `CapeAnimationCurveTest` pins the shares and the fold. Change the count and both stay green.
-- **The animation is driven by `modified_move_speed`, `is_jumping`, `vertical_speed`, `modified_distance_moved` and `body_y_rotation`.** The first four are the movement queries; `body_y_rotation` is fed through `math.sin(math.rad(...))` so a turn ripples the cloth but the term stays bounded — the raw yaw wraps, so using it directly would make the sway grow without bound as the player spins. `CapeAnimationCurve` implements the same maths in Java and builds the JSON expressions from the same constants, so the amplitudes have one definition; a literal drifting between the two is how "animates in the preview but not in the game" happens.
+- **The animation is driven by `cape_flap_amount` (primary) plus `modified_move_speed`, `is_jumping`, `vertical_speed`, `modified_distance_moved` and `body_y_rotation`.** Vanilla's own cape swing is `math.lerp(0.0, -126.0, query.cape_flap_amount) - 6.0`, so `cape_flap_amount` is the signal the game already computes and the curve reads it first; `modified_move_speed` is the fallback so the cloth still moves with no vanilla cape equipped. `body_y_rotation` is fed through `math.sin(math.rad(...))` so a turn ripples the cloth but the term stays bounded — the raw yaw wraps, so using it directly would make the sway grow without bound as the player spins. `CapeAnimationCurve` implements the same maths in Java and builds the JSON expressions from the same constants, so the amplitudes have one definition; a literal drifting between the two is how "animates in the preview but not in the game" happens. The animation is played from the entity's `animate` list and `loop: true`; see the "Do NOT redirect the vanilla `cape` animation key" bullet for why it must not go through the `cape` shortcut.
 
 - **The player-entity override must keep `min_engine_version` at `1.8.0`.** A player client-entity file declaring above `1.13.0` disables the Character Creator (Persona skins and capes). The entity file is otherwise the full vanilla animation set so every existing player animation and custom/Persona skin keeps working; only the cape shortnames and controller are new. `CapeResourcePackBuilderTest` pins the version, the controller wiring and that every generated file parses as JSON (a malformed client-entity/controller file is skipped silently by the game).
 - **On attachables.** A `minecraft:attachable` binds to an *item* slot (main/off hand, armour); a cape is not a held item, so there is no item for one to bind to. The client-entity render controller is the supported data-driven cape route and what the community cape packs use. Still pure JSON content, no native code.
@@ -1163,12 +1163,35 @@ these are the conclusions.
 - **A `minecraft:attachable` cannot be triggered by a cape.** Verified against the Bedrock Wiki:
   an attachable binds to an *item/block identifier* (main hand, off hand, armour) and renders when
   that item is equipped; there is no client-side condition to bind it to a cosmetic. The cape's
-  correct data-driven route is the vanilla `cape` animation key: `controller.animation.player.root`
-  plays `"cape"` in third person and the paperdoll, and the generated pack overrides
-  `entity/player.entity.json` to point that key at `animation.chimera_cape` plus a
-  `chimera_cape` render controller. That is the route the working community cape packs use, and it
-  is pure JSON — no native code, no hooking. Do not "convert the cape to an attachable"; there is
-  nothing for it to attach to.
+  correct data-driven route is the player client entity's `cape` *bone* plus the pack's own
+  animation, described below. Do not "convert the cape to an attachable"; there is nothing for it
+  to attach to.
+- **Do NOT redirect the vanilla `"cape"` animation key.** It is played by
+  `controller.animation.player.root` in third person and the paperdoll for *every* player, and it
+  drives the vanilla `cape` bone on a player wearing a vanilla or Persona cape. Pointing that key at
+  `animation.chimera_cape` (the first implementation) replaced vanilla's own
+  `math.lerp(0.0, -126.0, query.cape_flap_amount) - 6.0` swing globally, so a plain vanilla cape —
+  with no Chimera cosmetic at all — froze. The pack must leave `"cape": "animation.player.cape"`
+  alone and instead play `animation.chimera_cape` from the entity's own `animate` list. That is what
+  scopes it: the animation only writes the `cape_1..N` bones, which exist only in this pack's
+  geometry, so vanilla's `cape` bone and animation are never touched. `CapeResourcePackBuilderTest`
+  pins both the untouched key and the `animate`-list playback.
+- **The cape animation must read `query.cape_flap_amount`.** Vanilla drives its cape from that 0..1
+  signal, not from `modified_move_speed` (which is game-scaled and small at a walk). The curve uses
+  both: `cape_flap_amount` as the primary driver and `modified_move_speed` as a fallback so the
+  cloth still moves with no vanilla cape equipped. `loop: true`, matching vanilla. Amplitudes are
+  anchored to vanilla's 126° (deliberately shorter, 42°, so it reads as cloth not a flag).
+- **The worn headwear needs its own head-look animation.** An accessory is a separate geometry in
+  entity space, so it follows position and body facing but *not* the head's look rotation; without
+  `animation.chimera_hat` (played from `animate`) turning the `acc` bone by
+  `query.target_x_rotation`/`query.target_y_rotation`, a hat stays bolt-upright while the player
+  looks around. The `acc` pivot is the neck (0, 24, 0), the vanilla `head` bone's pivot.
+- **Authored Blockbench meshes are the intended fix for the "box glued to a box" look.** Procedural
+  box-stacking cannot produce the catalogue's quality bar. Drop a Blockbench `.geo.json` into
+  `resources/cosmetics/models/` (`chimera_cape.geo.json` / `chimera_hat.geo.json` /
+  `chimera_pet.geo.json`); `AuthoredGeometry` retargets its `identifier` to the pack id and the
+  builder writes it verbatim, falling back to the procedural mesh when absent or malformed. No code
+  change is needed to swap a mesh.
 - **A skin pack is the other documented Bedrock cape path, but it cannot serve a launcher
   cosmetic.** It pairs a cape texture with a skin in `skins.json`, so it only works while the
   player wears that exact skin and requires a Dressing Room re-entry. The render-controller route
