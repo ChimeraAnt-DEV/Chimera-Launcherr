@@ -236,17 +236,74 @@ public class CapeResourcePackBuilderTest {
     }
 
     /**
-     * The vanilla player controller plays the {@code cape} key in third person and the paperdoll,
-     * so the entity must point that key at this pack's animation or the cape never animates.
+     * The vanilla {@code cape} animation key must stay pointed at {@code animation.player.cape}.
+     *
+     * <p>It is played by {@code controller.animation.player.root} for <em>every</em> player, and
+     * drives the vanilla cape bone on a player with a vanilla or Persona cape equipped. The pack
+     * previously redirected this key to its own animation, which replaced the vanilla swing
+     * globally: a player wearing a plain vanilla cape — with no Chimera cosmetic at all — got this
+     * pack's animation and their cape froze. This pins that the vanilla key is untouched.
      */
     @Test
-    public void theEntityPointsTheCapeKeyAtTheClothAnimation() {
+    public void theVanillaCapeKeyIsNotRedirected() {
         String entity = CapeResourcePackBuilder.playerEntityJson();
-        assertTrue("entity binds the cape animation",
+        assertTrue("vanilla cape animation must be left alone",
+                entity.contains("\"cape\": \"animation.player.cape\""));
+        assertFalse("the cape key must not be redirected to this pack's animation",
                 entity.contains("\"cape\": \"" + CapeResourcePackBuilder.CAPE_ANIMATION_ID + "\""));
+    }
+
+    /**
+     * The pack's cape animation is played from the entity's own {@code animate} list instead.
+     *
+     * <p>That is what scopes it: it only writes the {@code cape_1..N} bones, which exist only in
+     * this pack's geometry, so the vanilla cape bone and its animation are never touched.
+     */
+    @Test
+    public void theCapeAnimationIsPlayedFromTheEntityAnimateList() {
+        String entity = CapeResourcePackBuilder.playerEntityJson();
+        assertTrue("cape animation is in the animate list",
+                entity.contains("\"" + CapeResourcePackBuilder.CAPE_ANIMATION_ID + "\""));
+        // And the animation file it names actually exists under that id.
         assertTrue("the animation file is written under the same id",
                 CapeResourcePackBuilder.capeAnimationJson()
                         .contains("\"" + CapeResourcePackBuilder.CAPE_ANIMATION_ID + "\""));
+        assertTrue("the cape animation loops like vanilla's",
+                CapeResourcePackBuilder.capeAnimationJson().contains("\"loop\": true"));
+    }
+
+    /**
+     * The cape animation writes only the pack's own {@code cape_N} bones.
+     *
+     * <p>If it named the vanilla {@code cape} bone it would fight vanilla's own animation for that
+     * bone. Scoping to the pack's bones is the whole reason the vanilla swing survives.
+     */
+    @Test
+    public void theCapeAnimationOnlyTouchesItsOwnBones() {
+        String animation = CapeResourcePackBuilder.capeAnimationJson();
+        assertFalse("must not write the vanilla cape bone",
+                animation.contains("\"cape\": {"));
+        for (int i = 1; i <= CapeGeometry.SEGMENT_COUNT; i++) {
+            assertTrue("writes cape_" + i, animation.contains("\"" + CapeGeometry.boneName(i) + "\""));
+        }
+    }
+
+    /**
+     * The worn headwear follows the head, not just the body.
+     *
+     * <p>An accessory is its own geometry in entity space, so it follows position and body facing
+     * already; without this animation it would stay bolt-upright while the player looks around.
+     * The animation must apply the head's look rotation and be played from the entity.
+     */
+    @Test
+    public void theHeadwearFollowsTheHeadLook() {
+        String animation = CapeResourcePackBuilder.hatAnimationJson();
+        assertTrue("head pitch", animation.contains("query.target_x_rotation"));
+        assertTrue("head yaw", animation.contains("query.target_y_rotation"));
+        assertTrue("drives the acc bone", animation.contains("\"acc\""));
+        String entity = CapeResourcePackBuilder.playerEntityJson();
+        assertTrue("hat animation is in the animate list",
+                entity.contains("\"" + CapeResourcePackBuilder.HAT_ANIMATION_ID + "\""));
     }
 
     /**
