@@ -12,8 +12,11 @@ package org.chimeramc.client.core.cosmetics;
  * renders one geometry per controller, and the player's vanilla geometry is a compiled
  * {@code geometry.humanoid.custom}. Injecting new cubes into it is not something a resource pack
  * can do, so each accessory is its own small geometry drawn in entity space at the head's real
- * coordinates (the vanilla head box spans x -4..4, y 24..32, z -4..4). It follows the player's
- * position and facing; it does not inherit a head tilt, which for a hat is not visible anyway.
+ * coordinates (the vanilla head box spans x -4..4, y 24..32, z -4..4). Its single {@code acc} bone
+ * is pivoted at the neck (0, 24, 0 — the vanilla {@code head} bone's pivot) and the pack's
+ * {@code animation.chimera_hat} turns that bone by {@code query.target_x_rotation} /
+ * {@code query.target_y_rotation}, so the accessory follows the player's position, body facing
+ * <em>and</em> head look, exactly like a worn item rather than a static prop.
  *
  * <p><b>Varied meshes, not one mesh recoloured.</b> Each {@link CosmeticCatalog.AccessoryKind}
  * builds a different set of boxes — a cap is a crown plus a brim, a crown is a band plus five

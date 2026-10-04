@@ -1,5 +1,6 @@
 package org.chimeramc.client.core.content;
 
+import org.chimeramc.client.core.cosmetics.AuthoredGeometry;
 import org.chimeramc.client.core.cosmetics.CapeResourcePackBuilder;
 import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
 
@@ -69,7 +70,20 @@ public final class CapeInGameInstaller {
                                                          CosmeticCatalog.Cape cape,
                                                          CosmeticCatalog.Accessory accessory,
                                                          CosmeticCatalog.Pet pet) {
-        if (!writePack(stagingRoot, gameDataDirs, cape, accessory, pet)) {
+        return install(stagingRoot, gameDataDirs, cape, accessory, pet, null);
+    }
+
+    /**
+     * As above, but preferring hand-authored Blockbench models from {@code assets} (see
+     * {@link AuthoredGeometry}). A {@code null} opener or an absent model falls back to the
+     * procedural geometry, so this is a pure opt-in overlay.
+     */
+    public static InGamePackChanger.ApplyOutcome install(File stagingRoot, List<File> gameDataDirs,
+                                                         CosmeticCatalog.Cape cape,
+                                                         CosmeticCatalog.Accessory accessory,
+                                                         CosmeticCatalog.Pet pet,
+                                                         AuthoredGeometry.AssetOpener assets) {
+        if (!writePack(stagingRoot, gameDataDirs, cape, accessory, pet, assets)) {
             return InGamePackChanger.ApplyOutcome.FAILED;
         }
 
@@ -114,7 +128,16 @@ public final class CapeInGameInstaller {
                                          CosmeticCatalog.Cape cape,
                                          CosmeticCatalog.Accessory accessory,
                                          CosmeticCatalog.Pet pet) {
-        return writePack(stagingRoot, gameDataDirs, cape, accessory, pet);
+        return installQuietly(stagingRoot, gameDataDirs, cape, accessory, pet, null);
+    }
+
+    /** As above, preferring hand-authored Blockbench models when {@code assets} has them. */
+    public static boolean installQuietly(File stagingRoot, List<File> gameDataDirs,
+                                         CosmeticCatalog.Cape cape,
+                                         CosmeticCatalog.Accessory accessory,
+                                         CosmeticCatalog.Pet pet,
+                                         AuthoredGeometry.AssetOpener assets) {
+        return writePack(stagingRoot, gameDataDirs, cape, accessory, pet, assets);
     }
 
     /** Removes the cape pack from every candidate root without asking a session to reload. */
@@ -138,13 +161,14 @@ public final class CapeInGameInstaller {
     private static boolean writePack(File stagingRoot, List<File> gameDataDirs,
                                      CosmeticCatalog.Cape cape,
                                      CosmeticCatalog.Accessory accessory,
-                                     CosmeticCatalog.Pet pet) {
+                                     CosmeticCatalog.Pet pet,
+                                     AuthoredGeometry.AssetOpener assets) {
         if (stagingRoot == null || gameDataDirs == null || gameDataDirs.isEmpty()) return false;
 
         File packDir = new File(stagingRoot, STAGING_DIR);
         try {
             deleteRecursively(packDir);
-            CapeResourcePackBuilder.build(packDir, cape, accessory, pet);
+            CapeResourcePackBuilder.build(packDir, cape, accessory, pet, assets);
         } catch (IOException e) {
             return false;
         }

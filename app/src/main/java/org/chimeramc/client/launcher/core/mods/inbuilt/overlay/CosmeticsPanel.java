@@ -447,7 +447,8 @@ final class CosmeticsPanel {
             return;
         }
         InGamePackChanger.ApplyOutcome outcome = CapeInGameInstaller.install(
-                new File(activity.getFilesDir(), "cape"), gameDataDirs, cape, accessory, pet);
+                new File(activity.getFilesDir(), "cape"), gameDataDirs, cape, accessory, pet,
+                path -> activity.getAssets().open(path));
         switch (outcome) {
             case RELOADED:
                 toast(R.string.cosmetics_applied_live);

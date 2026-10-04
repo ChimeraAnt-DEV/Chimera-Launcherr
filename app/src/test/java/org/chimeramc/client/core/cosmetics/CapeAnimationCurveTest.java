@@ -79,11 +79,47 @@ public class CapeAnimationCurveTest {
     }
 
     @Test
+    public void theFlapTermLeansTheCapeEvenWithoutSpeed() {
+        // query.cape_flap_amount is the signal vanilla computes for a real cape. It must move the
+        // cloth on its own, so a player with a vanilla/Persona cape sees motion even if
+        // modified_move_speed is small.
+        double resting = CapeAnimationCurve.leanDegrees(0.0, false, 0.0, 0.0, 0.0);
+        double flapping = CapeAnimationCurve.leanDegrees(0.0, false, 0.0, 0.0, 1.0);
+        assertEquals("no flap at rest", 0.0, resting, 1e-9);
+        assertTrue("a full flap must lean the cape back", flapping < 0.0);
+        assertTrue("a full flap must be a visible rotation",
+                Math.abs(flapping) >= 20.0);
+    }
+
+    @Test
+    public void realisticWalkAndRunSpeedsProduceVisibleMotion() {
+        // modified_move_speed is game-scaled and small at a walk; the lean must still be a clearly
+        // visible rotation there, not a fraction of a degree. These are the values the official
+        // sheep walk controller blends over (query.modified_move_speed 0.0-1.0).
+        double walk = CapeAnimationCurve.leanDegrees(0.3, false, 0.0, 0.0);
+        double run = CapeAnimationCurve.leanDegrees(0.8, false, 0.0, 0.0);
+        assertTrue("a walk must visibly move the cape (>= 5 deg)", Math.abs(walk) >= 5.0);
+        assertTrue("a run must visibly move the cape (>= 15 deg)", Math.abs(run) >= 15.0);
+        assertTrue("a run must lean further than a walk", run < walk);
+    }
+
+    @Test
+    public void theFlapAndSpeedTermsCombineRatherThanReplaceEachOther() {
+        double both = CapeAnimationCurve.leanDegrees(0.5, false, 0.0, 0.0, 0.5);
+        double speedOnly = CapeAnimationCurve.leanDegrees(0.5, false, 0.0, 0.0, 0.0);
+        double flapOnly = CapeAnimationCurve.leanDegrees(0.0, false, 0.0, 0.0, 0.5);
+        assertTrue("flap adds to speed", both < speedOnly);
+        assertTrue("speed adds to flap", both < flapOnly);
+    }
+
+    @Test
     public void theExpressionsAreBuiltFromTheSameConstantsAsTheJava() {
         // A literal drifting between the JSON and the Java is how the cape animates in one place
         // and not the other, so every constant the Java uses must appear in the expression.
         String lean = CapeAnimationCurve.leanExpression();
         assertTrue("speed query", lean.contains("query.modified_move_speed"));
+        assertTrue("cape flap query", lean.contains("query.cape_flap_amount"));
+        assertTrue("flap lean", lean.contains("42.0"));
         assertTrue("jump query", lean.contains("query.is_jumping"));
         assertTrue("vertical query", lean.contains("query.vertical_speed"));
         assertTrue("distance query", lean.contains("query.modified_distance_moved"));
