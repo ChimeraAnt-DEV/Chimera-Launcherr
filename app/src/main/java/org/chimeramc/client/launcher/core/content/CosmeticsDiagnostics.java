@@ -1,6 +1,7 @@
 package org.chimeramc.client.launcher.core.content;
 
 import org.chimeramc.client.core.cosmetics.CapeResourcePackBuilder;
+import org.chimeramc.client.core.cosmetics.NativeCosmeticsFeed;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -182,6 +183,12 @@ public final class CosmeticsDiagnostics {
                         + "(or the dressing-room paperdoll) means the entity override is working. "
                         + "If it never appears, this RenderDragon build ignores entity overrides and "
                         + "no resource-pack route can work."));
+
+        // The native route, reported separately: it is additive, so "not active" is information
+        // (the pack path is in use) rather than a failure.
+        NativeCosmeticsFeed.Status nativeStatus = NativeCosmeticsFeed.read();
+        checks.add(new Check("Native renderer hook", Status.MANUAL,
+                NativeCosmeticsFeed.describe(nativeStatus)));
         return checks;
     }
 

@@ -44,6 +44,24 @@ public class PreloaderInput {
      * seam exists and the Java side needs no change when the hook lands.
      */
     public static native boolean nativeReloadResourcePacks();
+
+    /**
+     * True once the game's own player-model renderer has run this session.
+     *
+     * <p>This is the native-cosmetics capability probe: the render hook is only useful if the
+     * renderer is actually running, so the launcher treats "hook live" as "the native path can
+     * drive cape/pet motion this session" and otherwise keeps the resource-pack path.
+     */
+    public static native boolean nativeIsPlayerRenderHookLive();
+
+    /**
+     * The render tick and per-frame call count, as
+     * {@code {renderTick, callsThisFrame, totalCalls, msSinceLastRender}}, or null when the
+     * renderer has not run. {@code callsThisFrame > 1} means the renderer drew more than one
+     * player model this frame, i.e. the hook also covers non-local players.
+     */
+    public static native int[] nativeReadPlayerRenderStats();
+
     public static native void nativeConfigureSignatureRules(String rulesPath, String minecraftVersion);
 
     public static void configureSignatureRules(File rulesFile, String minecraftVersion) {
@@ -151,6 +169,35 @@ public class PreloaderInput {
             return nativeReloadResourcePacks();
         } catch (UnsatisfiedLinkError e) {
             return false;
+        }
+    }
+
+    /**
+     * True once the game's own player-model renderer has run this session.
+     *
+     * <p>Fail-closed: an unavailable native library, an unresolved slot, or a build whose
+     * renderer never ran all read as false, so the launcher keeps the resource-pack path rather
+     * than assuming a native path it does not have.
+     */
+    public static boolean isPlayerRenderHookLive() {
+        try {
+            return nativeIsPlayerRenderHookLive();
+        } catch (UnsatisfiedLinkError e) {
+            return false;
+        }
+    }
+
+    /**
+     * The render tick and call counts, or null when the renderer has not run.
+     *
+     * @return {@code {renderTick, callsThisFrame, totalCalls, msSinceLastRender}}, or null.
+     */
+    public static int[] readPlayerRenderStats() {
+        try {
+            int[] value = nativeReadPlayerRenderStats();
+            return value != null && value.length >= 4 ? value : null;
+        } catch (UnsatisfiedLinkError e) {
+            return null;
         }
     }
 

@@ -380,9 +380,29 @@ public class CapePreviewView extends View {
             } else if (petLocomotion == CosmeticCatalog.PetLocomotion.SWIM) {
                 lift = 1.5f;
             }
+            // The pet is a separate body, so it needs its own contact shadow; without one it reads
+            // as pasted over the scene. The shadow fades and shrinks with the lift, so a flying or
+            // swimming pet is visibly off the ground instead of glued to it.
+            drawPetShadow(canvas, px, groundY + 0.5f * scale, scale, lift);
             drawPetModel(canvas, px, py + lift, ps, originX, originY,
                     0f, -petPose.crouchDrop, 0f, false);
         }
+    }
+
+    /** A soft contact shadow under the pet, faded by how far it is off the ground. */
+    private void drawPetShadow(Canvas canvas, float px, float groundY, float scale, float lift) {
+        float fade = 1f / (1f + lift * 0.35f);
+        paint.setShader(shadowGradient());
+        paint.setAlpha((int) (255 * fade));
+        float rx = 6.5f * scale * fade;
+        float ry = 1.7f * scale * fade;
+        canvas.save();
+        canvas.translate(px, groundY);
+        canvas.scale(rx, ry);
+        canvas.drawCircle(0f, 0f, 1f, paint);
+        canvas.restore();
+        paint.setAlpha(255);
+        paint.setShader(null);
     }
 
     /**
