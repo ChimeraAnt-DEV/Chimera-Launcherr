@@ -1220,6 +1220,41 @@ these are the conclusions.
   running world keeps its cached pack stack and the supported apply path relaunches the instance
   (`MinecraftSessionRestarter`). Do not promise a live recolour.
 
+## Cosmetics architecture pivot: native player-render hook
+- **The resource-pack route has four structural limits** and is now treated as a *fallback*, not the
+  destination: (1) no per-bone cloth physics (a pack has no physics driver, only Molang queries),
+  (2) no live apply without a world reload (the running world caches its pack stack — verified, see
+  the section above), (3) a cosmetic is only on *your* client entity, so another player sees it only
+  if they also run the same pack, and (4) the catalogue is texture-variant-limited. The pivot is a
+  hook on the game's own player renderer, which fixes all four in principle.
+- **Hook point: `LivePlayerRenderer::render`, primary-vtable slot 17, resolved by RTTI name**
+  (`resolveVtableFunction("18LivePlayerRenderer", 17, "libminecraftpe.so")`). No per-build code
+  address is baked in; the slot index is overridable per version through the signature rules
+  (`playerRenderVtableIndex`, default 17). The preloader module is
+  `pl::runtime::GamePlayerRender`; full method in `preloader-android/docs/player-render-hook.md`.
+- **The detour is a pure passthrough** — the game strips symbols, so the C++ signature is not
+  recoverable; the hook forwards `x0..x7` unchanged and dereferences nothing. That is what makes an
+  unknown ABI safe. It publishes a render tick and a per-frame call count; `callsThisFrame > 1`
+  proves the hook fires for non-local players' models too, which is the property the pack cannot
+  give.
+- **Launcher probe: `NativeCosmeticsFeed`** (in `core.cosmetics`) reads the feed over
+  `PreloaderInput.isPlayerRenderHookLive()` / `readPlayerRenderStats()` and classifies
+  `NATIVE_RENDER` vs `PACK_FALLBACK`. **Fail-closed:** no library, no hook, or the renderer never
+  ran reads as `PACK_FALLBACK`, so the launcher never claims a native path it does not have and the
+  pack path keeps working unchanged. `CosmeticsDiagnostics` reports the native mode as a separate
+  informational row.
+- **The native hook is additive and currently the *foundation*, not the finished cosmetic.** It
+  establishes the frame tick and proves multi-player coverage; driving segmented cape/pet motion and
+  rendering geometry from the hook are the next steps. Do not describe native cape rendering as
+  shipped until the render substitution is actually in place.
+- **An attachable cannot replace this, and the earlier "convert the cape to an attachable" advice
+  was wrong.** Verified against the shipped binary: `minecraft:attachable` binds to an
+  *item/block identifier* in an equipment slot — the only supported armor attachable slots are
+  `slot.armor.chest` and `slot.armor.body` — and `query.equipped_item_is_attachable` takes a hand
+  (0/1). There is no client-only player attachable, so there is nothing for a cape to attach to.
+  `enable_attachables` is only an entity flag that gates the *item* attachable path. The pack's
+  player-entity `cape` bone route (section above) remains the correct data-driven cape mechanism.
+
 ## Cosmetics: equip crash, preview holes, flat look (cosmetics/fix-list)
 - **Equipping a cosmetic crashed the game because `CosmeticSyncModule.start()` did blocking
   network I/O on the UI thread.** `start()` opened the multicast socket (`MulticastSocket`,
