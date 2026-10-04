@@ -276,6 +276,13 @@ public final class CapeResourcePackBuilder {
             writeAt(targetDir, HAT_RENDER_CONTROLLER_PATH,
                     hatRenderControllerJson(accEffect).getBytes(StandardCharsets.UTF_8));
         }
+        CosmeticEffects.Effect petEffect = CosmeticEffects.forPet(pet);
+        if (petEffect != null) {
+            writeAt(targetDir, CosmeticEffects.pathFor(petEffect),
+                    CosmeticEffects.particleJson(petEffect).getBytes(StandardCharsets.UTF_8));
+            writeAt(targetDir, PET_RENDER_CONTROLLER_PATH,
+                    petRenderControllerJson(petEffect).getBytes(StandardCharsets.UTF_8));
+        }
 
         return new BuiltPack(targetDir, PACK_UUID, PACK_VERSION);
     }
@@ -736,33 +743,53 @@ public final class CapeResourcePackBuilder {
      * geometry with its own texture and material, gated by {@link #petVisibilityCondition()}.
      */
     static String petRenderControllerJson() {
-        return "{\n"
-                + "  \"format_version\": \"1.8.0\",\n"
-                + "  \"render_controllers\": {\n"
-                + "    \"" + PET_CONTROLLER_ID + "\": {\n"
-                + "      \"geometry\": \"Geometry.chimera_pet\",\n"
-                + "      \"materials\": [\n"
-                + "        {\n"
-                + "          \"*\": \"Material.chimera_pet\"\n"
-                + "        }\n"
-                + "      ],\n"
-                + "      \"textures\": [\n"
-                + "        \"Texture.chimera_pet\"\n"
-                + "      ],\n"
-                + "      \"part_visibility\": [\n"
-                + "        {\n"
-                + "          \"pet\": \"" + petVisibilityCondition() + "\"\n"
-                + "        }\n"
-                + "      ],\n"
-                + "      \"is_hurt_color\": {\n"
-                + "        \"r\": 0.0,\n"
-                + "        \"g\": 0.0,\n"
-                + "        \"b\": 0.0,\n"
-                + "        \"a\": 0.0\n"
-                + "      }\n"
-                + "    }\n"
-                + "  }\n"
-                + "}\n";
+        return petRenderControllerJson(null);
+    }
+
+    /**
+     * As {@link #petRenderControllerJson()}, plus an optional signature particle effect bound to
+     * the {@code pet} bone (bee pollen, butterfly wing-dust, dragonfire, axolotl bubbles). Data
+     * driven like the cape/hat effects; a pet with no effect writes no particle file.
+     */
+    static String petRenderControllerJson(CosmeticEffects.Effect effect) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"format_version\": \"1.8.0\",\n");
+        sb.append("  \"render_controllers\": {\n");
+        sb.append("    \"").append(PET_CONTROLLER_ID).append("\": {\n");
+        sb.append("      \"geometry\": \"Geometry.chimera_pet\",\n");
+        sb.append("      \"materials\": [\n");
+        sb.append("        {\n");
+        sb.append("          \"*\": \"Material.chimera_pet\"\n");
+        sb.append("        }\n");
+        sb.append("      ],\n");
+        sb.append("      \"textures\": [\n");
+        sb.append("        \"Texture.chimera_pet\"\n");
+        sb.append("      ],\n");
+        sb.append("      \"part_visibility\": [\n");
+        sb.append("        {\n");
+        sb.append("          \"pet\": \"").append(petVisibilityCondition()).append("\"\n");
+        sb.append("        }\n");
+        sb.append("      ],\n");
+        if (effect != null) {
+            sb.append("      \"particle_effects\": [\n");
+            sb.append("        {\n");
+            sb.append("          \"effect\": \"").append(effect.id).append("\",\n");
+            sb.append("          \"locator\": \"pet\",\n");
+            sb.append("          \"bind_to_actor\": true\n");
+            sb.append("        }\n");
+            sb.append("      ],\n");
+        }
+        sb.append("      \"is_hurt_color\": {\n");
+        sb.append("        \"r\": 0.0,\n");
+        sb.append("        \"g\": 0.0,\n");
+        sb.append("        \"b\": 0.0,\n");
+        sb.append("        \"a\": 0.0\n");
+        sb.append("      }\n");
+        sb.append("    }\n");
+        sb.append("  }\n");
+        sb.append("}\n");
+        return sb.toString();
     }
 
     /**

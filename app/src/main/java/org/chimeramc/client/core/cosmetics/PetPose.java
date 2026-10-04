@@ -14,7 +14,9 @@ package org.chimeramc.client.core.cosmetics;
  *
  * <p><b>Contextual bug behaviour.</b> The crawling bugs do not just trot: when the player runs they
  * crawl in a small loop on the player's head, when the player crouches they stop and look around,
- * and when flying or swimming they cling and lean. {@link #ridesHead}, {@link #leanX} and
+ * and when swimming they cling low and paddle. A crawler with no flight of its own (spider, ant)
+ * also clings and leans back into the wind while the player flies; a crawler that can fly (beetle)
+ * flies alongside instead. {@link #ridesHead}, {@link #leanX} and
  * {@link #crawlLoopX}/{@link #crawlLoopZ} carry those states, and they are derived from the same
  * rules the in-game {@link PetAnimations} controller uses.
  *
@@ -70,6 +72,7 @@ public final class PetPose {
         double t = phase * Math.PI * 2.0;
 
         boolean crawler = s.isCrawler();
+        boolean clingsInAir = s.clingsInAir();
         legSwing = (float) Math.sin(t);
         bodyBob = (float) Math.sin(t * 2.0)
                 * (gait == CosmeticCatalog.PetLocomotion.RUN ? 0.7f : 0.4f);
@@ -87,8 +90,10 @@ public final class PetPose {
             case FLY:
                 wingFlap = (float) ((Math.sin(t * 4.0) + 1.0) * 0.5);
                 bodyBob = (float) Math.sin(t * 2.0) * 0.8f;
-                if (crawler) {
-                    // A crawling bug clings flat and leans back into the wind; its elytra buzz.
+                if (clingsInAir) {
+                    // A crawling bug that cannot fly clings flat and leans back into the wind; its
+                    // elytra buzz. A crawler that *can* fly (beetle) uses the ordinary fly pose
+                    // above and flies alongside the player instead.
                     wingFlap *= 0.7f;
                     ridesHead = true;
                     leanX = -55f;

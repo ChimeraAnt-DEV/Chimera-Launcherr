@@ -23,7 +23,8 @@ package org.chimeramc.client.core.cosmetics;
  *   <li><b>Running</b> — the bug crawls in a small loop on the player's head.</li>
  *   <li><b>Crouching</b> — it stops crawling, holds still and plays a looking-around idle (the head
  *       and its antennae sweep side to side).</li>
- *   <li><b>Flying</b> — it clings flat and leans back against the wind (blown-back pose).</li>
+ *   <li><b>Flying</b> — a crawler with no flight of its own clings flat and leans back against the
+ *       wind (blown-back pose); a crawler that can fly (beetle) flies alongside instead.</li>
  *   <li><b>Swimming</b> — a related but distinct cling: it stays low, bobs with the surface and
  *       paddles, rather than the airborne lean.</li>
  * </ul>
@@ -118,7 +119,9 @@ public final class PetAnimations {
             float[] o = headOffset(pet, scale);
             append(sb, first, CRAWL_HEAD, crawlOnHead(o));
             append(sb, first, LOOK_AROUND, lookAround(o));
-            append(sb, first, BLOWN_BACK, blownBack(o));
+            if (s.clingsInAir()) {
+                append(sb, first, BLOWN_BACK, blownBack(o));
+            }
             append(sb, first, WATER_CLING, waterCling(o));
         }
         sb.append("  }\n}\n");
@@ -133,9 +136,12 @@ public final class PetAnimations {
      * are wired to the contextual animations; a flying bug uses the ordinary fly cycle.
      */
     public static String controllerJson(CosmeticCatalog.PetSpecies species) {
-        boolean crawler = clingsToHead(species);
+        CosmeticCatalog.PetSpecies s = species == null ? CosmeticCatalog.PetSpecies.CAT : species;
+        boolean crawler = clingsToHead(s);
+        // A crawler with no flight of its own clings (blown back) in the air; a crawler that can
+        // fly (beetle) flies alongside like any other flyer. A non-crawler always flies.
+        String flyAnim = s.clingsInAir() ? BLOWN_BACK : FLY;
         String crouchAnim = crawler ? LOOK_AROUND : CROUCH;
-        String flyAnim = crawler ? BLOWN_BACK : FLY;
         String swimAnim = crawler ? WATER_CLING : SWIM;
         String runAnim = crawler ? CRAWL_HEAD : RUN;
         String walkAnim = crawler ? IDLE : WALK;

@@ -100,6 +100,34 @@ public class PetAnimationsTest {
     }
 
     @Test
+    public void aFlyingBugFliesAlongsideInsteadOfClinging() {
+        // The beetle is a crawler that can also fly. It must use the ordinary fly cycle and must
+        // not be given the blown-back cling (that is for crawlers with no flight of their own).
+        assertTrue("the beetle is still a crawler", CosmeticCatalog.PetSpecies.BEETLE.isCrawler());
+        assertFalse("a flying bug does not cling in the air",
+                CosmeticCatalog.PetSpecies.BEETLE.clingsInAir());
+        assertTrue("a crawler with no flight clings",
+                CosmeticCatalog.PetSpecies.SPIDER.clingsInAir());
+        assertTrue(CosmeticCatalog.PetSpecies.ANT.clingsInAir());
+
+        JsonObject beetle = JsonParser
+                .parseString(PetAnimations.animationsJson(pet(CosmeticCatalog.PetSpecies.BEETLE)))
+                .getAsJsonObject().getAsJsonObject("animations");
+        assertTrue("the beetle still crawls on the head when running",
+                beetle.has(PetAnimations.CRAWL_HEAD));
+        assertTrue("the beetle still looks around when crouching",
+                beetle.has(PetAnimations.LOOK_AROUND));
+        assertFalse("the beetle must not carry the blown-back cling",
+                beetle.has(PetAnimations.BLOWN_BACK));
+
+        String beetleController = PetAnimations.controllerJson(CosmeticCatalog.PetSpecies.BEETLE);
+        assertTrue("the beetle's fly state uses the ordinary fly cycle",
+                beetleController.contains("\"" + PetAnimations.FLY + "\""));
+        assertFalse("the beetle's fly state must not lean back",
+                beetleController.contains(PetAnimations.BLOWN_BACK));
+    }
+
+    @Test
     public void theControllerSwitchesOnThePlayersState() {
         String controller = PetAnimations.controllerJson(CosmeticCatalog.PetSpecies.CAT);
         // The transitions are what make one gait play at a time; without them every animation in

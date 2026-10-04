@@ -1,6 +1,7 @@
 package org.chimeramc.client.core.cosmetics;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -69,6 +70,44 @@ public class PetPoseTest {
         flyer.compute(CosmeticCatalog.PetSpecies.PARROT, CosmeticCatalog.PetLocomotion.FLY, 0.1f);
         assertTrue("a crawler's elytra buzzes less than a bird's wings",
                 crawler.wingFlap <= flyer.wingFlap);
+    }
+
+    /**
+     * The preview shows the contextual crawler states for the gaits the species actually has, and
+     * the beetle (a crawler that can fly) flies alongside instead of clinging.
+     *
+     * <p>The blown-back/water cling for a spider and an ant is reached in-game by the animation
+     * controller on the player's airborne/swimming queries (pinned by {@code PetAnimationsTest});
+     * the preview only offers a species its own supported gaits, so a spider cannot be asked to fly
+     * here and falls back to a walk.
+     */
+    @Test
+    public void aCrawlersContextualStatesAndTheFlyingBugsFlyAlongside() {
+        // The beetle can fly, so it reaches the fly pose — and must not cling.
+        PetPose beetleFly = new PetPose();
+        beetleFly.compute(CosmeticCatalog.PetSpecies.BEETLE, CosmeticCatalog.PetLocomotion.FLY, 0.25f);
+        assertFalse("a beetle flies alongside instead of clinging", beetleFly.ridesHead);
+
+        // A spider has no fly gait, so the preview falls back to a walk rather than a cling.
+        PetPose spiderFly = new PetPose();
+        spiderFly.compute(CosmeticCatalog.PetSpecies.SPIDER, CosmeticCatalog.PetLocomotion.FLY, 0.25f);
+        assertFalse("a spider has no fly gait in the preview", spiderFly.ridesHead);
+
+        // Both still crawl on the head when the player runs and look around when crouching.
+        PetPose beetleRun = new PetPose();
+        beetleRun.compute(CosmeticCatalog.PetSpecies.BEETLE, CosmeticCatalog.PetLocomotion.RUN, 0.25f);
+        assertTrue("a beetle still crawls on the head when running", beetleRun.ridesHead);
+        PetPose beetleCrouch = new PetPose();
+        beetleCrouch.compute(CosmeticCatalog.PetSpecies.BEETLE,
+                CosmeticCatalog.PetLocomotion.CROUCH, 0.25f);
+        assertTrue("a beetle still rides the head when crouching", beetleCrouch.ridesHead);
+        PetPose spiderRun = new PetPose();
+        spiderRun.compute(CosmeticCatalog.PetSpecies.SPIDER, CosmeticCatalog.PetLocomotion.RUN, 0.25f);
+        assertTrue("a spider crawls on the head when running", spiderRun.ridesHead);
+        PetPose spiderCrouch = new PetPose();
+        spiderCrouch.compute(CosmeticCatalog.PetSpecies.SPIDER,
+                CosmeticCatalog.PetLocomotion.CROUCH, 0.25f);
+        assertTrue("a spider rides the head when crouching", spiderCrouch.ridesHead);
     }
 
     @Test

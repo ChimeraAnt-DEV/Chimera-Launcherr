@@ -32,11 +32,32 @@ public class CosmeticCatalogExpansionTest {
     @Test
     public void everyCapeIdIsDistinctAndNamed() {
         java.util.Set<String> ids = new java.util.HashSet<>();
+        java.util.Set<String> names = new java.util.HashSet<>();
         for (CosmeticCatalog.Cape c : CosmeticCatalog.capes()) {
             assertNotNull(c.id);
             assertNotNull(c.name);
             assertFalse(c.name.isEmpty());
             assertTrue("duplicate cape id " + c.id, ids.add(c.id));
+            assertTrue("duplicate cape name " + c.name, names.add(c.name));
+        }
+    }
+
+    /**
+     * No two cosmetics anywhere may share a display name. The templated catalogue this replaced
+     * built every accessory as "&lt;palette&gt; &lt;kind&gt;", so the list read as one word swapped
+     * down a column; this pins that the names are genuinely distinct instead.
+     */
+    @Test
+    public void noTwoCosmeticsShareADisplayName() {
+        java.util.Set<String> names = new java.util.HashSet<>();
+        for (CosmeticCatalog.Cape c : CosmeticCatalog.capes()) {
+            assertTrue("duplicate cosmetic name " + c.name, names.add(c.name));
+        }
+        for (CosmeticCatalog.Accessory a : CosmeticCatalog.accessories()) {
+            assertTrue("duplicate cosmetic name " + a.name, names.add(a.name));
+        }
+        for (CosmeticCatalog.Pet p : CosmeticCatalog.pets()) {
+            assertTrue("duplicate cosmetic name " + p.name, names.add(p.name));
         }
     }
 

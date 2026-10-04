@@ -644,6 +644,32 @@ public class CapeResourcePackBuilderTest {
         }
     }
 
+    /**
+     * A themed pet's signature particle effect is written and referenced by its controller, so the
+     * FX does not silently no-op. A plain species writes no particle file.
+     */
+    @Test
+    public void aThemedPetWritesItsParticleEffectAndControllerReference() throws Exception {
+        File dir = Files.createTempDirectory("pet-fx-pack").toFile();
+        try {
+            CosmeticCatalog.Pet bee = new CosmeticCatalog.Pet("bee", "Bee",
+                    CosmeticCatalog.PetSpecies.BEE, 0xFFE8B93A, 0xFF2E2A22, 1f);
+            CapeResourcePackBuilder.build(dir, null, null, bee);
+
+            CosmeticEffects.Effect effect = CosmeticEffects.forPet(bee);
+            assertNotNull(effect);
+            assertTrue("the bee's particle file is written",
+                    new File(dir, CosmeticEffects.pathFor(effect)).isFile());
+            String controller = new String(java.nio.file.Files.readAllBytes(
+                    new File(dir, CapeResourcePackBuilder.PET_RENDER_CONTROLLER_PATH).toPath()),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            assertTrue("the pet controller names the bee's effect",
+                    controller.contains(effect.id));
+        } finally {
+            deleteRecursively(dir);
+        }
+    }
+
     private static void deleteRecursively(File file) {
         if (file == null || !file.exists()) return;
         if (file.isDirectory()) {

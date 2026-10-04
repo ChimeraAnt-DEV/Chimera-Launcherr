@@ -10,9 +10,13 @@ package org.chimeramc.client.core.cosmetics;
  * game, so a cosmetic with no effect writes no particle file and is unaffected.
  *
  * <p><b>Which cosmetics get one.</b> Only the ones with an obvious thematic tie, so the effect
- * reads as part of the piece rather than decoration: the Creeper palette carries a fuse spark, the
- * Ember palette rising embers, the Void palette slow dark motes, Gilded a gold sparkle, Lagoon
- * drifting bubbles. Everything else is intentionally effect-free.
+ * reads as part of the piece rather than decoration. Every palette except the deliberately neutral
+ * Graphite carries one: Creeper a fuse spark, Ember rising embers, Void slow dark motes, Gilded a
+ * gold sparkle, Lagoon drifting bubbles, Abyss deep-current motes, Verdant falling leaves, Rosewood
+ * drifting petals, Amethyst crystal glints, Flux static sparks, and the flagship Chimera palette
+ * violet brand motes. A few pets carry their own (bee pollen, butterfly wing-dust, dragonfire,
+ * axolotl bubbles). Graphite and the plain species are intentionally effect-free, and are the
+ * reference for the "no effect" path.
  *
  * <p>Pure string building, so a unit test can parse each particle file and assert it is valid JSON
  * with a matching identifier, and that only the themed cosmetics resolve to an effect.
@@ -39,12 +43,24 @@ public final class CosmeticEffects {
         }
     }
 
-    // Named effects, one per themed palette.
+    // Named effects, one per themed palette (plus a few species).
     static final Effect CREEPER_FUSE = new Effect("chimera:creeper_fuse", 0xFF8BC34A, 3f, 0.4f);
     static final Effect EMBER_RISE = new Effect("chimera:ember_rise", 0xFFFF8A5B, 5f, 0.7f);
     static final Effect VOID_MOTES = new Effect("chimera:void_motes", 0xFF8F979F, 2f, 0.25f);
     static final Effect GILDED_SPARKLE = new Effect("chimera:gilded_sparkle", 0xFFFFD86B, 2f, 0.35f);
     static final Effect LAGOON_BUBBLE = new Effect("chimera:lagoon_bubble", 0xFF57D9DB, 4f, 0.5f);
+    static final Effect ABYSS_CURRENT = new Effect("chimera:abyss_current", 0xFF5FB4FF, 3f, 0.3f);
+    static final Effect VERDANT_LEAF = new Effect("chimera:verdant_leaf", 0xFF8BC34A, 2f, 0.45f);
+    static final Effect ROSEWOOD_PETAL = new Effect("chimera:rosewood_petal", 0xFFD65C82, 3f, 0.4f);
+    static final Effect AMETHYST_GLINT = new Effect("chimera:amethyst_glint", 0xFFB07CE8, 2f, 0.3f);
+    static final Effect FLUX_SPARK = new Effect("chimera:flux_spark", 0xFFE070C0, 4f, 0.6f);
+    static final Effect CHIMERA_MOTE = new Effect("chimera:chimera_mote", 0xFFA88CFF, 3f, 0.4f);
+
+    // A few species with their own signature effect.
+    static final Effect BEE_POLLEN = new Effect("chimera:bee_pollen", 0xFFE8B93A, 3f, 0.35f);
+    static final Effect WING_DUST = new Effect("chimera:wing_dust", 0xFFC9A0FF, 3f, 0.3f);
+    static final Effect DRAGONFIRE = new Effect("chimera:dragonfire", 0xFFB07CE8, 4f, 0.5f);
+    static final Effect AXOLOTL_BUBBLE = new Effect("chimera:axolotl_bubble", 0xFFE68AA8, 3f, 0.45f);
 
     private CosmeticEffects() {
     }
@@ -62,9 +78,24 @@ public final class CosmeticEffects {
     }
 
     /**
+     * The effect for a pet, or {@code null} when the species has no signature effect. Pet ids are
+     * the species slug, so this keys on the species rather than the palette prefix.
+     */
+    public static Effect forPet(CosmeticCatalog.Pet pet) {
+        if (pet == null || pet.species == null) return null;
+        switch (pet.species) {
+            case BEE: return BEE_POLLEN;
+            case BUTTERFLY: return WING_DUST;
+            case DRAGON: return DRAGONFIRE;
+            case AXOLOTL: return AXOLOTL_BUBBLE;
+            default: return null;
+        }
+    }
+
+    /**
      * Maps a cosmetic id to its effect by the palette stem the id begins with. Ids are
      * {@code <palette>_<shape>}, so the prefix is a stable key that survives new shapes being added
-     * to a palette.
+     * to a palette. Graphite is deliberately absent: it is the neutral palette.
      */
     static Effect byTheme(String id) {
         if (id == null) return null;
@@ -73,6 +104,14 @@ public final class CosmeticEffects {
         if (id.startsWith("void")) return VOID_MOTES;
         if (id.startsWith("gilded")) return GILDED_SPARKLE;
         if (id.startsWith("lagoon")) return LAGOON_BUBBLE;
+        if (id.startsWith("abyss") || id.startsWith("deep")) return ABYSS_CURRENT;
+        if (id.startsWith("verdant") || id.startsWith("moss")) return VERDANT_LEAF;
+        if (id.startsWith("rosewood") || id.startsWith("petal")) return ROSEWOOD_PETAL;
+        if (id.startsWith("amethyst") || id.startsWith("geode") || id.startsWith("crystal")) {
+            return AMETHYST_GLINT;
+        }
+        if (id.startsWith("flux") || id.startsWith("static")) return FLUX_SPARK;
+        if (id.startsWith("chimera")) return CHIMERA_MOTE;
         return null;
     }
 

@@ -212,6 +212,18 @@ public final class CosmeticCatalog {
             return this == SPIDER || this == ANT || this == BEETLE;
         }
 
+        /**
+         * True when this species clings to the player in the air rather than flying alongside.
+         *
+         * <p>A crawling bug that has no flight of its own (spider, ant) hitches a ride and leans
+         * back into the wind. A bug that is genuinely a flyer (beetle) flies on its own instead, so
+         * it must not be given the blown-back cling. This is the one property that separates the
+         * two, and both the in-game controller and the preview read it so they cannot disagree.
+         */
+        public boolean clingsInAir() {
+            return isCrawler() && !supports(PetLocomotion.FLY);
+        }
+
         /** True when this species swims, i.e. it gets a dedicated swim set. */
         public boolean isSwimmer() {
             return supports(PetLocomotion.SWIM);
@@ -246,41 +258,50 @@ public final class CosmeticCatalog {
     };
 
     /**
-     * Evocative name stems per palette, used to compose a cape's name from its palette and pattern
-     * so a generated cape reads as a designed piece ("Emberdusk Aurora") rather than a catalogue
-     * entry ("Ember Gradient"). Index-aligned with {@link #PALETTES}.
+     * Per-palette cape names, one per {@link CapePattern} (index-aligned with
+     * {@link CapePattern#ordinal()}). A full table rather than one shared set of pattern words:
+     * the earlier version composed every cape as "&lt;palette&gt; Sovereign/Tapestry/..." so a
+     * column of capes was one word swapped, which is exactly the templated look this replaces.
+     * Every name here is distinct, and the second word varies by palette as well as by pattern, so
+     * "Emberdusk" and "Rosewood" do not share a pattern's nickname.
      */
-    private static final String[] CAPE_STEMS = {
-            "Chimera", "Umbral", "Fluxweave", "Wildwood", "Emberdusk", "Abyssal",
-            "Gilded", "Obsidian", "Rosewood", "Tidal", "Amethyst", "Creeping"
-    };
-
-    /** Evocative names per cape pattern, used with {@link #CAPE_STEMS}. Index-aligned with
-     *  {@link CapePattern}; a shorter array falls back to "Weave". */
-    private static final String[] CAPE_PATTERN_NAMES = {
-            "Sovereign", "Tapestry", "Ribbon", "Aurora", "Starburst", "Lattice",
-            "Chequered", "Chevron", "Horizon", "Riptide", "Wilds", "Celestial"
+    private static final String[][] CAPE_PATTERN_NAMES = {
+            // SOLID              VERTICAL              HORIZONTAL           GRADIENT            SPLIT                GRID                   CHECKER               CHEVRON              HORIZON              WAVE                  CAMO                STAR
+            {"Chimera Cape", "Violet Tapestry", "Amethyst Ribbon", "Twilight Aurora", "Starburst Regalia", "Arcane Lattice", "Chequered Sigil", "Violet Chevron", "Eventide Horizon", "Violet Riptide", "Wilds of Chimera", "Celestial Chimera"},
+            {"Umbral Sovereign", "Nightfall Tapestry", "Onyx Ribbon", "Voidlight Aurora", "Eclipse Starburst", "Obsidian Lattice", "Shadow Chequer", "Nightfall Chevron", "Dusk Horizon", "Umbral Riptide", "Hollow Wilds", "Starless Celestial"},
+            {"Fluxweave Cape", "Magenta Tapestry", "Neon Ribbon", "Pulse Aurora", "Static Starburst", "Circuit Lattice", "Overload Chequer", "Neon Chevron", "Signal Horizon", "Magenta Riptide", "Charged Wilds", "Neon Celestial"},
+            {"Wildwood Cape", "Thicket Tapestry", "Vine Ribbon", "Dawnleaf Aurora", "Canopy Starburst", "Bramble Lattice", "Mossy Chequer", "Thicket Chevron", "Greenwood Horizon", "Riverbed Riptide", "Deep Wilds", "Starlit Canopy"},
+            {"Emberdusk Cape", "Cinder Tapestry", "Scarlet Ribbon", "Sunset Aurora", "Bonfire Starburst", "Coalbed Lattice", "Cinder Chequer", "Scarlet Chevron", "Smoke Horizon", "Lavafall Riptide", "Scorched Wilds", "Ember Celestial"},
+            {"Abyssal Cape", "Trench Tapestry", "Current Ribbon", "Depth Aurora", "Kraken Starburst", "Coral Lattice", "Undertow Chequer", "Current Chevron", "Deepwater Horizon", "Undertow Riptide", "Drowned Wilds", "Abyssal Celestial"},
+            {"Gilded Cape", "Goldleaf Tapestry", "Bullion Ribbon", "Sunburst Aurora", "Midas Starburst", "Filigree Lattice", "Gilded Chequer", "Goldleaf Chevron", "Golden Horizon", "Bullion Riptide", "Auric Wilds", "Gilded Celestial"},
+            {"Obsidian Cape", "Slate Tapestry", "Steel Ribbon", "Ashfall Aurora", "Iron Starburst", "Graphite Lattice", "Slate Chequer", "Steel Chevron", "Ashen Horizon", "Coldiron Riptide", "Bleak Wilds", "Obsidian Celestial"},
+            {"Rosewood Cape", "Petal Tapestry", "Blossom Ribbon", "Rosegold Aurora", "Camellia Starburst", "Petalwork Lattice", "Rose Chequer", "Blossom Chevron", "Roseate Horizon", "Petal Riptide", "Blooming Wilds", "Rosewood Celestial"},
+            {"Tidal Cape", "Reef Tapestry", "Foam Ribbon", "Lagoon Aurora", "Seafoam Starburst", "Coralweave Lattice", "Tidal Chequer", "Reef Chevron", "Seabound Horizon", "Lagoon Riptide", "Shoreline Wilds", "Tidal Celestial"},
+            {"Amethyst Cape", "Crystal Tapestry", "Geode Ribbon", "Dusk Aurora", "Prism Starburst", "Crystalline Lattice", "Amethyst Chequer", "Geode Chevron", "Violet Horizon", "Prism Riptide", "Cavern Wilds", "Amethyst Celestial"},
+            {"Creeping Cape", "Vine Tapestry", "Spore Ribbon", "Fuse Aurora", "Creeper Starburst", "Mossy Lattice", "Spore Chequer", "Vine Chevron", "Blast Horizon", "Sporefall Riptide", "Overgrown Wilds", "Creeping Celestial"}
     };
 
     /**
      * Per-palette accessory names, one per {@link #ACCESSORY_KINDS} entry. Hand-written rather than
-     * composed so an accessory reads like a themed item ("Ember Circlet") instead of a swatch name
-     * ("Ember Tiara"). Index-aligned with {@link #PALETTES}.
+     * composed so an accessory reads like a themed item rather than a swatch name. Every name is
+     * distinct across the whole table: the earlier version composed "&lt;palette&gt; Cap/Crown/..."
+     * so the list was one word swapped, which is the templated look this replaces. Index-aligned
+     * with {@link #PALETTES} and {@link #ACCESSORY_KINDS}.
      */
     private static final String[][] ACCESSORY_NAMES = {
-            //        CAP            BEANIE        CROWN         GLASSES      MASK          SCARF        BACKPACK     HORNS        FLOWER       BOWTIE       EAR          TOPHAT       WIZARD_HAT   TIARA        BEARD        VEIL         MONOCLE      ANTLERS      PLUME        TRICORN      MORTARBOARD
+            //        CAP                 BEANIE              CROWN                GLASSES             MASK               SCARF               BACKPACK             HORNS              FLOWER              BOWTIE             EAR               TOPHAT              WIZARD_HAT          TIARA              BEARD              VEIL               MONOCLE            ANTLERS            PLUME              TRICORN            MORTARBOARD
             {"Chimera Crest", "Chimera Knit", "Chimera Circlet", "Chimera Visor", "Chimera Veil", "Chimera Stole", "Chimera Satchel", "Chimera Horns", "Chimera Bloom", "Chimera Knot", "Chimera Ears", "Chimera Stovepipe", "Chimera Arcanist", "Chimera Diadem", "Chimera Mane", "Chimera Shroud", "Chimera Lens", "Chimera Antlers", "Chimera Plume", "Chimera Corsair", "Chimera Scholar"},
-            {"Void Cap", "Void Watchcap", "Void Diadem", "Void Shades", "Void Cowl", "Void Wrap", "Void Pack", "Void Spikes", "Void Nightshade", "Void Cravat", "Void Bat Ears", "Void Chimney", "Void Occultist", "Void Tiara", "Void Growth", "Void Shroud", "Void Monocle", "Void Bramble", "Void Quill", "Void Freebooter", "Void Dean"},
-            {"Flux Beret", "Flux Beanie", "Flux Crown", "Flux Goggles", "Flux Mask", "Flux Scarf", "Flux Rucksack", "Flux Horns", "Flux Blossom", "Flux Bow", "Flux Ears", "Flux Top Hat", "Flux Hexer", "Flux Tiara", "Flux Beard", "Flux Veil", "Flux Lens", "Flux Antlers", "Flux Feather", "Flux Captain", "Flux Graduate"},
-            {"Verdant Cap", "Verdant Beanie", "Verdant Crown", "Verdant Specs", "Verdant Mask", "Verdant Scarf", "Verdant Pack", "Verdant Bramble", "Verdant Daisy", "Verdant Knot", "Verdant Ears", "Verdant Tall Hat", "Verdant Druid", "Verdant Tiara", "Verdant Mossbeard", "Verdant Veil", "Verdant Monocle", "Verdant Antlers", "Verdant Frond", "Verdant Explorer", "Verdant Scholar"},
-            {"Ember Cap", "Ember Beanie", "Ember Circlet", "Ember Goggles", "Ember Mask", "Ember Scarf", "Ember Pack", "Ember Horns", "Ember Lily", "Ember Bow", "Ember Ears", "Ember Stovepipe", "Ember Pyromancer", "Ember Tiara", "Ember Beard", "Ember Veil", "Ember Lens", "Ember Antlers", "Ember Plume", "Ember Corsair", "Ember Mortarboard"},
-            {"Abyss Cap", "Abyss Watchcap", "Abyss Crown", "Abyss Lenses", "Abyss Mask", "Abyss Scarf", "Abyss Pack", "Abyss Horns", "Abyss Coral", "Abyss Knot", "Abyss Fins", "Abyss Top Hat", "Abyss Tidecaller", "Abyss Tiara", "Abyss Beard", "Abyss Veil", "Abyss Monocle", "Abyss Antlers", "Abyss Plume", "Abyss Captain", "Abyss Scholar"},
-            {"Gilded Cap", "Gilded Beanie", "Gilded Crown", "Gilded Monocle", "Gilded Mask", "Gilded Scarf", "Gilded Coffer", "Gilded Horns", "Gilded Rose", "Gilded Bow", "Gilded Ears", "Gilded Stovepipe", "Gilded Archmage", "Gilded Diadem", "Gilded Mane", "Gilded Veil", "Gilded Lens", "Gilded Antlers", "Gilded Plume", "Gilded Corsair", "Gilded Graduate"},
-            {"Graphite Cap", "Graphite Watchcap", "Graphite Crown", "Graphite Shades", "Graphite Mask", "Graphite Scarf", "Graphite Pack", "Graphite Horns", "Graphite Bloom", "Graphite Bow", "Graphite Ears", "Graphite Chimney", "Graphite Occultist", "Graphite Tiara", "Graphite Beard", "Graphite Veil", "Graphite Monocle", "Graphite Antlers", "Graphite Quill", "Graphite Freebooter", "Graphite Dean"},
-            {"Rosewood Beret", "Rosewood Beanie", "Rosewood Circlet", "Rosewood Specs", "Rosewood Mask", "Rosewood Scarf", "Rosewood Pack", "Rosewood Horns", "Rosewood Camellia", "Rosewood Bow", "Rosewood Ears", "Rosewood Top Hat", "Rosewood Enchanter", "Rosewood Tiara", "Rosewood Beard", "Rosewood Veil", "Rosewood Monocle", "Rosewood Antlers", "Rosewood Plume", "Rosewood Corsair", "Rosewood Scholar"},
-            {"Tidal Cap", "Tidal Beanie", "Tidal Crown", "Tidal Goggles", "Tidal Mask", "Tidal Scarf", "Tidal Pack", "Tidal Horns", "Tidal Lotus", "Tidal Bow", "Tidal Fins", "Tidal Stovepipe", "Tidal Tidecaller", "Tidal Tiara", "Tidal Beard", "Tidal Veil", "Tidal Lens", "Tidal Antlers", "Tidal Plume", "Tidal Captain", "Tidal Graduate"},
-            {"Amethyst Beret", "Amethyst Beanie", "Amethyst Crown", "Amethyst Lenses", "Amethyst Mask", "Amethyst Scarf", "Amethyst Pack", "Amethyst Horns", "Amethyst Blossom", "Amethyst Bow", "Amethyst Ears", "Amethyst Top Hat", "Amethyst Arcanist", "Amethyst Diadem", "Amethyst Beard", "Amethyst Veil", "Amethyst Monocle", "Amethyst Antlers", "Amethyst Plume", "Amethyst Corsair", "Amethyst Scholar"},
-            {"Creeper Cap", "Creeper Beanie", "Creeper Crown", "Creeper Goggles", "Creeper Mask", "Creeper Scarf", "Creeper Pack", "Creeper Horns", "Creeper Bloom", "Creeper Bow", "Creeper Ears", "Creeper Stovepipe", "Creeper Hexer", "Creeper Tiara", "Creeper Beard", "Creeper Veil", "Creeper Monocle", "Creeper Antlers", "Creeper Plume", "Creeper Corsair", "Creeper Scholar"}
+            {"Gravekeeper Cap", "Ashen Watchcap", "Void Diadem", "Umbral Shades", "Shroud of Night", "Grave Wrap", "The Nightpack", "Voidgrasp Spikes", "Nightshade Bloom", "Gloom Cravat", "Vesper Bats", "Hollow Chimney", "Occultist's Hood", "Hollow Tiara", "Bramblebeard", "Sable Shroud", "Shadow Monocle", "Briar Antlers", "Raven Quill", "Dread Freebooter", "Dean of Shadows"},
+            {"Static Beret", "Neon Beanie", "Pulse Circlet", "Overclock Goggles", "Glitch Mask", "Static Scarf", "Signal Rucksack", "Stormhorn Spikes", "Neon Blossom", "Flux Bow", "Fizz Ears", "Overload Top Hat", "Hexweaver Hat", "Flux Tiara", "Voltage Beard", "Screen Veil", "Circuit Lens", "Voltaic Antlers", "Ion Feather", "Pulse Captain", "Graduate of Flux"},
+            {"Mossbank Cap", "Fern Beanie", "Thornwood Crown", "Leafcut Specs", "Verdant Mask", "Rootwork Scarf", "Forager's Pack", "Bramble Horns", "Daisy Crown", "Green Knot", "Faun Ears", "Great Tall Hat", "Druid's Crown", "Garland Tiara", "Mossbeard", "Petal Veil", "Oak Monocle", "Greenman Antlers", "Fern Frond", "Pathfinder's Tricorn", "Verdant Scholar"},
+            {"Cinder Cap", "Coalbeanie", "Ember Circlet", "Furnace Goggles", "Ashen Mask", "Scorch Scarf", "Pyre Pack", "Flarehorn Spikes", "Fire Lily", "Cinder Bow", "Salamander Ears", "Smokestack Hat", "Pyromancer's Hood", "Ember Tiara", "Sootbeard", "Smoke Veil", "Cinder Lens", "Flare Antlers", "Fire Plume", "Scorch Corsair", "Ember Mortarboard"},
+            {"Trench Cap", "Kelp Watchcap", "Drowned Crown", "Deepfathom Lenses", "Angler Mask", "Tide Scarf", "Salvage Pack", "Kraken Horns", "Deep Coral", "Tide Knot", "Siren Fins", "Deep Top Hat", "Tidecaller's Hood", "Abyssal Tiara", "Barnacle Beard", "Deep Veil", "Angler Monocle", "Kraken Antlers", "Storm Plume", "Drowned Captain", "Scholar of the Deep"},
+            {"Bullion Cap", "Filigree Beanie", "Crown of Midas", "Goldsmith Monocle", "Gilded Mask", "Goldthread Scarf", "The Coffer", "Gilt Horns", "Golden Rose", "Bullion Bow", "Fae Ears", "Gilded Stovepipe", "Archmage's Hat", "Gold Diadem", "Golden Mane", "Veil of Gold", "Assayer's Lens", "Gilt Antlers", "Plume of Gold", "Gold Corsair", "Gilded Graduate"},
+            {"Slate Cap", "Coldiron Watchcap", "Iron Crown", "Ashfall Shades", "Grey Mask", "Steel Scarf", "The Ironpack", "Coldiron Horns", "Ashen Bloom", "Grey Bow", "Slate Ears", "Chimney Stack", "Grey Occultist", "Iron Tiara", "Slatebeard", "Ash Veil", "Steel Monocle", "Iron Antlers", "Ash Quill", "Slate Freebooter", "Grey Dean"},
+            {"Petal Beret", "Rosebud Beanie", "Rosegold Circlet", "Rosewater Specs", "Rose Mask", "Petal Scarf", "Gardener's Pack", "Rosewood Horns", "Camellia Crown", "Rose Knot", "Fawn Ears", "Rosewood Top Hat", "Enchanter's Hat", "Petal Tiara", "Rosewood Beard", "Blossom Veil", "Rosewater Monocle", "Rosewood Antlers", "Rose Plume", "Rosewood Corsair", "Rosewood Scholar"},
+            {"Seafoam Cap", "Reef Beanie", "Lagoon Crown", "Coral Goggles", "Tidepool Mask", "Foam Scarf", "Beachcomber's Pack", "Coral Horns", "Lagoon Lotus", "Foam Bow", "Reef Fins", "Seafoam Stovepipe", "Tidecaller's Hat", "Lagoon Tiara", "Coral Beard", "Sea Veil", "Coral Lens", "Reef Antlers", "Foam Plume", "Lagoon Captain", "Tidal Graduate"},
+            {"Geode Beret", "Crystal Beanie", "Prism Crown", "Amethyst Lenses", "Crystal Mask", "Geode Scarf", "Prospector's Pack", "Prism Horns", "Amethyst Blossom", "Prism Bow", "Crystal Ears", "Amethyst Top Hat", "Arcanist's Crown", "Amethyst Diadem", "Geode Beard", "Crystal Veil", "Amethyst Monocle", "Crystal Antlers", "Prism Plume", "Amethyst Corsair", "Amethyst Scholar"},
+            {"Spore Cap", "Moss Beanie", "Vine Crown", "Fuse Goggles", "Creeper Mask", "Spore Scarf", "Overgrowth Pack", "Thornhorn Spikes", "Spore Bloom", "Creeper Bow", "Grasshopper Ears", "Moss Stovepipe", "Hexer of Vines", "Creeper Tiara", "Sporebeard", "Moss Veil", "Fuse Monocle", "Thorn Antlers", "Spore Plume", "Creeper Corsair", "Creeper Scholar"}
     };
 
     static {
@@ -288,12 +309,12 @@ public final class CosmeticCatalog {
 
         // The flagship cape keeps its exact id and stays first, animated and branded, so the
         // section opens on the one piece of motion it is meant to show off.
-        capes.add(new Cape("chimera", "Chimera Cape", 0xFF6236E8, 0xFFA88CFF, 0xFFFFD86B,
+        capes.add(new Cape("chimera", "Chimera Prime", 0xFF6236E8, 0xFFA88CFF, 0xFFFFD86B,
                 CapePattern.SOLID, true, true));
 
         // The classic ids are preserved verbatim so existing selections keep resolving. Their
         // display names are upgraded to the designed naming the rest of the catalogue uses.
-        capes.add(new Cape("void_black", "Umbral Sovereign", 0xFF141418, 0xFF3A3A44, 0xFF8F979F,
+        capes.add(new Cape("void_black", "Sovereign of the Void", 0xFF141418, 0xFF3A3A44, 0xFF8F979F,
                 CapePattern.SOLID, false, false));
         capes.add(new Cape("magenta_flux", "Fluxweave Aurora", 0xFFA82E9E, 0xFFE070C0, 0xFFFFE1F4,
                 CapePattern.GRADIENT, false, false));
@@ -302,17 +323,16 @@ public final class CosmeticCatalog {
 
         // Generated families: every palette crossed with every pattern. The brand mark rides on
         // the "Chimera" palette's Split weave only, so the flagship stays special instead of every
-        // cape being branded. Names are composed from the palette's evocative stem and the
-        // pattern's own name so a cape reads as a designed piece.
+        // cape being branded. Each palette has its own row of names (see CAPE_PATTERN_NAMES), so a
+        // cape is a genuinely named piece rather than "<palette> <shared pattern word>".
         for (int p = 0; p < PALETTES.length; p++) {
             int[] pal = PALETTES[p];
             String stem = PALETTE_NAMES[p];
-            String nameStem = CAPE_STEMS[p];
             for (CapePattern pattern : CapePattern.values()) {
                 String id = slug(stem) + "_" + pattern.name().toLowerCase();
                 if (isHandAuthored(id)) continue;
                 boolean branded = "Chimera".equals(stem) && pattern == CapePattern.SPLIT;
-                capes.add(new Cape(id, nameStem + " " + capePatternName(pattern),
+                capes.add(new Cape(id, capePatternName(p, pattern),
                         pal[0], pal[1], pal[2], pattern, false, branded));
             }
         }
@@ -382,10 +402,13 @@ public final class CosmeticCatalog {
                 || id.equals("amethyst_wings");
     }
 
-    /** The evocative name for a cape pattern, used with {@link #CAPE_STEMS}. */
-    private static String capePatternName(CapePattern pattern) {
-        int i = pattern.ordinal();
-        return i >= 0 && i < CAPE_PATTERN_NAMES.length ? CAPE_PATTERN_NAMES[i] : "Weave";
+    /** The designed name for a cape, from the palette's row and the pattern's column. */
+    private static String capePatternName(int palette, CapePattern pattern) {
+        int p = palette;
+        int i = pattern == null ? 0 : pattern.ordinal();
+        if (p < 0 || p >= CAPE_PATTERN_NAMES.length) p = 0;
+        String[] row = CAPE_PATTERN_NAMES[p];
+        return i >= 0 && i < row.length ? row[i] : "Cape";
     }
 
     private static String slug(String value) {
