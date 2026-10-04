@@ -149,6 +149,9 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
         trace.mark("Mojang MainActivity super.onCreate finished")
         ModSafeMode.completeLaunch(this)
         trace.mark("Mod crash-loop marker cleared")
+        // The game process reached its own onCreate, so the optifine set active for this launch
+        // did not kill it before the game started; clear the crash attribution.
+        org.chimeramc.client.core.minecraft.OptifineModeManager.onSessionReachedWorld(this)
 
         MinecraftForegroundService.startIfEnabled(this)
 
@@ -241,6 +244,9 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
     private fun returnToLauncherAfterLaunchFailure(throwable: Throwable? = null) {
         gameRuntimeStarted = false
         MinecraftLaunchSession.clear()
+        // A failure before the game's own onCreate is attributed to the optifine items active
+        // for this launch, so a bad hook is disabled rather than retried forever.
+        org.chimeramc.client.core.minecraft.OptifineModeManager.onLaunchFailed(this)
         try {
             val logFile = File(getExternalFilesDir(null), "last_launch_failure.txt")
             logFile.writeText(

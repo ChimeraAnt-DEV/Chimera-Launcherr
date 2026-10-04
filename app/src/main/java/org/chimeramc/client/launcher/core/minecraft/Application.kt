@@ -20,6 +20,9 @@ class LauncherApplication : Application() {
         LowLatencyNetworkManager.init(applicationContext)
         ThermalGovernor.init(applicationContext)
         org.chimeramc.client.core.minecraft.FpsOptimizationService.init(applicationContext)
+        // Attribute a launch that never reported a session to the optifine items that were
+        // active for it, so a hook that kills the process cannot trap the user in a crash loop.
+        org.chimeramc.client.core.minecraft.OptifineModeManager.reconcileOnStartup(applicationContext)
         CrashReporter.init(this)
         // Mirror the persisted haptics preference into the static feedback layer so the
         // very first interaction honours it, before Settings is ever opened.

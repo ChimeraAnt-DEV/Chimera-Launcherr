@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Green "FPS+" badge beside the Bedrock Optifine Mode title. A fixed green, not the accent:
+     the badge is a capability mark, and an accent-tinted badge would change meaning with the
+     wallpaper. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/optifine_badge_green" />
+    <corners android:radius="6dp" />
+</shape>

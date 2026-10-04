@@ -88,6 +88,9 @@ public class SettingsActivity extends BaseActivity {
     private TextView bgImageBrightnessValue;
     private ImageView bgImagePreview;
     private TextView migrationCleanupStatus;
+
+    /** Drives the Bedrock Optifine Mode section; rebuilt on each bind. */
+    private org.chimeramc.client.core.minecraft.OptifineSettingsController optifineController;
     private Button migrationCleanupButton;
     private SwitchMaterial switchSharedStorageLayout;
     private TextView sharedStorageLayoutStatus;
@@ -418,7 +421,55 @@ public class SettingsActivity extends BaseActivity {
             });
         }
 
+        setupOptifineModeSection();
+
         setupCurseForgeKeyRow();
+    }
+
+    /**
+     * Wires the Bedrock Optifine Mode card.
+     *
+     * <p>The master switch gates the whole section; the per-item rows are built by
+     * {@code OptifineSettingsController} so the item list comes from one source. Applying pushes
+     * the configuration to the preloader straight away, but a game already in a world keeps the
+     * settings it launched with -- the summary says so rather than implying a live change.
+     */
+    private void setupOptifineModeSection() {
+        SwitchMaterial master = findViewById(R.id.switch_optifine_mode);
+        ViewGroup details = findViewById(R.id.optifine_details);
+        ViewGroup items = findViewById(R.id.optifine_items_container);
+        TextView summary = findViewById(R.id.optifine_summary);
+        TextView badge = findViewById(R.id.optifine_fps_badge);
+        if (master == null || items == null) {
+            return;
+        }
+
+        FeatureSettings fs = FeatureSettings.getInstance();
+        master.setChecked(fs.isOptifineModeEnabled());
+        if (details != null) {
+            details.setVisibility(fs.isOptifineModeEnabled() ? View.VISIBLE : View.GONE);
+        }
+        if (badge != null) {
+            badge.setVisibility(fs.isOptifineModeEnabled() ? View.VISIBLE : View.GONE);
+        }
+
+        optifineController = new org.chimeramc.client.core.minecraft.OptifineSettingsController(
+                this, items, summary);
+        optifineController.bind();
+
+        master.setOnCheckedChangeListener((btn, checked) -> {
+            fs.setOptifineModeEnabled(checked);
+            if (details != null) {
+                details.setVisibility(checked ? View.VISIBLE : View.GONE);
+            }
+            if (badge != null) {
+                badge.setVisibility(checked ? View.VISIBLE : View.GONE);
+            }
+            org.chimeramc.client.core.minecraft.OptifineModeManager.apply(this);
+            if (optifineController != null) {
+                optifineController.refreshStatus();
+            }
+        });
     }
 
     /**

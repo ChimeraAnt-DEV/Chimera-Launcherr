@@ -99,10 +99,19 @@ object MinecraftRuntimePreparer {
         fileListener.onLog("Loading game loader")
         trace.mark("Game loader load started")
         val hasEnabledMods = modManager.getMods().any { it.isEnabled }
-        if (hasEnabledMods && ModManager.ensurePreloaderLoaded()) {
+        // Optifine mode applies through the preloader even with no mods, so load it whenever
+        // either a mod or the master switch needs it.
+        val optifineWanted = org.chimeramc.client.settings.FeatureSettings
+            .getInstance().isOptifineModeEnabled
+        if ((hasEnabledMods || optifineWanted) && ModManager.ensurePreloaderLoaded()) {
             trace.mark("Game loader load finished")
         } else {
             trace.mark("Game loader load skipped", if (hasEnabledMods) "preloader unavailable" else "no enabled mods")
+        }
+        if (optifineWanted) {
+            org.chimeramc.client.core.minecraft.OptifineModeManager
+                .apply(context.applicationContext)
+            trace.mark("Optifine mode configured")
         }
         val signatureRulesFile = PreloaderSignatureRulesManager.getRulesFile(context.applicationContext)
         PreloaderInput.configureSignatureRules(signatureRulesFile, version.versionCode)
