@@ -232,7 +232,9 @@ public class CapeResourcePackBuilderTest {
                 .getAsJsonObject(CapeResourcePackBuilder.PET_CONTROLLER_ID);
         assertEquals("Geometry.chimera_pet", petController.get("geometry").getAsString());
 
-        JsonParser.parseString(CapeResourcePackBuilder.petAnimationJson()).getAsJsonObject();
+        JsonParser.parseString(CapeResourcePackBuilder.petAnimationsJson()).getAsJsonObject();
+        JsonParser.parseString(CapeResourcePackBuilder.petAnimationControllerJson())
+                .getAsJsonObject();
     }
 
     /**
@@ -637,6 +639,32 @@ public class CapeResourcePackBuilderTest {
                     new File(dir, CapeResourcePackBuilder.PET_TEXTURE_PATH).isFile());
             assertTrue("pet animation",
                     new File(dir, CapeResourcePackBuilder.PET_ANIMATION_PATH).isFile());
+        } finally {
+            deleteRecursively(dir);
+        }
+    }
+
+    /**
+     * A themed pet's signature particle effect is written and referenced by its controller, so the
+     * FX does not silently no-op. A plain species writes no particle file.
+     */
+    @Test
+    public void aThemedPetWritesItsParticleEffectAndControllerReference() throws Exception {
+        File dir = Files.createTempDirectory("pet-fx-pack").toFile();
+        try {
+            CosmeticCatalog.Pet bee = new CosmeticCatalog.Pet("bee", "Bee",
+                    CosmeticCatalog.PetSpecies.BEE, 0xFFE8B93A, 0xFF2E2A22, 1f);
+            CapeResourcePackBuilder.build(dir, null, null, bee);
+
+            CosmeticEffects.Effect effect = CosmeticEffects.forPet(bee);
+            assertNotNull(effect);
+            assertTrue("the bee's particle file is written",
+                    new File(dir, CosmeticEffects.pathFor(effect)).isFile());
+            String controller = new String(java.nio.file.Files.readAllBytes(
+                    new File(dir, CapeResourcePackBuilder.PET_RENDER_CONTROLLER_PATH).toPath()),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            assertTrue("the pet controller names the bee's effect",
+                    controller.contains(effect.id));
         } finally {
             deleteRecursively(dir);
         }

@@ -81,8 +81,12 @@ public final class CapeResourcePackBuilder {
     public static final String HAT_ANIMATION_ID = "animation.chimera_hat_tilt";
     /** Render controller that draws the equipped pet. */
     public static final String PET_CONTROLLER_ID = "controller.render.chimera_pet";
-    /** The animation that bobs the pet; played by the {@code pet} key. */
-    public static final String PET_ANIMATION_ID = "animation.chimera_pet";
+    /**
+     * The pet's animation controller, referenced by the entity's {@code animate} list. It plays
+     * exactly one gait animation at a time (see {@link PetAnimations}); the individual gait
+     * animations live in the same file.
+     */
+    public static final String PET_ANIMATION_ID = PetAnimations.CONTROLLER_ID;
 
     /** Paths the pack writes. Public so diagnostics and tests can verify the pack layout. */
     public static final String PLAYER_ENTITY_PATH = "entity/player.entity.json";
@@ -100,6 +104,8 @@ public final class CapeResourcePackBuilder {
     public static final String PET_RENDER_CONTROLLER_PATH =
             "render_controllers/chimera_pet.render_controllers.json";
     public static final String PET_ANIMATION_PATH = "animations/chimera_pet.animation.json";
+    public static final String PET_ANIMATION_CONTROLLER_PATH =
+            "animation_controllers/chimera_pet.animation_controllers.json";
     public static final String PET_TEXTURE_PATH = "textures/entity/chimera_pet.png";
     static final String PACK_ICON_PATH = "pack_icon.png";
 
@@ -243,9 +249,40 @@ public final class CapeResourcePackBuilder {
                                 PetGeometry.TEXTURE_WIDTH, PetGeometry.TEXTURE_HEIGHT,
                                 PetGeometry.UV_ACCENT_Y,
                                 pet.color ^ (pet.species.ordinal() * 131)));
-        // The animation is always written so the entity's reference to it always resolves.
+        // The gait animations and their controller are always written so the entity's reference to
+        // the controller always resolves. The controller plays exactly one gait at a time; the
+        // entity's animate list names the controller, not the individual animations (which would
+        // all blend together).
         writeAt(targetDir, PET_ANIMATION_PATH,
-                petAnimationJson().getBytes(StandardCharsets.UTF_8));
+                PetAnimations.animationsJson(pet).getBytes(StandardCharsets.UTF_8));
+        writeAt(targetDir, PET_ANIMATION_CONTROLLER_PATH,
+                PetAnimations.controllerJson(pet == null ? null : pet.species)
+                        .getBytes(StandardCharsets.UTF_8));
+
+        // Thematic FX: a render controller can emit particles, so a creeper/ember/void cosmetic
+        // carries a small looping effect. Each effect gets its own particle file; a cosmetic with
+        // no effect writes none, and a controller that names a missing file is skipped by the game.
+        CosmeticEffects.Effect capeEffect = CosmeticEffects.forCape(cape);
+        CosmeticEffects.Effect accEffect = CosmeticEffects.forAccessory(accessory);
+        if (capeEffect != null) {
+            writeAt(targetDir, CosmeticEffects.pathFor(capeEffect),
+                    CosmeticEffects.particleJson(capeEffect).getBytes(StandardCharsets.UTF_8));
+            writeAt(targetDir, CAPE_RENDER_CONTROLLER_PATH,
+                    capeRenderControllerJson(capeEffect).getBytes(StandardCharsets.UTF_8));
+        }
+        if (accEffect != null) {
+            writeAt(targetDir, CosmeticEffects.pathFor(accEffect),
+                    CosmeticEffects.particleJson(accEffect).getBytes(StandardCharsets.UTF_8));
+            writeAt(targetDir, HAT_RENDER_CONTROLLER_PATH,
+                    hatRenderControllerJson(accEffect).getBytes(StandardCharsets.UTF_8));
+        }
+        CosmeticEffects.Effect petEffect = CosmeticEffects.forPet(pet);
+        if (petEffect != null) {
+            writeAt(targetDir, CosmeticEffects.pathFor(petEffect),
+                    CosmeticEffects.particleJson(petEffect).getBytes(StandardCharsets.UTF_8));
+            writeAt(targetDir, PET_RENDER_CONTROLLER_PATH,
+                    petRenderControllerJson(petEffect).getBytes(StandardCharsets.UTF_8));
+        }
 
         return new BuiltPack(targetDir, PACK_UUID, PACK_VERSION);
     }
@@ -386,6 +423,7 @@ public final class CapeResourcePackBuilder {
                 // plain vanilla/Persona capes. Our cape plays from the animate list instead.
                 + "        \"cape\": \"animation.player.cape\",\n"
                 + "        \"chimera_hat_tilt\": \"" + HAT_ANIMATION_ID + "\",\n"
+                + "        \"chimera_pet\": \"" + PET_ANIMATION_ID + "\",\n"
                 + "        \"move.arms\": \"animation.player.move.arms\",\n"
                 + "        \"move.legs\": \"animation.player.move.legs\",\n"
                 + "        \"swimming\": \"animation.player.swim\",\n"
@@ -510,6 +548,20 @@ public final class CapeResourcePackBuilder {
     }
 
     /**
+     * The pet's gait animations (walk, run, crouch, fly, swim and the contextual crawler states),
+     * delegated to {@link PetAnimations}. Kept as a thin builder method so tests and diagnostics
+     * reach them the same way as the cape/hat animations.
+     */
+    static String petAnimationsJson() {
+        return PetAnimations.animationsJson(null);
+    }
+
+    /** The pet animation controller, delegated to {@link PetAnimations}. */
+    static String petAnimationControllerJson() {
+        return PetAnimations.controllerJson(null);
+    }
+
+    /**
      * The cape's cloth animation: one rotation triple per segment, all driven from
      * {@link CapeAnimationCurve}.
      *
@@ -570,6 +622,15 @@ public final class CapeResourcePackBuilder {
      * cape red, which would read as a bug rather than feedback.
      */
     static String capeRenderControllerJson() {
+        return capeRenderControllerJson(null);
+    }
+
+    /**
+     * As {@link #capeRenderControllerJson()}, plus an optional thematic particle effect emitted
+     * from the cape's top segment (the collar). See {@link #hatRenderControllerJson(CosmeticEffects.Effect)}
+     * for why this is data-driven and harmless when absent.
+     */
+    static String capeRenderControllerJson(CosmeticEffects.Effect effect) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
         sb.append("  \"format_version\": \"1.8.0\",\n");
@@ -595,6 +656,15 @@ public final class CapeResourcePackBuilder {
         }
         sb.append("        }\n");
         sb.append("      ],\n");
+        if (effect != null) {
+            sb.append("      \"particle_effects\": [\n");
+            sb.append("        {\n");
+            sb.append("          \"effect\": \"").append(effect.id).append("\",\n");
+            sb.append("          \"locator\": \"").append(CapeGeometry.boneName(1)).append("\",\n");
+            sb.append("          \"bind_to_actor\": true\n");
+            sb.append("        }\n");
+            sb.append("      ],\n");
+        }
         sb.append("      \"is_hurt_color\": {\n");
         sb.append("        \"r\": 0.0,\n");
         sb.append("        \"g\": 0.0,\n");
@@ -617,33 +687,55 @@ public final class CapeResourcePackBuilder {
      * accessory-less pack draws nothing rather than erroring.
      */
     static String hatRenderControllerJson() {
-        return "{\n"
-                + "  \"format_version\": \"1.8.0\",\n"
-                + "  \"render_controllers\": {\n"
-                + "    \"" + HAT_CONTROLLER_ID + "\": {\n"
-                + "      \"geometry\": \"Geometry.chimera_hat\",\n"
-                + "      \"materials\": [\n"
-                + "        {\n"
-                + "          \"*\": \"Material.chimera_hat\"\n"
-                + "        }\n"
-                + "      ],\n"
-                + "      \"textures\": [\n"
-                + "        \"Texture.chimera_hat\"\n"
-                + "      ],\n"
-                + "      \"part_visibility\": [\n"
-                + "        {\n"
-                + "          \"acc\": \"" + hatVisibilityCondition() + "\"\n"
-                + "        }\n"
-                + "      ],\n"
-                + "      \"is_hurt_color\": {\n"
-                + "        \"r\": 0.0,\n"
-                + "        \"g\": 0.0,\n"
-                + "        \"b\": 0.0,\n"
-                + "        \"a\": 0.0\n"
-                + "      }\n"
-                + "    }\n"
-                + "  }\n"
-                + "}\n";
+        return hatRenderControllerJson(null);
+    }
+
+    /**
+     * As {@link #hatRenderControllerJson()}, plus an optional thematic particle effect. A render
+     * controller emits particles by naming them in {@code particle_effects}, which is the standard
+     * data-driven route — no native code. The effect is bound to the {@code acc} bone so it emits
+     * at the accessory, and a controller that names a missing particle file is simply skipped, so
+     * an effectless accessory is unaffected.
+     */
+    static String hatRenderControllerJson(CosmeticEffects.Effect effect) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"format_version\": \"1.8.0\",\n");
+        sb.append("  \"render_controllers\": {\n");
+        sb.append("    \"").append(HAT_CONTROLLER_ID).append("\": {\n");
+        sb.append("      \"geometry\": \"Geometry.chimera_hat\",\n");
+        sb.append("      \"materials\": [\n");
+        sb.append("        {\n");
+        sb.append("          \"*\": \"Material.chimera_hat\"\n");
+        sb.append("        }\n");
+        sb.append("      ],\n");
+        sb.append("      \"textures\": [\n");
+        sb.append("        \"Texture.chimera_hat\"\n");
+        sb.append("      ],\n");
+        sb.append("      \"part_visibility\": [\n");
+        sb.append("        {\n");
+        sb.append("          \"acc\": \"").append(hatVisibilityCondition()).append("\"\n");
+        sb.append("        }\n");
+        sb.append("      ],\n");
+        if (effect != null) {
+            sb.append("      \"particle_effects\": [\n");
+            sb.append("        {\n");
+            sb.append("          \"effect\": \"").append(effect.id).append("\",\n");
+            sb.append("          \"locator\": \"acc\",\n");
+            sb.append("          \"bind_to_actor\": true\n");
+            sb.append("        }\n");
+            sb.append("      ],\n");
+        }
+        sb.append("      \"is_hurt_color\": {\n");
+        sb.append("        \"r\": 0.0,\n");
+        sb.append("        \"g\": 0.0,\n");
+        sb.append("        \"b\": 0.0,\n");
+        sb.append("        \"a\": 0.0\n");
+        sb.append("      }\n");
+        sb.append("    }\n");
+        sb.append("  }\n");
+        sb.append("}\n");
+        return sb.toString();
     }
 
     /**
@@ -651,33 +743,53 @@ public final class CapeResourcePackBuilder {
      * geometry with its own texture and material, gated by {@link #petVisibilityCondition()}.
      */
     static String petRenderControllerJson() {
-        return "{\n"
-                + "  \"format_version\": \"1.8.0\",\n"
-                + "  \"render_controllers\": {\n"
-                + "    \"" + PET_CONTROLLER_ID + "\": {\n"
-                + "      \"geometry\": \"Geometry.chimera_pet\",\n"
-                + "      \"materials\": [\n"
-                + "        {\n"
-                + "          \"*\": \"Material.chimera_pet\"\n"
-                + "        }\n"
-                + "      ],\n"
-                + "      \"textures\": [\n"
-                + "        \"Texture.chimera_pet\"\n"
-                + "      ],\n"
-                + "      \"part_visibility\": [\n"
-                + "        {\n"
-                + "          \"pet\": \"" + petVisibilityCondition() + "\"\n"
-                + "        }\n"
-                + "      ],\n"
-                + "      \"is_hurt_color\": {\n"
-                + "        \"r\": 0.0,\n"
-                + "        \"g\": 0.0,\n"
-                + "        \"b\": 0.0,\n"
-                + "        \"a\": 0.0\n"
-                + "      }\n"
-                + "    }\n"
-                + "  }\n"
-                + "}\n";
+        return petRenderControllerJson(null);
+    }
+
+    /**
+     * As {@link #petRenderControllerJson()}, plus an optional signature particle effect bound to
+     * the {@code pet} bone (bee pollen, butterfly wing-dust, dragonfire, axolotl bubbles). Data
+     * driven like the cape/hat effects; a pet with no effect writes no particle file.
+     */
+    static String petRenderControllerJson(CosmeticEffects.Effect effect) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"format_version\": \"1.8.0\",\n");
+        sb.append("  \"render_controllers\": {\n");
+        sb.append("    \"").append(PET_CONTROLLER_ID).append("\": {\n");
+        sb.append("      \"geometry\": \"Geometry.chimera_pet\",\n");
+        sb.append("      \"materials\": [\n");
+        sb.append("        {\n");
+        sb.append("          \"*\": \"Material.chimera_pet\"\n");
+        sb.append("        }\n");
+        sb.append("      ],\n");
+        sb.append("      \"textures\": [\n");
+        sb.append("        \"Texture.chimera_pet\"\n");
+        sb.append("      ],\n");
+        sb.append("      \"part_visibility\": [\n");
+        sb.append("        {\n");
+        sb.append("          \"pet\": \"").append(petVisibilityCondition()).append("\"\n");
+        sb.append("        }\n");
+        sb.append("      ],\n");
+        if (effect != null) {
+            sb.append("      \"particle_effects\": [\n");
+            sb.append("        {\n");
+            sb.append("          \"effect\": \"").append(effect.id).append("\",\n");
+            sb.append("          \"locator\": \"pet\",\n");
+            sb.append("          \"bind_to_actor\": true\n");
+            sb.append("        }\n");
+            sb.append("      ],\n");
+        }
+        sb.append("      \"is_hurt_color\": {\n");
+        sb.append("        \"r\": 0.0,\n");
+        sb.append("        \"g\": 0.0,\n");
+        sb.append("        \"b\": 0.0,\n");
+        sb.append("        \"a\": 0.0\n");
+        sb.append("      }\n");
+        sb.append("    }\n");
+        sb.append("  }\n");
+        sb.append("}\n");
+        return sb.toString();
     }
 
     /**
@@ -704,29 +816,6 @@ public final class CapeResourcePackBuilder {
                 + "            \"query.target_y_rotation\",\n"
                 + "            0.0\n"
                 + "          ]\n"
-                + "        }\n"
-                + "      }\n"
-                + "    }\n"
-                + "  }\n"
-                + "}\n";
-    }
-
-    /**
-     * The pet animation: a gentle idle bob on the {@code pet} bone, so a stationary pet is not a
-     * statue. It is played from the player entity's {@code animate} list, which runs in every
-     * frame — unlike the cape, whose animation is played by the vanilla controller only in third
-     * person, the pet is visible in first person too and so cannot rely on that controller.
-     */
-    static String petAnimationJson() {
-        return "{\n"
-                + "  \"format_version\": \"1.8.0\",\n"
-                + "  \"animations\": {\n"
-                + "    \"" + PET_ANIMATION_ID + "\": {\n"
-                + "      \"loop\": true,\n"
-                + "      \"animation_length\": 2.0,\n"
-                + "      \"bones\": {\n"
-                + "        \"pet\": {\n"
-                + "          \"position\": [0.0, \"Math.sin(query.anim_time * 180.0) * 0.4\", 0.0]\n"
                 + "        }\n"
                 + "      }\n"
                 + "    }\n"

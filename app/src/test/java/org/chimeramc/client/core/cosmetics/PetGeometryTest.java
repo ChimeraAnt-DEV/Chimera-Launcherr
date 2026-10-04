@@ -117,12 +117,22 @@ public class PetGeometryTest {
     }
 
     private static JsonArray cubes(CosmeticCatalog.PetSpecies species) {
-        return JsonParser.parseString(PetGeometry.geometryJson(pet(species)))
+        // The mesh is multi-bone now (head, tail, wings, legs are separate), so gather every bone's
+        // cubes; reading only the first bone would miss the species-defining parts.
+        com.google.gson.JsonArray bones = JsonParser.parseString(PetGeometry.geometryJson(pet(species)))
                 .getAsJsonObject()
                 .getAsJsonArray("minecraft:geometry")
                 .get(0).getAsJsonObject()
-                .getAsJsonArray("bones").get(0).getAsJsonObject()
-                .getAsJsonArray("cubes");
+                .getAsJsonArray("bones");
+        com.google.gson.JsonArray all = new com.google.gson.JsonArray();
+        for (int b = 0; b < bones.size(); b++) {
+            JsonArray cubes = bones.get(b).getAsJsonObject().getAsJsonArray("cubes");
+            if (cubes == null) continue;
+            for (int i = 0; i < cubes.size(); i++) {
+                all.add(cubes.get(i));
+            }
+        }
+        return all;
     }
 
     private static double[] origin(JsonObject cube) {

@@ -849,6 +849,7 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="cosmetics_accessories">Accessories</string>
     <string name="cosmetics_pets">Pets</string>
     <string name="cosmetics_pet_gait">Gait</string>
+    <string name="cosmetics_gait_idle">Idle</string>
     <string name="cosmetics_gait_walk">Walk</string>
     <string name="cosmetics_gait_run">Run</string>
     <string name="cosmetics_gait_crouch">Crouch</string>
@@ -857,7 +858,7 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="cosmetics_none">None</string>
     <string name="cosmetics_equipped">Equipped %1$s</string>
     <string name="cosmetics_scope_note">Capes, accessories and pets are launcher-side looks. The preview shows your own skin wearing the equipped cape, accessory and pet, and pets animate their walk, run, crouch, fly and swim gaits here. All three can reach the running game: Apply in game installs a resource pack that draws a cape, a hat and a pet on the player entity for the selected instance, and cosmetic sync shows them to other Chimera users in the same world. Vanilla players do not see them — Bedrock gives an app no way to push a cosmetic onto someone else\'s account — and the pet is drawn on your own player rather than spawned as an entity, so it needs no server command and cannot trip a server check. Cape movement is drawn in the preview with a full cloth simulation; in-game the pack supplies a 16-segment cape that folds and ripples from your movement (speed, jumping, falling and turning), plus a gentle idle bob for the pet.</string>
-    <string name="accessory_style_note">Each style is a real, different mesh — a cap, a beanie, a crown, horns, a halo and so on are separate geometry. Every palette then tints those meshes, so "Amethyst Crown" and "Ember Crown" are the same shape in different colours while "Amethyst Crown" and "Amethyst Cap" are different shapes.</string>
+    <string name="accessory_style_note">Each style is a real, different mesh — a cap, a beanie, a crown, horns, a halo and so on are separate geometry. Every palette then tints those meshes, so "Prism Crown" and "Ember Circlet" share a shape in different colours while "Prism Crown" and "Geode Beret" are different shapes. Names are individual to each piece, not one palette word repeated down the list.</string>
     <string name="cosmetics_in_game">On your character in-game</string>
     <string name="cosmetics_apply_in_game">Apply in game</string>
     <string name="cosmetics_remove_in_game">Remove</string>
