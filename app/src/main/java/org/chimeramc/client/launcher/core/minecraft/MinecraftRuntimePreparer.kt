@@ -103,19 +103,35 @@ object MinecraftRuntimePreparer {
         // either a mod or the master switch needs it.
         val optifineWanted = org.chimeramc.client.settings.FeatureSettings
             .getInstance().isOptifineModeEnabled
-        if ((hasEnabledMods || optifineWanted) && ModManager.ensurePreloaderLoaded()) {
-            trace.mark("Game loader load finished")
+        // The preloader must be loaded before *any* PreloaderInput call. configureSignatureRules
+        // below goes through that same JNI surface, so when neither a mod nor Optifine Mode wanted
+        // the loader the call used to arrive with no library loaded, be discarded by the caught
+        // UnsatisfiedLinkError, and the hooks were then installed later (from MinecraftActivity)
+        // with no signature rules -- which faulted on the render thread. Loading here is a no-op
+        // when MinecraftActivity would have loaded it anyway, and it is what makes the rules land.
+        if (!ModManager.ensurePreloaderLoaded()) {
+            fileListener.onLog(
+                if (hasEnabledMods) "Game loader unavailable; enabled mods will not load"
+                else "Game loader unavailable; the session will launch without mods"
+            )
+            trace.mark("Game loader unavailable",
+                if (hasEnabledMods) "enabled mods present" else "no enabled mods")
         } else {
-            trace.mark("Game loader load skipped", if (hasEnabledMods) "preloader unavailable" else "no enabled mods")
+            trace.mark("Game loader load finished")
         }
         if (optifineWanted) {
             org.chimeramc.client.core.minecraft.OptifineModeManager
                 .apply(context.applicationContext)
             trace.mark("Optifine mode configured")
         }
-        val signatureRulesFile = PreloaderSignatureRulesManager.getRulesFile(context.applicationContext)
-        PreloaderInput.configureSignatureRules(signatureRulesFile, version.versionCode)
-        trace.mark("Preloader signature rules configured", signatureRulesFile?.absolutePath ?: "<none>")
+        // Only configure the rules once the library handle is live. A failed load is surfaced by
+        // the preloader's own "rules not delivered" guard at hook-install time; delivering into
+        // the void here would leave the same silent state the crash came from.
+        if (ModManager.ensurePreloaderLoaded()) {
+            val signatureRulesFile = PreloaderSignatureRulesManager.getRulesFile(context.applicationContext)
+            PreloaderInput.configureSignatureRules(signatureRulesFile, version.versionCode)
+            trace.mark("Preloader signature rules configured", signatureRulesFile?.absolutePath ?: "<none>")
+        }
 
         fileListener.onLog("Loading native libraries")
         loadMinecraftLibraries(gameManager, version, fileListener, trace)
