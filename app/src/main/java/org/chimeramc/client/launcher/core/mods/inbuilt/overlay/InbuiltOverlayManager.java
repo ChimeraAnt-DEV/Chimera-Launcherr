@@ -121,6 +121,7 @@ public class InbuiltOverlayManager {
         modActiveStates.put(ModIds.POJAV_CONTROLS, false);
         modActiveStates.put(ModIds.MORE_BUTTONS, false);
         modActiveStates.put(ModIds.HOTBAR_SLOT, false);
+        modActiveStates.put(ModIds.OFFHAND, false);
         modActiveStates.put(ModIds.AIM_SETTINGS, false);
         modActiveStates.put(ModIds.ARMOR_HUD, false);
         modActiveStates.put(ModIds.CRYSTAL_OPTIMIZER, false);
@@ -168,6 +169,7 @@ public class InbuiltOverlayManager {
         restorePersistedInbuiltModState(manager, ModIds.POJAV_CONTROLS);
         restorePersistedInbuiltModState(manager, ModIds.MORE_BUTTONS);
         restorePersistedInbuiltModState(manager, ModIds.HOTBAR_SLOT);
+        restorePersistedInbuiltModState(manager, ModIds.OFFHAND);
         restorePersistedInbuiltModState(manager, ModIds.AIM_SETTINGS);
         restorePersistedInbuiltModState(manager, ModIds.ARMOR_HUD);
         restorePersistedInbuiltModState(manager, ModIds.CRYSTAL_OPTIMIZER);
@@ -302,6 +304,13 @@ public class InbuiltOverlayManager {
             case ModIds.HOTBAR_SLOT:
                 refreshHotbarSlots();
                 break;
+            case ModIds.OFFHAND: {
+                OffhandOverlay offhand = new OffhandOverlay(activity);
+                offhand.show(savedX, savedY);
+                overlays.add(offhand);
+                modOverlayMap.put(modId, offhand);
+                break;
+            }
             case ModIds.POJAV_CONTROLS:
                 if (activity instanceof PojavControlsHost && PojavControlsMod.setEnabled(true)) {
                     PojavControls.setEnabled(activity, (PojavControlsHost) activity, true);
@@ -1082,6 +1091,19 @@ public class InbuiltOverlayManager {
                     snaplookOverlay.onKeyUp();
                     return true;
                 }
+            }
+        }
+
+        // Offhand hardware bind. Only the press, and skipped while we are the ones injecting the
+        // off-hand key so binding the swap/use key to itself cannot recurse.
+        if (action == android.view.KeyEvent.ACTION_DOWN
+                && !OffhandOverlay.isInjecting()
+                && modActiveStates.getOrDefault(ModIds.OFFHAND, false)) {
+            int offhandBind = manager.getOffhandKeybind();
+            if (offhandBind != 0 && keyCode == offhandBind) {
+                OffhandOverlay.performAction(activity, manager.getOffhandMode(),
+                        manager.getOffhandSwapKey(), manager.getOffhandUseKey());
+                return true;
             }
         }
 

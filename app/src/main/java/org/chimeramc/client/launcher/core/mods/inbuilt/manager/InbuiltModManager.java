@@ -37,6 +37,10 @@ public class InbuiltModManager {
     private static final String KEY_GYRO_INVERT_X = "gyro_invert_x";
     private static final String KEY_GYRO_INVERT_Y = "gyro_invert_y";
     private static final String KEY_GYRO_DEADZONE = "gyro_deadzone";
+    private static final String KEY_OFFHAND_MODE = "offhand_mode";
+    private static final String KEY_OFFHAND_SWAP_KEY = "offhand_swap_key";
+    private static final String KEY_OFFHAND_USE_KEY = "offhand_use_key";
+    private static final String KEY_OFFHAND_KEYBIND = "offhand_keybind";
     private static final String KEY_OVERLAY_POSITION_X_PREFIX = "overlay_pos_x_";
     private static final String KEY_OVERLAY_POSITION_Y_PREFIX = "overlay_pos_y_";
     private static final String KEY_OVERLAY_LOCK_PREFIX = "overlay_lock_";
@@ -442,6 +446,47 @@ public class InbuiltModManager {
 
     public void setGyroDeadzone(int deadzone) {
         prefs.edit().putInt(KEY_GYRO_DEADZONE, Math.max(0, Math.min(50, deadzone))).apply();
+    }
+
+    // --- Offhand module --------------------------------------------------------------------
+    // The Bedrock offhand keys: F swaps the held item into the off hand, V uses the off-hand item.
+    // Stored as Android key codes so the bind editor works like every other keybind.
+
+    public int getOffhandSwapKey() {
+        return prefs.getInt(KEY_OFFHAND_SWAP_KEY, KeyEvent.KEYCODE_F);
+    }
+
+    public void setOffhandSwapKey(int keyCode) {
+        prefs.edit().putInt(KEY_OFFHAND_SWAP_KEY, keyCode).apply();
+    }
+
+    public int getOffhandUseKey() {
+        return prefs.getInt(KEY_OFFHAND_USE_KEY, KeyEvent.KEYCODE_V);
+    }
+
+    public void setOffhandUseKey(int keyCode) {
+        prefs.edit().putInt(KEY_OFFHAND_USE_KEY, keyCode).apply();
+    }
+
+    /**
+     * The on-screen button's behaviour: 0 = swap (F), 1 = use (V), 2 = both.
+     * Stored as an int so the config RADIO can present the labels.
+     */
+    public int getOffhandMode() {
+        return prefs.getInt(KEY_OFFHAND_MODE, 0);
+    }
+
+    public void setOffhandMode(int mode) {
+        prefs.edit().putInt(KEY_OFFHAND_MODE, Math.max(0, Math.min(2, mode))).apply();
+    }
+
+    /** The hardware keybind that triggers the offhand action; 0 means none. */
+    public int getOffhandKeybind() {
+        return prefs.getInt(KEY_OFFHAND_KEYBIND, 0);
+    }
+
+    public void setOffhandKeybind(int keyCode) {
+        prefs.edit().putInt(KEY_OFFHAND_KEYBIND, keyCode).apply();
     }
     public boolean isHotbarItemIconsEnabled() {
         return prefs.getBoolean(KEY_HOTBAR_ITEM_ICONS, false);

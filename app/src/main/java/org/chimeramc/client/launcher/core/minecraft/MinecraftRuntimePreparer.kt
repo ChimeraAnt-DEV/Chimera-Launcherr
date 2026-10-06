@@ -183,7 +183,10 @@ val modsDir = modManager.currentVersion?.modsDir?.absolutePath
                 context, profileId, version.versionIsolation
             )
             val store = CosmeticStore(context)
-            val cape = store.equippedCape
+            // getEquippedCapeForDisplay applies the Optifine default: with Optifine Mode on and no
+            // cape chosen, the classic all-black Optifine cape is installed so the character is not
+            // left bare. An explicit choice always wins.
+            val cape = store.equippedCapeForDisplay
             val accessory = store.equippedAccessory
             val pet = store.equippedPet
             val stagingRoot = File(context.filesDir, "cape")

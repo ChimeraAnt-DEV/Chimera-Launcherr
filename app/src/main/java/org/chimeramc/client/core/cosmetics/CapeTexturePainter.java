@@ -112,6 +112,28 @@ public final class CapeTexturePainter {
         if (branded) {
             paintMark(pixels, CLOTH_X + 3, CLOTH_Y + 5, 4, 6, trimColor);
         }
+        if (pattern == CosmeticCatalog.CapePattern.OPTIFINE) {
+            paintOptifineMonogram(pixels, accentColor);
+        }
+    }
+
+    /**
+     * Paints the classic Optifine "OF" monogram onto the visible cloth panel.
+     *
+     * <p>The glyph rule lives in {@link CapePatterns#optifineMonogramAt} so the texture and the
+     * launcher preview draw the same letters. It is painted in the cape's accent colour, which for
+     * the two built-in Optifine capes is red or blue as the original mod offered.
+     */
+    private static void paintOptifineMonogram(int[] pixels, int color) {
+        for (int row = 0; row < CLOTH_HEIGHT; row++) {
+            float v = row / (float) (CLOTH_HEIGHT - 1);
+            for (int col = 0; col < CLOTH_WIDTH; col++) {
+                float u = col / (float) (CLOTH_WIDTH - 1);
+                if (CapePatterns.optifineMonogramAt(u, v)) {
+                    pixels[(CLOTH_Y + row) * TEXTURE_WIDTH + (CLOTH_X + col)] = color;
+                }
+            }
+        }
     }
 
     /**

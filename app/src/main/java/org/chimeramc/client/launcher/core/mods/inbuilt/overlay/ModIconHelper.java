@@ -20,6 +20,7 @@ public class ModIconHelper {
             case ModIds.POJAV_CONTROLS -> R.drawable.ic_pojav_controls;
             case ModIds.MORE_BUTTONS -> R.drawable.ic_more_buttons_normal;
             case ModIds.HOTBAR_SLOT -> R.drawable.ic_hotbar_slot;
+            case ModIds.OFFHAND -> R.drawable.ic_offhand;
             case ModIds.AIM_SETTINGS -> R.drawable.ic_crosshair;
             default -> R.drawable.ic_settings;
         };

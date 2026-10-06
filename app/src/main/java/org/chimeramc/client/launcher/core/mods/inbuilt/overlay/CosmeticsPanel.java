@@ -99,7 +99,7 @@ final class CosmeticsPanel {
                 dp(compact ? 10 : 16), dp(compact ? 8 : 12));
 
         preview = new CapePreviewView(activity);
-        preview.setCape(store.getEquippedCape());
+        preview.setCape(store.getEquippedCapeForDisplay());
         preview.setAccessory(store.getEquippedAccessory());
         preview.setPet(store.getEquippedPet());
         preview.setContentDescription(activity.getString(R.string.cosmetics_preview_description));
@@ -248,7 +248,7 @@ final class CosmeticsPanel {
     private void applyInGameQuietly() {
         final List<File> gameDataDirs = resolveGameDataDirs();
         if (gameDataDirs.isEmpty()) return;
-        final CosmeticCatalog.Cape cape = store.getEquippedCape();
+        final CosmeticCatalog.Cape cape = store.getEquippedCapeForDisplay();
         final CosmeticCatalog.Accessory accessory = store.getEquippedAccessory();
         final CosmeticCatalog.Pet pet = store.getEquippedPet();
         final Activity target = activity;
@@ -491,7 +491,7 @@ final class CosmeticsPanel {
             toast(R.string.cosmetics_no_instance);
             return;
         }
-        CosmeticCatalog.Cape cape = store.getEquippedCape();
+        CosmeticCatalog.Cape cape = store.getEquippedCapeForDisplay();
         CosmeticCatalog.Accessory accessory = store.getEquippedAccessory();
         CosmeticCatalog.Pet pet = store.getEquippedPet();
         if (cape == null && accessory == null && pet == null) {

@@ -13,6 +13,38 @@ package org.chimeramc.client.core.cosmetics;
  */
 public final class CapePatterns {
 
+    /**
+     * The "OF" monogram, a 6x5 blocky glyph. '#' is ink. Shared by the in-game texture painter and
+     * the launcher preview so the two cannot draw a different mark.
+     */
+    private static final String[] OPTIFINE_MONOGRAM = {
+            "###.##",
+            "#.#.#.",
+            "#.#.##",
+            "#.#.#.",
+            "###.#."
+    };
+
+    /** The monogram is drawn centred, occupying this fraction of the cloth panel. */
+    private static final float OF_U0 = 0.15f, OF_U1 = 0.85f, OF_V0 = 0.38f, OF_V1 = 0.66f;
+
+    /**
+     * Whether the point is inside the Optifine "OF" monogram, in normalised cloth coordinates.
+     *
+     * <p>The monogram is lettering, not a weave, so it is deliberately not part of
+     * {@link #colorAt}: both renderers ask this separately and paint the accent colour where it is
+     * true, which keeps the letters a solid, readable colour instead of being re-shaded as cloth.
+     */
+    public static boolean optifineMonogramAt(float u, float v) {
+        if (u < OF_U0 || u >= OF_U1 || v < OF_V0 || v >= OF_V1) return false;
+        int gx = (int) ((u - OF_U0) / (OF_U1 - OF_U0) * OPTIFINE_MONOGRAM[0].length());
+        int gy = (int) ((v - OF_V0) / (OF_V1 - OF_V0) * OPTIFINE_MONOGRAM.length);
+        if (gy < 0 || gy >= OPTIFINE_MONOGRAM.length) return false;
+        String row = OPTIFINE_MONOGRAM[gy];
+        if (gx < 0 || gx >= row.length()) return false;
+        return row.charAt(gx) == '#';
+    }
+
     private CapePatterns() {
     }
 

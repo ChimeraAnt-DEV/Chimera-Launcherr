@@ -171,6 +171,48 @@ public class SkinModelTest {
         assertTrue("a higher point must draw higher on screen", high[1] < low[1]);
     }
 
+    /**
+     * The face corner order is the UV mapping for {@code Canvas.drawBitmapMesh}, which maps a
+     * bitmap's corners to {@code verts} in {@code [TL, TR, BL, BR]} order. If the texture's top
+     * edge is not the model's upper edge, every face renders upside down — the head's eyes and
+     * mouth land on its forehead and the hand/boot bands land at the shoulder and hip. That was
+     * the "mismatched textures" defect.
+     */
+    @Test
+    public void everyVerticalFaceMapsItsTextureTopEdgeToTheUpperModelEdge() {
+        for (SkinModel.Box box : SkinModel.boxes()) {
+            for (SkinModel.Face face : new SkinModel.Face[]{
+                    SkinModel.Face.FRONT, SkinModel.Face.BACK,
+                    SkinModel.Face.LEFT, SkinModel.Face.RIGHT}) {
+                float[][] c = box.faceCorners(face);
+                assertEquals(box.id + " " + face + " needs four corners", 4, c.length);
+                // verts[0..1] are the texture's top edge, verts[2..3] its bottom.
+                assertEquals(box.id + " " + face + " top edge must be level",
+                        c[0][1], c[1][1], 1e-4f);
+                assertEquals(box.id + " " + face + " bottom edge must be level",
+                        c[2][1], c[3][1], 1e-4f);
+                assertTrue(box.id + " " + face + " texture top must be the higher edge",
+                        c[0][1] > c[2][1]);
+            }
+        }
+    }
+
+    /**
+     * The horizontal direction must run the same way for a face and its opposite so a limb's
+     * front and back strips do not mirror. This is a weak invariant (it cannot catch a globally
+     * mirrored model) but it catches a transposed pair, which is the common typo.
+     */
+    @Test
+    public void faceCornersAreInGridOrderNotPerimeterOrder() {
+        SkinModel.Box box = boxById("body");
+        float[][] f = box.faceCorners(SkinModel.Face.FRONT);
+        // TL and TR share the top Y and differ in X; TL and BL share X and differ in Y.
+        assertEquals("TL/TR share Y", f[0][1], f[1][1], 1e-4f);
+        assertTrue("TL/TR differ in X", Math.abs(f[0][0] - f[1][0]) > 1e-4f);
+        assertEquals("TL/BL share X", f[0][0], f[2][0], 1e-4f);
+        assertTrue("TL/BL differ in Y", Math.abs(f[0][1] - f[2][1]) > 1e-4f);
+    }
+
     @Test
     public void everyBoxHasPositiveVolume() {
         for (SkinModel.Box box : SkinModel.boxes()) {

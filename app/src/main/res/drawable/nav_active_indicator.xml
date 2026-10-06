@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The sliding accent bar under the active nav tab. A rounded pill so it reads as a deliberate
+    indicator rather than a stray line; BaseActivity tints it to the accent.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/colorPrimary" />
+    <corners android:radius="2dp" />
+</shape>

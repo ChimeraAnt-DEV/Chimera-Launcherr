@@ -108,6 +108,15 @@
             app:layout_constraintStart_toEndOf="@id/nav_app_name"
             app:layout_constraintTop_toTopOf="parent">
 
+            <!--
+                The tab row and its sliding accent indicator share a FrameLayout so the indicator
+                can sit under the active tab and scroll with the strip. HorizontalScrollView takes
+                a single child, so this wrapper is what allows the overlay.
+            -->
+            <FrameLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent">
+
             <LinearLayout
                 android:id="@+id/nav_tab_row"
                 android:layout_width="wrap_content"
@@ -152,6 +161,16 @@
                     android:text="@string/nav_settings" />
 
             </LinearLayout>
+
+                <!-- The sliding accent indicator, positioned by BaseActivity under the active tab. -->
+                <View
+                    android:id="@+id/nav_active_indicator"
+                    android:layout_width="28dp"
+                    android:layout_height="3dp"
+                    android:layout_gravity="bottom"
+                    android:background="@drawable/nav_active_indicator"
+                    android:visibility="invisible" />
+            </FrameLayout>
         </HorizontalScrollView>
 
         <!--

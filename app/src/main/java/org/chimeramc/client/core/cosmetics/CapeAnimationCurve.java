@@ -41,11 +41,11 @@ public final class CapeAnimationCurve {
     /** Lean added per unit of vertical speed, so rising and falling both stream the cloth. */
     public static final double VERTICAL_LEAN_DEG = 10.0;
     /** Amplitude of the travelling flutter. */
-    public static final double FLUTTER_AMPLITUDE_DEG = 9.0;
+    public static final double FLUTTER_AMPLITUDE_DEG = 13.0;
     /** Spatial frequency of the flutter, per block moved. */
     public static final double FLUTTER_FREQUENCY = 60.0;
     /** Amplitude of the secondary sideways sway. */
-    public static final double SWAY_AMPLITUDE_DEG = 7.0;
+    public static final double SWAY_AMPLITUDE_DEG = 10.0;
     /** Spatial frequency of the sway, per block moved. */
     public static final double SWAY_FREQUENCY = 44.0;
 

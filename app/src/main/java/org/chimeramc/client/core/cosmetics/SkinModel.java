@@ -127,25 +127,39 @@ public final class SkinModel {
         public float maxZ() { return cz + d / 2f; }
 
         /**
-         * The four corners of a face, wound so that projecting them in order gives a
-         * non-self-intersecting quad. The order is fixed per face rather than derived, because
-         * a wrong winding draws a bow-tie and the texture mapping then looks sheared.
+         * The four corners of a face in <b>grid order</b>: top-left, top-right, bottom-left,
+         * bottom-right of the texture rectangle.
+         *
+         * <p>The order is load-bearing twice over. The textured character is drawn with
+         * {@code Canvas.drawBitmapMesh}, which maps a bitmap's corners to {@code verts} in the
+         * order {@code [TL, TR, BL, BR]} — it has no source rectangle of its own, so this array is
+         * the UV mapping. A perimeter winding (the previous TL, TR, BR, BL order) therefore drew
+         * every face rotated 180 degrees: the head's eyes and mouth ended up on its forehead, and
+         * the arm/leg hand and boot bands ended up at the shoulder and hip instead of the wrist
+         * and ankle. That was the "mismatched textures" defect.
+         *
+         * <p>The same order also keeps the projected quad simple (non-self-intersecting) for the
+         * flat accessory boxes, which are filled with {@code drawPath} rather than textured.
+         *
+         * <p>Each face maps its texture's <em>top</em> edge to the model's <em>+y</em> edge, so a
+         * texture is upright on every side. The horizontal direction is chosen so that adjacent
+         * faces stay continuous around the box.
          */
         public float[][] faceCorners(Face f) {
             float x0 = minX(), x1 = maxX(), y0 = minY(), y1 = maxY(), z0 = minZ(), z1 = maxZ();
             switch (f) {
                 case TOP:
-                    return new float[][]{{x0, y1, z1}, {x1, y1, z1}, {x1, y1, z0}, {x0, y1, z0}};
+                    return new float[][]{{x0, y1, z0}, {x1, y1, z0}, {x0, y1, z1}, {x1, y1, z1}};
                 case BOTTOM:
-                    return new float[][]{{x0, y0, z0}, {x1, y0, z0}, {x1, y0, z1}, {x0, y0, z1}};
+                    return new float[][]{{x0, y0, z1}, {x1, y0, z1}, {x0, y0, z0}, {x1, y0, z0}};
                 case LEFT:
-                    return new float[][]{{x0, y0, z1}, {x0, y1, z1}, {x0, y1, z0}, {x0, y0, z0}};
+                    return new float[][]{{x0, y1, z1}, {x0, y1, z0}, {x0, y0, z1}, {x0, y0, z0}};
                 case RIGHT:
-                    return new float[][]{{x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1}, {x1, y0, z1}};
+                    return new float[][]{{x1, y1, z0}, {x1, y1, z1}, {x1, y0, z0}, {x1, y0, z1}};
                 case FRONT:
-                    return new float[][]{{x0, y0, z1}, {x1, y0, z1}, {x1, y1, z1}, {x0, y1, z1}};
+                    return new float[][]{{x0, y1, z1}, {x1, y1, z1}, {x0, y0, z1}, {x1, y0, z1}};
                 case BACK:
-                    return new float[][]{{x1, y0, z0}, {x0, y0, z0}, {x0, y1, z0}, {x1, y1, z0}};
+                    return new float[][]{{x1, y1, z0}, {x0, y1, z0}, {x1, y0, z0}, {x0, y0, z0}};
                 default:
                     return new float[0][];
             }

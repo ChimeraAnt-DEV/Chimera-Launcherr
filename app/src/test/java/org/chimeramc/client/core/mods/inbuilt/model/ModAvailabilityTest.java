@@ -32,7 +32,10 @@ public class ModAvailabilityTest {
         String[] working = {
                 ModIds.AUTO_SPRINT, ModIds.ZOOM, ModIds.FPS_DISPLAY, ModIds.CPS_DISPLAY,
                 ModIds.SNAPLOOK, ModIds.GYRO, ModIds.HIT_REGISTRATION, ModIds.HIT_TIMING,
-                ModIds.VOICE_CHAT, ModIds.MOD_MENU
+                ModIds.VOICE_CHAT, ModIds.MOD_MENU,
+                // Offhand sends the game's own off-hand keys, so it needs no native feed and must
+                // stay usable.
+                ModIds.OFFHAND
         };
         for (String id : working) {
             assertFalse(id + " must stay usable", ModAvailability.isUnavailable(id));

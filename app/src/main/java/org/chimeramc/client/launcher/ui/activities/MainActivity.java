@@ -1301,11 +1301,13 @@ import okhttp3.OkHttpClient;
             @Override
             public void run() {
                 if (!pulseRunning) return;
-                // Subtle glow + lift pulse on the hero card, then settle back.
+                // A gentle lift-and-settle: elevation and a hair of scale, never alpha. Dimming the
+                // card faded its own text with it, which read as a flicker rather than a pulse.
                 heroCard.animate().cancel();
                 heroCard.animate()
                         .translationZ(dp(6f))
-                        .alpha(0.94f)
+                        .scaleX(1.012f)
+                        .scaleY(1.012f)
                         .setDuration(700L)
                         .setInterpolator(DynamicAnim.getDefaultInterpolator())
                         .start();
@@ -1313,7 +1315,8 @@ import okhttp3.OkHttpClient;
                     if (!pulseRunning) return;
                     heroCard.animate()
                             .translationZ(dp(0f))
-                            .alpha(1f)
+                            .scaleX(1f)
+                            .scaleY(1f)
                             .setDuration(900L)
                             .setInterpolator(DynamicAnim.getDefaultInterpolator())
                             .withLayer()
@@ -1339,7 +1342,8 @@ import okhttp3.OkHttpClient;
         View heroCard = findViewById(R.id.last_played_card);
         if (heroCard != null) {
             heroCard.animate().cancel();
-            heroCard.animate().translationZ(0f).alpha(1f).setDuration(200L).start();
+            heroCard.animate().translationZ(0f).alpha(1f)
+                    .scaleX(1f).scaleY(1f).setDuration(200L).start();
         }
     }
 

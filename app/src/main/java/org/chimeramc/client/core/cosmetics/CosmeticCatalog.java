@@ -37,7 +37,14 @@ public final class CosmeticCatalog {
         HORIZON,
         WAVE,
         CAMO,
-        STAR
+        STAR,
+        /**
+         * The classic all-black Optifine cape with its "OF" monogram. Only ever used by the two
+         * built-in Optifine capes; the "OF" text is drawn by {@link CapeTexturePainter} and the
+         * preview, not by {@link CapePatterns#colorAt}, because it is lettering rather than a
+         * cloth weave.
+         */
+        OPTIFINE
     }
 
     /** The drawing family of an accessory; the preview switches on this, not on the id string. */
@@ -232,6 +239,16 @@ public final class CosmeticCatalog {
 
     public static final String NONE = "none";
 
+    /**
+     * The two built-in Optifine capes.
+     *
+     * <p>When Optifine Mode is enabled and the player has no cape equipped, one of these is worn
+     * automatically so the character still has the classic Optifine cape rather than nothing. They
+     * are all-black cloth with the "OF" monogram, in the two colours the original mod offers.
+     */
+    public static final String OPTIFINE_RED_ID = "optifine_red";
+    public static final String OPTIFINE_BLUE_ID = "optifine_blue";
+
     private static final List<Cape> CAPES;
     private static final List<Accessory> ACCESSORIES;
     private static final List<Pet> PETS;
@@ -321,6 +338,13 @@ public final class CosmeticCatalog {
         capes.add(new Cape("verdant", "Wildwood Sovereign", 0xFF1F7A4D, 0xFF63D69B, 0xFFE9FFF3,
                 CapePattern.SOLID, false, false));
 
+        // The built-in Optifine capes: black cloth, an "OF" monogram. The trim and accent are the
+        // monogram colours. They are never branded with the Chimera mark.
+        capes.add(new Cape(OPTIFINE_RED_ID, "Optifine Cape (Red)", 0xFF0A0A0C, 0xFFD8202A, 0xFFD8202A,
+                CapePattern.OPTIFINE, false, false));
+        capes.add(new Cape(OPTIFINE_BLUE_ID, "Optifine Cape (Blue)", 0xFF0A0A0C, 0xFF2A6FD8, 0xFF2A6FD8,
+                CapePattern.OPTIFINE, false, false));
+
         // Generated families: every palette crossed with every pattern. The brand mark rides on
         // the "Chimera" palette's Split weave only, so the flagship stays special instead of every
         // cape being branded. Each palette has its own row of names (see CAPE_PATTERN_NAMES), so a
@@ -329,6 +353,8 @@ public final class CosmeticCatalog {
             int[] pal = PALETTES[p];
             String stem = PALETTE_NAMES[p];
             for (CapePattern pattern : CapePattern.values()) {
+                // OPTIFINE is not a weave; it is only ever the two built-in capes added above.
+                if (pattern == CapePattern.OPTIFINE) continue;
                 String id = slug(stem) + "_" + pattern.name().toLowerCase();
                 if (isHandAuthored(id)) continue;
                 boolean branded = "Chimera".equals(stem) && pattern == CapePattern.SPLIT;
@@ -467,6 +493,28 @@ public final class CosmeticCatalog {
             if (c.id.equals(id)) return c;
         }
         return null;
+    }
+
+    /**
+     * The cape to actually wear, applying the Optifine default.
+     *
+     * <p>When the player has no cape equipped and Optifine Mode is on, the classic all-black
+     * Optifine cape is worn instead of nothing — that is the point of the mode. An explicit
+     * selection always wins, so turning Optifine Mode on never overrides a cape the player chose.
+     *
+     * @param id            the stored cape id ({@link #NONE} for none)
+     * @param optifineMode  whether the Bedrock Optifine Mode setting is enabled
+     * @return the cape to render/install, or null when nothing should be worn
+     */
+    public static Cape resolveEquippedCape(String id, boolean optifineMode) {
+        Cape chosen = equippedCape(id);
+        if (chosen != null) return chosen;
+        return optifineMode ? optifineDefaultCape() : null;
+    }
+
+    /** The default Optifine cape applied when the mode is on and nothing else is equipped. */
+    public static Cape optifineDefaultCape() {
+        return cape(OPTIFINE_RED_ID);
     }
 
     public static Accessory accessory(String id) {

@@ -338,8 +338,22 @@ public class CapePreviewView extends View {
         // a flat sheet stuck to the front of the model. The over-head and beside-head pieces stay
         // in the foreground pass, where they belong.
         drawAccessoryBehind(canvas, originX, originY, scale);
-        if (cape != null) drawCape(canvas, originX, originY, scale);
+
+        // The cape hangs just behind the body, so whether it should be painted before or after the
+        // body depends on which side the camera is on: viewed from behind the cloth is nearest and
+        // must paint over the body, viewed from the front it is occluded and must paint first.
+        // Drawing it unconditionally before the body (the old order) hid it whenever the camera
+        // was behind the player — which the idle spin reaches half the time — so the cape was
+        // effectively invisible, the "barely visible cape" defect.
+        boolean capeNearest = false;
+        if (cape != null) {
+            projectCape(originX, originY, scale);
+            projectPoint(0f, 18f, 0f, scale, originX, originY);
+            capeNearest = capeAverageDepth > projected[2];
+        }
+        if (cape != null && !capeNearest) paintCape(canvas);
         drawModel(canvas, originX, originY, scale);
+        if (cape != null && capeNearest) paintCape(canvas);
         if (accessory != null) drawAccessoryFront(canvas, originX, originY, scale);
     }
 
@@ -643,12 +657,21 @@ public class CapePreviewView extends View {
         }
     }
 
+    /**
+     * Fills the quad described by {@code v}, which is in {@link SkinModel.Box#faceCorners} grid
+     * order: {@code [TL, TR, BL, BR]}.
+     *
+     * <p>Traversing the array in order would draw a bow-tie, so the perimeter is walked
+     * TL → TR → BR → BL instead. That order is correct for both the flat accessory fills and the
+     * character's shading overlay; the textured pass uses {@code drawBitmapMesh}, which wants the
+     * grid order directly.
+     */
     private void drawQuad(Canvas canvas, float[] v) {
         path.reset();
         path.moveTo(v[0], v[1]);
         path.lineTo(v[2], v[3]);
-        path.lineTo(v[4], v[5]);
         path.lineTo(v[6], v[7]);
+        path.lineTo(v[4], v[5]);
         path.close();
         canvas.drawPath(path, paint);
     }
@@ -665,12 +688,19 @@ public class CapePreviewView extends View {
         return PreviewLighting.overlayAlphaFor(face, perspective) << 24;
     }
 
-    /** Draws the cloth mesh behind the body, with the animated mark printed on it. */
-    private void drawCape(Canvas canvas, float originX, float originY, float scale) {
+    /** Average camera depth of the projected cloth, set by {@link #projectCape}. */
+    private float capeAverageDepth;
+
+    /**
+     * Projects the cloth mesh once for this frame and records the average depth.
+     *
+     * <p>Split out of the paint so the caller can decide whether the cape is in front of or behind
+     * the body before choosing a draw order. Without this the cape was always painted first and so
+     * vanished whenever the camera swung around to the player's back.
+     */
+    private void projectCape(float originX, float originY, float scale) {
         int cols = CapeSimulator.COLS;
         int rows = CapeSimulator.ROWS;
-        // The cloth is anchored at the shoulders and hangs from just below the neck, on the same
-        // back plane the wings reference so the two never disagree about where "behind" is.
         float anchorY = 24f;
         float anchorZ = CosmeticLayering.CAPE_Z;
 
@@ -684,10 +714,7 @@ public class CapePreviewView extends View {
             capeOrder = new int[quadCount];
         }
 
-        // Project every particle once, keeping its depth, so the quads can be depth-sorted.
-        // Without the sort the mesh is painted row-major and, the moment the cape swings, the
-        // far side of a fold paints over the near side — the "glitched paper cape" where the
-        // cloth appears to fold through itself and reads as a flat sheet.
+        float depthSum = 0f;
         for (int i = 0; i < particleCount; i++) {
             float mx = capeSim.x(i) / SkinModel.PIXELS_TO_BLOCKS;
             float my = capeSim.y(i) / SkinModel.PIXELS_TO_BLOCKS;
@@ -696,7 +723,22 @@ public class CapePreviewView extends View {
             capeXs[i] = projected[0];
             capeYs[i] = projected[1];
             capeParticleDepth[i] = projected[2];
+            depthSum += projected[2];
         }
+        capeAverageDepth = particleCount == 0 ? 0f : depthSum / particleCount;
+    }
+
+    /**
+     * Paints the cloth mesh with the animated mark printed on it.
+     *
+     * <p>Requires {@link #projectCape} to have run for this frame; the draw order in {@code onDraw}
+     * guarantees it. Kept separate from the projection so the depth sort and the paint order can
+     * disagree about nothing.
+     */
+    private void paintCape(Canvas canvas) {
+        int cols = CapeSimulator.COLS;
+        int rows = CapeSimulator.ROWS;
+        int quadCount = (cols - 1) * (rows - 1);
 
         for (int r = 0; r + 1 < rows; r++) {
             for (int c = 0; c + 1 < cols; c++) {
@@ -738,6 +780,13 @@ public class CapePreviewView extends View {
             float u = (c + 0.5f) / Math.max(1f, cols - 1f);
             float wv = (r + 0.5f) / Math.max(1f, rows - 1f);
             int cloth = CapePatterns.colorAt(cape.pattern, u, wv, cape.color, cape.accentColor);
+            // The Optifine "OF" monogram is lettering, not a weave, so it is applied on top of the
+            // cloth colour from the shared glyph rule. The in-game texture painter draws the same
+            // glyph, so the preview and the worn cape cannot show a different mark.
+            if (cape.pattern == CosmeticCatalog.CapePattern.OPTIFINE
+                    && CapePatterns.optifineMonogramAt(u, wv)) {
+                cloth = cape.accentColor;
+            }
             int color = PreviewLighting.shadeColorForNormal(cloth, nx3, ny3, nz3);
             paint.setColor(color);
             path.reset();

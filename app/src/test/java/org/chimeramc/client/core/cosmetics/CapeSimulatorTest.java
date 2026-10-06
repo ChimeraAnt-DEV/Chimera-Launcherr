@@ -115,4 +115,26 @@ public class CapeSimulatorTest {
         CapeSimulator sim = new CapeSimulator();
         assertEquals(CapeSimulator.COLS * CapeSimulator.ROWS, sim.size());
     }
+
+    /**
+     * A cape on a still character must still move, or it reads as a rigid board. The ambient breeze
+     * sways the hem on X while leaving the hanging pose (Y) and the back plane (Z) at rest, so the
+     * cloth stays the right shape but is never perfectly flat.
+     */
+    @Test
+    public void theAmbientBreezeMovesTheHemEvenAtRest() {
+        CapeSimulator sim = new CapeSimulator();
+        sim.reset(0f, 0f, 0f);
+        int hem = (CapeSimulator.ROWS - 1) * CapeSimulator.COLS;
+        float first = sim.x(hem);
+        float maxDelta = 0f;
+        for (int i = 0; i < 300; i++) {
+            sim.step(CapeSimulator.FIXED_DT, 0f, 0f, 0f, 0f, 0f, 0f);
+            maxDelta = Math.max(maxDelta, Math.abs(sim.x(hem) - first));
+        }
+        assertTrue("the hem must sway at rest", maxDelta > 0.01f);
+        // The sway is on X only, so the hanging shape is preserved.
+        assertEquals(-CapeSimulator.HEIGHT_BLOCKS, sim.y(hem), 0.25f);
+        assertEquals(0f, sim.z(hem), 0.25f);
+    }
 }

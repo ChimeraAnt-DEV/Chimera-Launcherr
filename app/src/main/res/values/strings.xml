@@ -1523,6 +1523,16 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="mod_config_hotbar_slot_enabled">Show hotbar slot %1$d</string>
     <string name="mod_config_hotbar_slot_size">Hotbar slot %1$d size (dp)</string>
     <string name="mod_config_hotbar_slot_opacity">Hotbar slot %1$d opacity</string>
+
+    <!-- Offhand -->
+    <string name="inbuilt_mod_offhand">Offhand</string>
+    <string name="inbuilt_mod_offhand_desc">Swap to and use your off-hand item with a button or keybind; works in worlds, Realms and servers</string>
+    <string name="mod_config_offhand_mode">Button action</string>
+    <string name="mod_config_offhand_mode_labels">Swap,Use,Both</string>
+    <string name="mod_config_offhand_swap_key">Swap key</string>
+    <string name="mod_config_offhand_use_key">Use key</string>
+    <string name="mod_config_offhand_keybind">Hardware keybind</string>
+    <string name="offhand_scope_note">This sends the game\'s own off-hand keys (swap and use). Bedrock decides the swap and use, so it works the same in a local world, a Realm or a large server — nothing is server-specific.</string>
     <string name="changelog_title">What’s new</string>
     <string name="changelog_version">GlowberryClient %1$s</string>
     <string name="changelog_continue">Continue</string>

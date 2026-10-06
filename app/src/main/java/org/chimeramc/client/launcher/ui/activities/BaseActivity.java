@@ -147,6 +147,9 @@ public class BaseActivity extends AppCompatActivity {
     /** The firework touch layer for this screen, or null when the nav bar is skipped. */
     private FireworkTouchLayer fireworkLayer;
 
+    /** True once the nav indicator has been placed once, so later moves spring instead of jump. */
+    private boolean navIndicatorPlaced;
+
     /**
      * Installs the shared firework touch layer over the screen.
      *
@@ -577,7 +580,68 @@ public class BaseActivity extends AppCompatActivity {
             if (compactNavTabs) {
                 tab.setText(id == activeTabId ? getString(labelForTab(id)) : "");
             }
+            if (id == activeTabId) moveNavIndicator(tab, accentColor);
         }
+    }
+
+    /**
+     * Slides the accent indicator under the active tab.
+     *
+     * <p>The indicator lives in the same {@code FrameLayout} as the tab row, so it scrolls with the
+     * strip instead of floating over it. It is positioned from the tab's own bounds once layout has
+     * run (a fresh screen's tabs have no width yet at {@code onResume}), and its width tracks the
+     * tab so a wider label keeps the bar centred. The move is a spring so the marker glides rather
+     * than snapping; reduced motion makes it instant through {@link DynamicAnim}.
+     */
+    private void moveNavIndicator(TextView tab, int accentColor) {
+        View indicator = findViewById(R.id.nav_active_indicator);
+        if (indicator == null) return;
+        indicator.setVisibility(View.VISIBLE);
+        tintIndicator(indicator, accentColor);
+        Runnable place = () -> {
+            View parent = (View) indicator.getParent();
+            if (parent == null) return;
+            int tabWidth = tab.getWidth();
+            if (tabWidth <= 0) return;
+            int indicatorWidth = Math.max(dp(24), (int) (tabWidth * 0.55f));
+            ViewGroup.LayoutParams lp = indicator.getLayoutParams();
+            if (lp.width != indicatorWidth) {
+                lp.width = indicatorWidth;
+                indicator.setLayoutParams(lp);
+            }
+            float targetX = tab.getLeft() + (tabWidth - indicatorWidth) / 2f;
+            if (!DynamicAnim.areAnimationsEnabled()) {
+                indicator.setTranslationX(targetX);
+                indicator.setAlpha(1f);
+                navIndicatorPlaced = true;
+                return;
+            }
+            if (!navIndicatorPlaced) {
+                // First placement: no slide, just fade in under the tab.
+                indicator.setTranslationX(targetX);
+                indicator.setAlpha(0f);
+                indicator.animate().alpha(1f).setDuration(180L).start();
+                navIndicatorPlaced = true;
+            } else {
+                DynamicAnim.springTranslationXTo(indicator, targetX).start();
+                indicator.setAlpha(1f);
+            }
+        };
+        if (tab.getWidth() > 0) place.run();
+        else tab.post(place);
+    }
+
+    /** Tints the sliding indicator to the active accent. */
+    private void tintIndicator(View indicator, int color) {
+        android.graphics.drawable.Drawable bg = indicator.getBackground();
+        if (bg == null) return;
+        android.graphics.drawable.Drawable tinted = androidx.core.graphics.drawable.DrawableCompat.wrap(bg.mutate());
+        androidx.core.graphics.drawable.DrawableCompat.setTint(tinted, color);
+        indicator.setBackground(tinted);
+    }
+
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density);
     }
 
     /** The resource string for one of {@link #NAV_TAB_IDS}, or 0 for an unknown id. */

@@ -13,9 +13,25 @@ import android.widget.ImageButton;
 import org.chimeramc.client.R;
 import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
 import org.chimeramc.client.core.mods.inbuilt.model.ModIds;
-import org.levimc.launcher.core.mods.inbuilt.nativemod.GyroMod;
+import org.levimc.launcher.core.mods.inbuilt.nativemod.PojavControlsMod;
 
+/**
+ * Gyroscope camera control.
+ *
+ * <p>The sensor reading is turned into a look delta and pushed through the <em>same</em> path the
+ * game already uses for touch and mouse look ({@code PojavControlsMod.nativeSendLookDelta}), rather
+ * than a separate native gyro hook. That path is exercised by every mouse-look frame, so it works
+ * in worlds, Realms and on servers alike; a bespoke native hook would have to resolve a per-build
+ * game address and silently do nothing when it failed. Sensitivity, invert and dead zone are
+ * applied here in Java, so the module needs no native gyro symbol at all.
+ */
 public class GyroOverlay extends BaseOverlayButton implements SensorEventListener {
+    /**
+     * Look pixels produced by one radian of device rotation at sensitivity 1.0. Chosen so the
+     * default sensitivity feels roughly like a mouse at normal DPI; the config scales it.
+     */
+    private static final float PIXELS_PER_RADIAN = 220f;
+
     private boolean isActive = false;
     private boolean initialized = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -23,6 +39,14 @@ public class GyroOverlay extends BaseOverlayButton implements SensorEventListene
     private SensorManager sensorManager;
     private Sensor rotationSensor;
     private int sensorType;
+
+    // Settings, mirrored into plain fields so the sensor callback (which runs on the sensor
+    // thread) never touches SharedPreferences.
+    private float sensitivityX = 1f;
+    private float sensitivityY = 1f;
+    private boolean invertX = false;
+    private boolean invertY = false;
+    private float deadzoneRadians = 0f;
 
     private final float[] referenceRotationMatrix = new float[9];
     private final float[] inverseReferenceMatrix = new float[9];
@@ -86,28 +110,23 @@ public class GyroOverlay extends BaseOverlayButton implements SensorEventListene
     }
 
     private void initializeNative() {
+        // "Initialising" now means the shared look path is reachable. PojavControlsMod is a no-op
+        // when its library is missing, so the module degrades to doing nothing rather than
+        // crashing, and the toggle simply has no effect on such a build.
         handler.postDelayed(() -> {
-            if (GyroMod.init()) {
-                initialized = true;
-                applyGyroSettings();
-            }
+            PojavControlsMod.initialize();
+            initialized = true;
+            applyGyroSettings();
         }, 1000);
     }
 
     private void applyGyroSettings() {
         InbuiltModManager manager = InbuiltModManager.getInstance(activity);
-        float sensX = manager.getGyroSensitivityX() / 100f;
-        float sensY = manager.getGyroSensitivityY() / 100f;
-        boolean invertX = manager.isGyroInvertX();
-        boolean invertY = manager.isGyroInvertY();
-        float deadzone = manager.getGyroDeadzone() / 10f;
-        float deadzoneRad = (float) Math.toRadians(deadzone);
-
-        GyroMod.nativeSetSensitivityX(sensX);
-        GyroMod.nativeSetSensitivityY(sensY);
-        GyroMod.nativeSetInvertX(invertX);
-        GyroMod.nativeSetInvertY(invertY);
-        GyroMod.nativeSetDeadzone(deadzoneRad);
+        sensitivityX = manager.getGyroSensitivityX() / 100f;
+        sensitivityY = manager.getGyroSensitivityY() / 100f;
+        invertX = manager.isGyroInvertX();
+        invertY = manager.isGyroInvertY();
+        deadzoneRadians = (float) Math.toRadians(manager.getGyroDeadzone() / 10f);
     }
 
     @Override
@@ -138,7 +157,6 @@ public class GyroOverlay extends BaseOverlayButton implements SensorEventListene
         prevDeltaPitch = 0f;
 
         sensorManager.registerListener(this, rotationSensor, SensorManager.SENSOR_DELAY_GAME);
-        GyroMod.nativeSetEnabled(true);
         updateButtonState(true);
     }
 
@@ -147,7 +165,6 @@ public class GyroOverlay extends BaseOverlayButton implements SensorEventListene
         hasReference = false;
 
         sensorManager.unregisterListener(this);
-        GyroMod.nativeSetEnabled(false);
         updateButtonState(false);
     }
 
@@ -225,7 +242,7 @@ public class GyroOverlay extends BaseOverlayButton implements SensorEventListene
         System.arraycopy(currentRotationMatrix, 0, referenceRotationMatrix, 0, 9);
         invertMatrix3x3(referenceRotationMatrix, inverseReferenceMatrix);
 
-        GyroMod.nativeUpdateDelta(deltaYaw, deltaPitch);
+        sendLookDelta(deltaYaw, deltaPitch);
     }
 
     private void handleGyroscopeEvent(SensorEvent event) {
@@ -258,7 +275,30 @@ public class GyroOverlay extends BaseOverlayButton implements SensorEventListene
                 break;
         }
 
-        GyroMod.nativeUpdateDelta(deltaYaw, deltaPitch);
+        sendLookDelta(deltaYaw, deltaPitch);
+    }
+
+    /**
+     * Applies the user's sensitivity, invert and dead-zone settings and pushes the result to the
+     * shared look path. The dead zone suppresses slow drift while the device is nearly still; it is
+     * applied to the raw delta magnitude, not per axis, so a slow diagonal wobble is filtered too.
+     */
+    private void sendLookDelta(float deltaYaw, float deltaPitch) {
+        float magnitude = (float) Math.hypot(deltaYaw, deltaPitch);
+        if (magnitude < deadzoneRadians) {
+            return;
+        }
+        float dx = deltaYaw * sensitivityX * PIXELS_PER_RADIAN * (invertX ? -1f : 1f);
+        float dy = deltaPitch * sensitivityY * PIXELS_PER_RADIAN * (invertY ? -1f : 1f);
+        if (dx == 0f && dy == 0f) return;
+        // Same path the mouse/touch look uses, so it reaches the game identically in every mode.
+        // Guarded because this runs on the sensor thread: a build without the library must degrade
+        // to "gyro does nothing", not kill the sensor thread with an UnsatisfiedLinkError.
+        try {
+            PojavControlsMod.nativeSendLookDelta(dx, dy);
+        } catch (Throwable ignored) {
+            // No native look path on this build.
+        }
     }
 
     @Override

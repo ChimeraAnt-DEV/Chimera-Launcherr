@@ -21,6 +21,7 @@ public final class ModIds {
     public static final String POJAV_CONTROLS = "pojav_controls";
     public static final String MORE_BUTTONS = "more_buttons";
     public static final String HOTBAR_SLOT = "hotbar_slot";
+    public static final String OFFHAND = "offhand";
     public static final String AIM_SETTINGS = "aim_settings";
     public static final String MOD_MENU = "mod_menu";
     public static final String ARMOR_HUD = "armor_hud";

@@ -39,6 +39,10 @@ public final class InbuiltModuleProvider {
     private static final String CFG_GYRO_INVERT_Y = "gyro_invert_y";
     private static final String CFG_GYRO_DEADZONE = "gyro_deadzone";
     private static final String CFG_HOTBAR_ITEM_ICONS = "hotbar_item_icons";
+    private static final String CFG_OFFHAND_MODE = "offhand_mode";
+    private static final String CFG_OFFHAND_SWAP_KEY = "offhand_swap_key";
+    private static final String CFG_OFFHAND_USE_KEY = "offhand_use_key";
+    private static final String CFG_OFFHAND_KEYBIND = "offhand_keybind";
     private static final String CFG_HOTBAR_SLOT_PREFIX = "hotbar_slot_";
     private static final String CFG_HOTBAR_SLOT_ENABLED = "enabled";
     private static final String CFG_HOTBAR_SLOT_SIZE = "size";
@@ -139,6 +143,9 @@ public final class InbuiltModuleProvider {
         mods.add(create(activity, manager, overlayManager, ModIds.HOTBAR_SLOT,
                 R.string.inbuilt_mod_hotbar_slot, R.string.inbuilt_mod_hotbar_slot_desc,
                 groupName));
+        mods.add(create(activity, manager, overlayManager, ModIds.OFFHAND,
+                R.string.inbuilt_mod_offhand, R.string.inbuilt_mod_offhand_desc,
+                groupName));
         // PvP Suite (V1.1): overlay-only visual aids. They sit in the General section, not a
         // separate PvP section - the suite is not gameplay automation and the spec is explicit
         // that no new tab is added.
@@ -207,7 +214,8 @@ public final class InbuiltModuleProvider {
                 || ModIds.HIT_REGISTRATION.equals(id) || ModIds.HIT_TIMING.equals(id)
                 || ModIds.HITBOX.equals(id) || ModIds.VOICE_CHAT.equals(id)
                 || ModIds.REACH_INDICATOR.equals(id) || ModIds.TRAJECTORY_PREDICTION.equals(id)
-                || ModIds.HIT_PREDICTION.equals(id) || ModIds.KILL_EFFECTS.equals(id);
+                || ModIds.HIT_PREDICTION.equals(id) || ModIds.KILL_EFFECTS.equals(id)
+                || ModIds.OFFHAND.equals(id);
         // Combat modules get their own PvP section so the tab is a real destination, not just a
         // filter over the inbuilt list. They remain inbuilt modules, so the Inbuilt filter and
         // the "Inbuilt" grouping still find them.
@@ -246,6 +254,9 @@ public final class InbuiltModuleProvider {
         if (ModIds.REACH_INDICATOR.equals(modId) || ModIds.TRAJECTORY_PREDICTION.equals(modId)
                 || ModIds.HIT_PREDICTION.equals(modId) || ModIds.KILL_EFFECTS.equals(modId)) {
             return createPvpSuiteConfigSchema(context, mod);
+        }
+        if (ModIds.OFFHAND.equals(modId)) {
+            return createOffhandConfigSchema(context, mod);
         }
         boolean hotbar = ModIds.HOTBAR_SLOT.equals(mod.getId());
         if (!hotbar && !ModIds.GYRO.equals(mod.getId())) return null;
@@ -457,6 +468,37 @@ public final class InbuiltModuleProvider {
         }
     }
 
+    /**
+     * Category layout for the Offhand module.
+     *
+     * <p>Two categories: what the on-screen button does (mode + overlay look) and the hardware
+     * keybinds. The scope note is in the default category because the module is honest about being
+     * a key-sender — Bedrock resolves the swap/use, so it works everywhere the game does.
+     */
+    private static RuntimeConfigSchema createOffhandConfigSchema(Context context, UnifiedMod mod) {
+        try {
+            JSONArray categories = new JSONArray();
+            JSONArray nodes = new JSONArray();
+            categories.put(configCategory(context, "action", R.string.mod_config_category_behavior));
+            categories.put(configCategory(context, "keys", R.string.mod_config_category_button));
+            categories.put(configCategory(context, "overlay", R.string.mod_config_category_appearance));
+            nodes.put(configNode(context, mod, CFG_OFFHAND_MODE, "action"));
+            nodes.put(configNode(context, mod, CFG_OFFHAND_SWAP_KEY, "keys"));
+            nodes.put(configNode(context, mod, CFG_OFFHAND_USE_KEY, "keys"));
+            nodes.put(configNode(context, mod, CFG_OFFHAND_KEYBIND, "keys"));
+            nodes.put(configNode(context, mod, CFG_OVERLAY_SIZE, "overlay"));
+            nodes.put(configNode(context, mod, CFG_OVERLAY_OPACITY, "overlay"));
+            nodes.put(configNode(context, mod, CFG_OVERLAY_LOCK, "overlay"));
+            nodes.put(configNode(context, mod, CFG_OVERLAY_SHOW_EVERYWHERE, "overlay"));
+            nodes.put(scopeNoteNode(context, mod, R.string.offhand_scope_note, "action"));
+            return RuntimeConfigSchema.parse(new JSONObject().put("version", 2)
+                    .put("default_category", "action")
+                    .put("categories", categories).put("nodes", nodes).toString());
+        } catch (JSONException e) {
+            throw new IllegalStateException("Unable to build offhand config schema", e);
+        }
+    }
+
     private static JSONObject configCategory(Context context, String id, int titleRes) throws JSONException {
         return new JSONObject().put("id", id).put("title", context.getString(titleRes));
     }
@@ -659,6 +701,29 @@ public final class InbuiltModuleProvider {
                         "100", "0", "100",
                         String.valueOf(manager.getOverlayOpacity(overlayKey)), enabledKey));
             }
+        }
+
+        if (ModIds.OFFHAND.equals(modId)) {
+            configs.add(config(CFG_OFFHAND_MODE,
+                    context.getString(R.string.mod_config_offhand_mode),
+                    UnifiedMod.ConfigType.RADIO,
+                    context.getString(R.string.mod_config_offhand_mode_labels), "", "",
+                    String.valueOf(manager.getOffhandMode())));
+            configs.add(config(CFG_OFFHAND_SWAP_KEY,
+                    context.getString(R.string.mod_config_offhand_swap_key),
+                    UnifiedMod.ConfigType.KEYBIND,
+                    "", "", "",
+                    String.valueOf(manager.getOffhandSwapKey())));
+            configs.add(config(CFG_OFFHAND_USE_KEY,
+                    context.getString(R.string.mod_config_offhand_use_key),
+                    UnifiedMod.ConfigType.KEYBIND,
+                    "", "", "",
+                    String.valueOf(manager.getOffhandUseKey())));
+            configs.add(config(CFG_OFFHAND_KEYBIND,
+                    context.getString(R.string.mod_config_offhand_keybind),
+                    UnifiedMod.ConfigType.KEYBIND,
+                    "", "", "",
+                    String.valueOf(manager.getOffhandKeybind())));
         }
 
         if (ModIds.AUTO_SPRINT.equals(modId)) {
@@ -1027,6 +1092,18 @@ public final class InbuiltModuleProvider {
                 break;
             case CFG_HOTBAR_ITEM_ICONS:
                 manager.setHotbarItemIconsEnabled(parseBoolean(value));
+                break;
+            case CFG_OFFHAND_MODE:
+                manager.setOffhandMode(parseInt(value, manager.getOffhandMode()));
+                break;
+            case CFG_OFFHAND_SWAP_KEY:
+                manager.setOffhandSwapKey(parseInt(value, manager.getOffhandSwapKey()));
+                break;
+            case CFG_OFFHAND_USE_KEY:
+                manager.setOffhandUseKey(parseInt(value, manager.getOffhandUseKey()));
+                break;
+            case CFG_OFFHAND_KEYBIND:
+                manager.setOffhandKeybind(parseInt(value, manager.getOffhandKeybind()));
                 break;
             case CFG_AIM_SMOOTHING:
                 manager.setAimSmoothing(parseInt(value, manager.getAimSmoothing()));

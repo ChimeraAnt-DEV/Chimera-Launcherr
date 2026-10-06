@@ -1333,3 +1333,68 @@ these are the conclusions.
   transport is actually carrying advertisements. The panel's manual-peer row is hidden while a
   relay is configured, because the relay is the better route and the manual value is ignored then.
 
+
+## Cosmetics preview orientation + cape occlusion (the "Steve is broken / capes invisible" fixes)
+- **`SkinModel.Box.faceCorners` must return grid order `[TL, TR, BL, BR]`, not a perimeter winding.**
+  The textured character is drawn with `Canvas.drawBitmapMesh`, which has no source rectangle: it maps
+  the bitmap's corners to `verts` in `[TL, TR, BL, BR]` order, so `faceCorners` *is* the UV mapping.
+  The old perimeter order (TL, TR, BR, BL) drew every face rotated 180 degrees — the head's eyes and
+  mouth landed on its forehead and the arm/leg hand and boot bands landed at the shoulder and hip.
+  That was the reported "Steve preview is broken / mismatched textures". Each face now maps its
+  texture *top* to the model's `+y` edge, so textures are upright on every side. `SkinModelTest`
+  pins it (`everyVerticalFaceMapsItsTextureTopEdgeToTheUpperModelEdge`,
+  `faceCornersAreInGridOrderNotPerimeterOrder`).
+- **`CapePreviewView.drawQuad` walks the perimeter `TL → TR → BR → BL`, because the array is grid
+  order.** Traversing `[TL, TR, BL, BR]` in order draws a bow-tie; the textured pass keeps the grid
+  order for `drawBitmapMesh`, the flat pass uses the perimeter.
+- **The cape's draw order is depth-aware, not "always behind the body".** The cloth hangs just behind
+  the body, so when the camera is on the player's *back* the cape is the nearest surface and must
+  paint *over* the body. Painting it unconditionally before the body (the old order) hid it whenever
+  the camera was behind the player — and the idle spin reaches that half the time — so the cape read
+  as barely visible. `onDraw` now projects the cloth once (`projectCape`), compares its average depth
+  to the body centre, and paints the cape before or after the model accordingly. `paintCape` does the
+  actual painting from that projection; do not fold them back together.
+- **The preview cloth has an ambient breeze.** A still character's cape hung perfectly flat and read
+  as a rigid board; `CapeSimulator.BREEZE_STRENGTH`/`BREEZE_FREQUENCY` sway the hem on X only (Y and Z
+  stay at rest, so the hanging pose is preserved). Mesh is 9x11. `CapeAnimationCurve` flutter/sway
+  amplitudes were raised (13/10 deg) so the in-game chain visibly folds; `CapeAnimationCurveTest`
+  pins the literals.
+
+## Default Optifine cape (`CosmeticCatalog` + `CosmeticStore`)
+- Optifine Mode + no equipped cape implies the classic all-black Optifine cape with an "OF" monogram.
+  `CosmeticCatalog.resolveEquippedCape(id, optifineMode)` is the single rule; an explicit selection
+  always wins. `CosmeticStore.getEquippedCapeForDisplay()` applies it (reads `FeatureSettings`), and
+  the cosmetics panel and `MinecraftRuntimePreparer` both use it so preview and launch-time pack
+  agree. Two entries: `optifine_red`/`optifine_blue`.
+- `CapePattern.OPTIFINE` is a monogram, **not** a generated weave: the generation loop skips it, so it
+  appears on exactly two capes. The glyph rule is `CapePatterns.optifineMonogramAt` (shared by the
+  texture painter and the preview), and the loop that draws it is applied *after* the cloth colour so
+  the letters stay solid. `OptifineCapeTest` pins the default rule, the black cloth and the monogram.
+
+## Gyro and Offhand modules
+- **The Gyro module drives look through `PojavControlsMod.nativeSendLookDelta`** — the same path
+  mouse/touch look uses — instead of a separate native gyro hook. Sensitivity, invert and dead zone
+  are applied in Java (`GyroOverlay.sendLookDelta`), so it needs no native gyro symbol and works
+  wherever the game does. `GyroMod` (the native class) is still pre-resolved at launch but the overlay
+  no longer calls it.
+- **The Offhand module sends the game's own off-hand keys** (F swap / V use, configurable) through
+  `activity.dispatchKeyEvent`, so it is world/Realm/server-agnostic. `OffhandOverlay.performAction` is
+  shared by the button and the hardware bind; a static `injecting` guard stops the bind from matching
+  its own injected key and recursing. `OffhandAction.keysFor(mode, swap, use)` is the pure mode rule.
+  Both modules are `ModIds`-registered, available (not greyed), and have config schemas.
+
+## Launcher UI (nav indicator, hero pulse)
+- `nav_bar.xml` wraps the tab row and a `nav_active_indicator` in a `FrameLayout` (a
+  `HorizontalScrollView` takes one child). `BaseActivity.setActiveNavTab` slides the indicator under
+  the active tab via `moveNavIndicator` — spring for a move, fade-in for the first placement
+  (`navIndicatorPlaced`), instant under reduced motion. Its width tracks the tab so a wider label
+  stays centred.
+- The hero-card pulse lifts (`translationZ` + a hair of scale) and never touches `alpha`; dimming the
+  card faded its own text and read as a flicker.
+
+## Firework touch effect
+- `FireworkTouchLayer` is a real explosion: a white core flash, an expanding shockwave `Ring`, a
+  spherical shell of `Spark`s at varied speeds with comet streaks, gravity/drag, and slow embers.
+  Blue palette by default, accent when enabled; white is only the core. Sparks are pooled; the
+  driver self-cancels when nothing is alive. Package is `org.chimeramc.client.ui.views` (the file
+  path has an extra `launcher/` segment — keep the package as the import sites expect).

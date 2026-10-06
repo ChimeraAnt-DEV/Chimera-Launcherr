@@ -33,6 +33,26 @@ public final class CosmeticStore {
         return CosmeticCatalog.equippedCape(getEquippedCapeId());
     }
 
+    /**
+     * The cape to wear/render, honouring the Optifine default.
+     *
+     * <p>When Optifine Mode is on and the player has not equipped a cape, the classic all-black
+     * Optifine cape is returned so the character is not left bare. The launcher reads the setting
+     * through the stored feature flag so the preview and the launch-time pack sync agree on the
+     * same cape without either re-implementing the rule.
+     */
+    public CosmeticCatalog.Cape getEquippedCapeForDisplay() {
+        return CosmeticCatalog.resolveEquippedCape(getEquippedCapeId(), isOptifineModeEnabled());
+    }
+
+    private boolean isOptifineModeEnabled() {
+        try {
+            return org.chimeramc.client.settings.FeatureSettings.getInstance().isOptifineModeEnabled();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     public void setEquippedCape(String capeId) {
         prefs.edit().putString(KEY_CAPE, capeId == null ? CosmeticCatalog.NONE : capeId).apply();
     }

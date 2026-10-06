@@ -23,9 +23,13 @@ package org.chimeramc.client.core.cosmetics;
  */
 public final class CapeSimulator {
 
-    /** Grid resolution: enough columns that the hem curves, few enough to stay trivially cheap. */
-    public static final int COLS = 7;
-    public static final int ROWS = 9;
+    /**
+     * Grid resolution: enough columns and rows that the hem curves and the fold reads as cloth,
+     * few enough to stay trivially cheap. Raised from 7x9 so the mesh has enough rings for the
+     * trailing fold to bend smoothly instead of faceting into a handful of flat panels.
+     */
+    public static final int COLS = 9;
+    public static final int ROWS = 11;
 
     /** Cape width in blocks, from Minecraft's 10-px cape texture (10/16). */
     public static final float WIDTH_BLOCKS = 10f / 16f;
@@ -66,6 +70,19 @@ public final class CapeSimulator {
     /** Maximum stretch of a structural link, as a fraction of its rest length. */
     public static final float MAX_STRETCH = 1.35f;
 
+    /**
+     * A gentle ambient breeze on the world X axis, in "wind units" (the same scale as
+     * {@code speedBlocks}). Without it a still character's cape hangs perfectly flat and reads as
+     * a rigid board; the breeze keeps the hem moving so the cloth always looks like fabric. It is
+     * deliberately a slow oscillation, not a constant push, so the cape sways rather than leaning
+     * permanently to one side. It is applied on X only, which keeps the hanging pose (Y) and the
+     * back plane (Z) at rest.
+     */
+    public static final float BREEZE_STRENGTH = 12.0f;
+
+    /** Radians per second of the breeze oscillation. */
+    public static final float BREEZE_FREQUENCY = 1.4f;
+
     private final float[] px = new float[COLS * ROWS];
     private final float[] py = new float[COLS * ROWS];
     private final float[] pz = new float[COLS * ROWS];
@@ -78,6 +95,9 @@ public final class CapeSimulator {
 
     private float accumulator;
     private boolean initialised;
+
+    /** Elapsed simulated time, used to phase the ambient breeze. */
+    private float clock;
 
     /**
      * Anchor-space offset per particle: a point on the cape's rest quad relative to the top
@@ -108,6 +128,7 @@ public final class CapeSimulator {
             prevZ[i] = pz[i];
         }
         accumulator = 0f;
+        clock = 0f;
         initialised = true;
     }
 
@@ -145,7 +166,10 @@ public final class CapeSimulator {
         // settling time does not change with the timestep.
         float dampingPerStep = (float) Math.pow(DAMPING, dt);
         // The cape trails behind the direction of travel: the wind pushes opposite to forward.
-        float windX = -forwardX * speedBlocks * 0.11f;
+        // The ambient breeze is added on X so a still character's hem still moves.
+        clock += dt;
+        float breezeX = (float) Math.sin(clock * BREEZE_FREQUENCY) * BREEZE_STRENGTH;
+        float windX = -forwardX * speedBlocks * 0.11f + breezeX * 0.11f;
         float windZ = -forwardZ * speedBlocks * 0.11f;
 
         for (int i = 0; i < px.length; i++) {

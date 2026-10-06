@@ -126,12 +126,12 @@ public class CapeAnimationCurveTest {
         assertTrue("walk lean", lean.contains("28.0"));
         assertTrue("jump flare", lean.contains("12.0"));
         assertTrue("vertical lean", lean.contains("10.0"));
-        assertTrue("flutter", lean.contains("9.0"));
+        assertTrue("flutter", lean.contains("13.0"));
         assertTrue("flutter frequency", lean.contains("60.0"));
         assertTrue("speed is clamped", lean.contains("math.clamp(query.modified_move_speed"));
 
         String sway = CapeAnimationCurve.swayExpression();
-        assertTrue("sway amplitude", sway.contains("7.0"));
+        assertTrue("sway amplitude", sway.contains("10.0"));
         assertTrue("sway frequency", sway.contains("44.0"));
         assertTrue("sway distance query", sway.contains("query.modified_distance_moved"));
     }
