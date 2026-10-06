@@ -104,10 +104,12 @@ public class SteveSkinLayoutTest {
     @Test
     public void theBodyIsTheShirtAllRound() {
         int[] atlas = paint();
+        // The front is the lit shade; the sides and back are a step darker so the torso reads as
+        // a shaded surface rather than one flat colour. Both are the shirt, never bare skin.
         assertEquals(SteveSkinLayout.SHIRT, texel(atlas, 20, 20)); // FRONT
-        assertEquals(SteveSkinLayout.SHIRT, texel(atlas, 16, 20)); // RIGHT
-        assertEquals(SteveSkinLayout.SHIRT, texel(atlas, 28, 20)); // LEFT
-        assertEquals(SteveSkinLayout.SHIRT, texel(atlas, 32, 20)); // BACK
+        assertEquals(SteveSkinLayout.SHIRT_DARK, texel(atlas, 16, 20)); // RIGHT
+        assertEquals(SteveSkinLayout.SHIRT_DARK, texel(atlas, 28, 20)); // LEFT
+        assertEquals(SteveSkinLayout.SHIRT_DARK, texel(atlas, 32, 20)); // BACK
     }
 
     /**
