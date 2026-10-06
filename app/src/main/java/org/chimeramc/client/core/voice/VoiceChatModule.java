@@ -372,13 +372,25 @@ public final class VoiceChatModule {
         return link != null && link.prefersOpus() && codec.isAvailable();
     }
 
+    /**
+     * Stops the link: signals the loops, tears down the transport and the audio device, and
+     * clears the peer state. Idempotent and never throws.
+     *
+     * <p><b>Never throws.</b> This is called from the UI thread (the module toggle, the launcher
+     * Voice screen, overlay teardown) and from the relay's reconnect path, so an exception from
+     * any step — a transport whose socket was already closed by a racing reconnect, an
+     * {@link VoiceAudioEngine} device already released — would otherwise propagate into a click
+     * handler or into session teardown and crash the client. That is the "turn voice off and it
+     * crashes" report. Each teardown step is therefore guarded independently so one failing step
+     * cannot skip the rest and leave the module half-stopped.
+     */
     public synchronized void stop() {
-        if (!running) {
-            audio.stop();
-            return;
-        }
         running = false;
-        sendBye();
+        try {
+            sendBye();
+        } catch (Throwable t) {
+            Log.w(TAG, "voice bye failed", t);
+        }
         Thread beacon = beaconThread;
         beaconThread = null;
         if (beacon != null) {
@@ -398,11 +410,20 @@ public final class VoiceChatModule {
                 Thread.currentThread().interrupt();
             }
         }
-        if (transport != null) {
-            transport.stop();
-            transport = null;
+        VoiceLink active = transport;
+        transport = null;
+        if (active != null) {
+            try {
+                active.stop();
+            } catch (Throwable t) {
+                Log.w(TAG, "voice transport stop failed", t);
+            }
         }
-        audio.stop();
+        try {
+            audio.stop();
+        } catch (Throwable t) {
+            Log.w(TAG, "voice audio stop failed", t);
+        }
         registry.clear();
         streams.clear();
     }

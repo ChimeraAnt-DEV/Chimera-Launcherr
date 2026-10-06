@@ -508,32 +508,50 @@ public final class CapeResourcePackBuilder {
     }
 
     /**
-     * When the cape draws: third person, or the paperdoll (dressing-room preview), never in first
-     * person, on the map icon, or as a spectator. The same condition gates the render controller
-     * and its part visibility so the two cannot disagree.
+     * The condition every cosmetic shares: it draws <b>only on the local player's own model</b>.
+     *
+     * <p>Without this the pack put the cape, hat and pet on <em>every</em> player in the world —
+     * the pack overrides the shared {@code minecraft:player} client entity, so the game applied it
+     * to any player it rendered. {@code query.is_local_player} is the documented query that returns
+     * 1 for the entity rendered for this window and 0 for everyone else (and always 0 in a behavior
+     * pack, which is exactly the "don't affect other players" behaviour wanted). The cross-player
+     * Chimera-to-Chimera sharing is a separate feature (cosmetic sync advertises ids; a receiving
+     * Chimera client renders the peer's cosmetic on that peer's own model there).
+     */
+    static String localPlayerCondition() {
+        return "query.is_local_player";
+    }
+
+    /**
+     * When the cape draws: on the local player, in third person or the paperdoll (dressing-room
+     * preview), never in first person, on the map icon, or as a spectator. The same condition gates
+     * the render controller and its part visibility so the two cannot disagree.
      */
     static String capeVisibilityCondition() {
-        return "(!variable.is_first_person || variable.is_paperdoll)"
+        return localPlayerCondition()
+                + " && (!variable.is_first_person || variable.is_paperdoll)"
                 + " && !variable.map_face_icon && !query.is_spectator";
     }
 
     /**
-     * When the worn accessory draws. The same rule as the cape: third person and the paperdoll,
-     * never first person (the player body is not drawn there, so a hat would float), on the map
-     * icon, or as a spectator.
+     * When the worn accessory draws. The same rule as the cape: local player, third person and the
+     * paperdoll, never first person (the player body is not drawn there, so a hat would float), on
+     * the map icon, or as a spectator.
      */
     static String hatVisibilityCondition() {
-        return "(!variable.is_first_person || variable.is_paperdoll)"
+        return localPlayerCondition()
+                + " && (!variable.is_first_person || variable.is_paperdoll)"
                 + " && !variable.map_face_icon && !query.is_spectator";
     }
 
     /**
      * When the equipped pet draws. Unlike the cape and hat, the pet is <em>not</em> part of the
      * player's body, so it stays visible in first person too — a companion at your feet is exactly
-     * what you want to see while playing. It is hidden only on the map icon and for a spectator.
+     * what you want to see while playing. It is hidden on other players' models, on the map icon
+     * and for a spectator.
      */
     static String petVisibilityCondition() {
-        return "!variable.map_face_icon && !query.is_spectator";
+        return localPlayerCondition() + " && !variable.map_face_icon && !query.is_spectator";
     }
 
     /**

@@ -321,8 +321,14 @@ public class VoiceChatActivity extends BaseActivity {
     /** Starts or stops the link from the launcher, requesting the mic only when transmitting. */
     private void setVoiceRunning(boolean enabled) {
         if (!enabled) {
-            VoiceChatModule existing = VoiceChatModule.peek();
-            if (existing != null && existing.isRunning()) existing.stop();
+            // Best-effort: a teardown that throws (a device already released, a transport whose
+            // reconnect races the stop) must not crash the screen the user is standing on.
+            try {
+                VoiceChatModule existing = VoiceChatModule.peek();
+                if (existing != null && existing.isRunning()) existing.stop();
+            } catch (Throwable t) {
+                android.util.Log.w("VoiceChatActivity", "Voice chat stop failed", t);
+            }
             return;
         }
         if (manager().isVoiceMicEnabled()

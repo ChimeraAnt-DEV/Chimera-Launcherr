@@ -409,6 +409,16 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
             (source and InputDevice.SOURCE_MOUSE_RELATIVE) == InputDevice.SOURCE_MOUSE_RELATIVE
     }
 
+    /**
+     * True for the controller buttons a player expects to attack with: the right shoulder and the
+     * right trigger. Both are treated as the attack input so Select Hit works whichever the player
+     * uses; the launcher's own control overlay maps the trigger to the primary mouse button, so a
+     * touch-control player is covered by the mouse path instead.
+     */
+    private fun isControllerAttackButton(keyCode: Int): Boolean {
+        return keyCode == KeyEvent.KEYCODE_BUTTON_R1 || keyCode == KeyEvent.KEYCODE_BUTTON_R2
+    }
+
     private fun getMouseButton(event: KeyEvent): Int {
         if (!isMouseSource(event.source)) {
             return 0
@@ -457,6 +467,14 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
         // Recorded regardless of whether the preloader consumed the press: the player pressed
         // attack either way, and Select Hit needs the real input timing.
         if (mouseButton == MotionEvent.BUTTON_PRIMARY && event.action == KeyEvent.ACTION_DOWN) {
+            overlayManager?.notifyAttack()
+        }
+        // A physical controller's attack trigger arrives as a gamepad key (KEYCODE_BUTTON_R2),
+        // not as a mouse-source event, so it never reached the block above — which is why Select
+        // Hit did nothing for controller players. Record it here as the attack input too. A
+        // duplicate call in the same instant is harmless: the solver treats a click inside the
+        // window as discarded, so re-recording cannot advance the combo or extend the window.
+        if (event.action == KeyEvent.ACTION_DOWN && isControllerAttackButton(event.keyCode)) {
             overlayManager?.notifyAttack()
         }
 

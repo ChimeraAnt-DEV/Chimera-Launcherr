@@ -135,6 +135,26 @@ public class CapeResourcePackBuilderTest {
                         + CapeResourcePackBuilder.capeVisibilityCondition() + "\""));
     }
 
+    /**
+     * Every cosmetic is gated to the local player's own model.
+     *
+     * <p>The pack overrides the shared {@code minecraft:player} client entity, so without
+     * {@code query.is_local_player} the cape, hat and pet appeared on <em>every</em> player the
+     * game rendered — the "cosmetics show on all players" defect.
+     */
+    @Test
+    public void everyCosmeticDrawsOnlyOnTheLocalPlayersModel() {
+        String gate = CapeResourcePackBuilder.localPlayerCondition();
+        assertTrue("the gate is the local-player query", gate.contains("query.is_local_player"));
+        for (String condition : new String[]{
+                CapeResourcePackBuilder.capeVisibilityCondition(),
+                CapeResourcePackBuilder.hatVisibilityCondition(),
+                CapeResourcePackBuilder.petVisibilityCondition()}) {
+            assertTrue("every visibility condition must require the local player: " + condition,
+                    condition.contains("query.is_local_player"));
+        }
+    }
+
     /** The cape geometry is now a chain of thin bones spanning the vanilla cape box. */
     @Test
     public void theCapeGeometryIsASegmentedChainAcrossTheStandardCapeBox() {

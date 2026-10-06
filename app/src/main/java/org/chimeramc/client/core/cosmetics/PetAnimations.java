@@ -206,6 +206,21 @@ public final class PetAnimations {
         }
     }
 
+    /**
+     * The trailing offset on the pet root, in blocks, that makes the companion <em>follow</em>
+     * rather than sit glued to the player.
+     *
+     * <p>The pet is drawn on the player's own client entity (never a summoned mob — that is
+     * server-side and would flag the account), so it is always anchored to the player. Without a
+     * trailing offset it moves in perfect lockstep and reads as attached. This pushes it behind
+     * (−z) and slightly to one side as the player's speed rises, so it lags on a run and catches
+     * up at a walk — the visual behaviour of a pet following you. It is a position on the pet
+     * bone, not a second entity, so it stays within the supported data-driven mechanism.
+     */
+    private static String followZ() {
+        return "\"-math.clamp(query.modified_move_speed, 0.0, 1.0) * 1.6\"";
+    }
+
     private static String gait(Family family, boolean run) {
         float speed = run ? 1.9f : 1.0f;
         float amp = run ? 1.35f : 1.0f;
@@ -215,7 +230,7 @@ public final class PetAnimations {
         switch (family) {
             case BIRD:
                 return anim(run ? 0.8f : 1.4f,
-                        bone("pet", null, "[0, \"math.abs(math.sin(query.anim_time * " + sp + ")) * " + f(bob * 1.6f) + "\", 0]", null),
+                        bone("pet", null, "[0, \"math.abs(math.sin(query.anim_time * " + sp + ")) * " + f(bob * 1.6f) + "\", " + followZ() + "]", null),
                         bone("head", null, "[0, \"math.sin(query.anim_time * " + sp + " + 60) * " + f(amp * 0.6f) + "\", 0]", null),
                         bone("wing_l", "[0, 0, \"math.sin(query.anim_time * " + sp + ") * " + f(legDeg * 0.4f) + "\"]", null, null),
                         bone("wing_r", "[0, 0, \"math.sin(query.anim_time * " + sp + " + 180) * " + f(legDeg * 0.4f) + "\"]", null, null),
@@ -226,13 +241,13 @@ public final class PetAnimations {
                         bone("tail", "[0, \"math.sin(query.anim_time * " + sp + " + 90) * " + f(legDeg) + "\", 0]", null, null));
             case CRAWLER:
                 return anim(run ? 0.55f : 0.9f,
-                        bone("pet", null, "[0, \"math.abs(math.sin(query.anim_time * " + sp + ")) * " + f(bob * 0.5f) + "\", 0]", null),
+                        bone("pet", null, "[0, \"math.abs(math.sin(query.anim_time * " + sp + ")) * " + f(bob * 0.5f) + "\", " + followZ() + "]", null),
                         bone("leg_a", "[0, 0, \"math.sin(query.anim_time * " + sp + ") * " + f(legDeg) + "\"]", null, null),
                         bone("leg_b", "[0, 0, \"math.sin(query.anim_time * " + sp + " + 180) * " + f(legDeg) + "\"]", null, null),
                         bone("leg_c", "[0, 0, \"math.sin(query.anim_time * " + sp + " + 90) * " + f(legDeg) + "\"]", null, null));
             default:
                 return anim(run ? 0.6f : 1.0f,
-                        bone("pet", null, "[0, \"math.abs(math.sin(query.anim_time * " + sp + ")) * " + f(bob) + "\", 0]", null),
+                        bone("pet", null, "[0, \"math.abs(math.sin(query.anim_time * " + sp + ")) * " + f(bob) + "\", " + followZ() + "]", null),
                         bone("head", null, "[0, \"math.sin(query.anim_time * " + sp + " + 45) * " + f(amp * 0.5f) + "\", 0]", null),
                         bone("leg_a", "[0, 0, \"math.sin(query.anim_time * " + sp + ") * " + f(legDeg) + "\"]", null, null),
                         bone("leg_b", "[0, 0, \"math.sin(query.anim_time * " + sp + " + 180) * " + f(legDeg) + "\"]", null, null),

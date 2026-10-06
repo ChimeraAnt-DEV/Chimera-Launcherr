@@ -34,6 +34,15 @@ public class FpsDisplayOverlay {
     private Runnable pendingShowRunnable;
     private boolean initialized = false;
 
+    /**
+     * Host-side fallback meter. The native {@code FpsMod} only reports when its hook resolves a
+     * game address, which not every build does; without this the readout stayed on "FPS: --"
+     * forever. The Choreographer count works on any build and is what the overlay shows when the
+     * native value is unavailable.
+     */
+    private final FrameRateMeter fallbackMeter = new FrameRateMeter();
+    private volatile int fallbackFps;
+
     private float initialX, initialY;
     private float initialTouchX, initialTouchY;
     private boolean isDragging = false;
@@ -103,6 +112,7 @@ public class FpsDisplayOverlay {
             windowManager.addView(overlayView, wmParams);
             isShowing = true;
 
+            startFallbackMeter();
             handler.post(updateRunnable);
             applyOpacity();
             updateLockState();
@@ -138,6 +148,7 @@ public class FpsDisplayOverlay {
         isShowing = true;
         wmParams = null;
 
+        startFallbackMeter();
         handler.post(updateRunnable);
         applyOpacity();
         updateLockState();
@@ -154,14 +165,40 @@ public class FpsDisplayOverlay {
 
     private void updateDisplay() {
         if (statsText != null) {
-            if (initialized && FpsMod.nativeIsInitialized()) {
-                int fps = FpsMod.nativeGetFps();
+            int fps = nativeFps();
+            if (fps > 0) {
                 statsText.setText(activity.getString(R.string.mod_overlay_fps_value, fps));
+            } else if (fallbackMeter.isRunning() && fallbackFps > 0) {
+                // The native hook did not resolve on this build; show the host's own present rate
+                // rather than a permanent "FPS: --", which read as a broken module.
+                statsText.setText(activity.getString(R.string.mod_overlay_fps_value, fallbackFps));
             } else {
                 statsText.setText(activity.getString(R.string.mod_overlay_fps_unknown));
             }
             clampCurrentPosition(false);
         }
+    }
+
+    /**
+     * Starts the host-side frame-rate meter, which drives the readout whenever the native hook is
+     * unavailable. The listener runs on the main thread (Choreographer's thread) and only writes an
+     * int the update loop reads, so it never touches a View from off the UI thread.
+     */
+    private void startFallbackMeter() {
+        fallbackMeter.start(fps -> fallbackFps = fps);
+    }
+
+    /** The native FPS, or 0 when the hook is not available/initialised. */
+    private int nativeFps() {
+        try {
+            if (initialized && FpsMod.nativeIsInitialized()) {
+                int fps = FpsMod.nativeGetFps();
+                return fps > 0 ? fps : 0;
+            }
+        } catch (Throwable ignored) {
+            // A build without the native hook; fall through to the host meter.
+        }
+        return 0;
     }
 
     private void applyOpacity() {
@@ -324,6 +361,8 @@ public class FpsDisplayOverlay {
         }
         if (!isShowing) return;
         isShowing = false;
+        fallbackMeter.stop();
+        fallbackFps = 0;
         handler.removeCallbacks(updateRunnable);
         try {
             if (wmParams != null && windowManager != null) {

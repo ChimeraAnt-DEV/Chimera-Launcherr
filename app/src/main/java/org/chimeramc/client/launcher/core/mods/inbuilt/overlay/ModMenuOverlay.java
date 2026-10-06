@@ -425,6 +425,12 @@ public class ModMenuOverlay {
 
 
     private void setupViews() {
+        // The overlay tree is re-inflated on every show(), so any panel that was attached to the
+        // previous tree is now parented to a detached view. Reset the cached references (and
+        // release the ones that own executors) here, or a section that caches its panel would
+        // build it once and then render blank on every reopen because its view belongs to the
+        // old, discarded tree.
+        releasePanels();
         menuContainer = overlayView.findViewById(R.id.mod_menu_container);
         modMenuTopBar = overlayView.findViewById(R.id.mod_menu_topbar);
         modMenuLogo = overlayView.findViewById(R.id.mod_menu_logo);
@@ -1113,6 +1119,24 @@ public class ModMenuOverlay {
 
     private void hideCosmetics() {
         if (cosmeticsContainer != null) cosmeticsContainer.setVisibility(View.GONE);
+    }
+
+    /**
+     * Drops every panel that was attached to the previous overlay tree.
+     *
+     * <p>Called from {@code setupViews} after a re-inflate. Most panels are cheap and rebuilt on
+     * entry; the ones that are cached must be released so they are rebuilt against the new tree,
+     * and the Replay panel additionally owns a background executor and a live recorder listener,
+     * so it is disposed rather than just dropped.
+     */
+    private void releasePanels() {
+        if (replayPanel != null) {
+            replayPanel.dispose();
+            replayPanel = null;
+        }
+        cosmeticsPanel = null;
+        packChangerPanel = null;
+        voicePanel = null;
     }
 
     /**

@@ -10,14 +10,18 @@ import org.chimeramc.client.R;
 import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
 import org.chimeramc.client.core.mods.inbuilt.model.ModIds;
 import org.chimeramc.client.core.mods.inbuilt.model.OffhandAction;
+import org.chimeramc.pojavcontrols.KeyMapper;
+import org.levimc.launcher.core.mods.inbuilt.nativemod.MoreButtonsMod;
 
 /**
  * The Offhand button: swaps the held item into the off hand and/or uses the off-hand item.
  *
- * <p>It sends the game's own off-hand key presses (F to swap, V to use) through the same
- * {@code dispatchKeyEvent} path a hardware keyboard uses, so it behaves identically in a local
- * world, a Realm and on a large server such as The Hive — nothing here is server- or world-specific.
- * Bedrock resolves the swap/use itself; the button only delivers the key.
+ * <p>It injects the game's own off-hand keys (F to swap, V to use) through
+ * {@link MoreButtonsMod#sendKey}, which is the same native key-injection path the working
+ * on-screen button modules use (Quick Drop, Toggle HUD, Hotbar Slot). A key that only reached
+ * {@code Activity.dispatchKeyEvent} is not seen by the game's input loop, which is why an earlier
+ * version of this module did nothing at all. The path is key-level, so it behaves identically in a
+ * local world, a Realm and on a large server such as The Hive — nothing here is server-specific.
  *
  * <p>The hardware keybind mirrors the button so a keyboard/controller player can trigger the same
  * action without the on-screen control.
@@ -91,11 +95,24 @@ public class OffhandOverlay extends BaseOverlayButton {
         }
     }
 
-    private static void dispatchKey(Activity activity, int keyCode) {
+    /**
+     * Sends one off-hand key through the native key-injection path the working button modules use.
+     *
+     * <p>{@code MoreButtonsMod.sendKey} takes a Bedrock key code, so the stored Android key code is
+     * converted through {@link KeyMapper}. If the native path is unavailable on this build the
+     * call falls back to {@code Activity.dispatchKeyEvent}, which still reaches the game when the
+     * launcher owns the input pipeline — the module degrades rather than doing nothing.
+     */
+    private static void dispatchKey(Activity activity, int androidKeyCode) {
+        int bedrockCode = KeyMapper.toBedrock(KeyMapper.fromAndroidKeyCode(androidKeyCode));
+        if (bedrockCode > 0 && MoreButtonsMod.sendKey(bedrockCode, true)
+                && MoreButtonsMod.sendKey(bedrockCode, false)) {
+            return;
+        }
         long now = SystemClock.uptimeMillis();
-        activity.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode,
+        activity.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, androidKeyCode,
                 0, 0, -1, 0, 0, InputDevice.SOURCE_KEYBOARD));
-        activity.dispatchKeyEvent(new KeyEvent(now, now + 10, KeyEvent.ACTION_UP, keyCode,
+        activity.dispatchKeyEvent(new KeyEvent(now, now + 10, KeyEvent.ACTION_UP, androidKeyCode,
                 0, 0, -1, 0, 0, InputDevice.SOURCE_KEYBOARD));
     }
 

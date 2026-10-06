@@ -940,10 +940,23 @@ public class InbuiltOverlayManager {
         }
     }
 
+    /**
+     * Stops the voice link, swallowing any failure.
+     *
+     * <p>This runs on the UI thread from the module toggle and from {@code hideAllOverlays}. A
+     * throw here — a transport whose teardown races a reconnect, a device already released —
+     * would otherwise propagate out of the click handler or out of overlay teardown and take the
+     * session down, which is exactly the "turn voice off and the client crashes" report. Stopping
+     * is best-effort: the module is left stopped and the UI stays alive either way.
+     */
     private void stopVoiceChat() {
-        org.chimeramc.client.core.voice.VoiceChatModule module =
-                org.chimeramc.client.core.voice.VoiceChatModule.peek();
-        if (module != null) module.stop();
+        try {
+            org.chimeramc.client.core.voice.VoiceChatModule module =
+                    org.chimeramc.client.core.voice.VoiceChatModule.peek();
+            if (module != null) module.stop();
+        } catch (Throwable t) {
+            android.util.Log.w("InbuiltOverlayManager", "Voice chat stop failed", t);
+        }
     }
 
     /**
