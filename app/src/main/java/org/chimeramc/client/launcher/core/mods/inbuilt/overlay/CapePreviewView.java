@@ -16,6 +16,7 @@ import org.chimeramc.client.core.cosmetics.CosmeticLayering;
 import org.chimeramc.client.core.cosmetics.PetModel;
 import org.chimeramc.client.core.cosmetics.PetPose;
 import org.chimeramc.client.core.cosmetics.PlayerSkinProvider;
+import org.chimeramc.client.core.cosmetics.PreviewDepthBuffer;
 import org.chimeramc.client.core.cosmetics.PreviewLighting;
 import org.chimeramc.client.core.cosmetics.QuadDepthSorter;
 import org.chimeramc.client.core.cosmetics.SkinModel;
@@ -83,6 +84,12 @@ public class CapePreviewView extends View {
 
     private final CapeSimulator capeSim = new CapeSimulator();
     private final List<FaceQuad> drawList = new ArrayList<>();
+
+    /** Offscreen 2x supersample target; reallocated only when the view size changes. */
+    private Bitmap frame;
+
+    /** Body depth, so the cape is clipped where the skin is in front of it. */
+    private final PreviewDepthBuffer depthBuffer = new PreviewDepthBuffer();
 
     /** Reused cape projections so a swinging cape allocates nothing per frame. */
     private float[] capeXs;
@@ -316,6 +323,41 @@ public class CapePreviewView extends View {
         int h = getHeight();
         if (w <= 0 || h <= 0) return;
 
+        // Supersample: draw everything into an offscreen bitmap at 2x and scale it down, so the
+        // thin cloth edges and the model's silhouette are anti-aliased instead of jagged. The
+        // preview is small, so 2x costs little and is the single biggest quality win.
+        int ss = 2;
+        Bitmap target = ensureFrame(w * ss, h * ss);
+        if (target != null) {
+            Canvas scaled = new Canvas(target);
+            scaled.scale(ss, ss);
+            drawScene(scaled, w, h);
+            canvas.drawBitmap(target, new android.graphics.Rect(0, 0, w * ss, h * ss),
+                    new android.graphics.Rect(0, 0, w, h), pixelPaint);
+            return;
+        }
+        drawScene(canvas, w, h);
+    }
+
+    /** The offscreen supersample target, or null when it cannot be allocated. */
+    private Bitmap ensureFrame(int width, int height) {
+        if (frame != null && frame.getWidth() == width && frame.getHeight() == height) {
+            frame.eraseColor(0);
+            return frame;
+        }
+        try {
+            frame = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        } catch (Throwable t) {
+            frame = null;
+        }
+        return frame;
+    }
+
+    private void drawScene(Canvas canvas, int w, int h) {
+        // The depth buffer covers the logical frame the quads project into (not the supersampled
+        // canvas), so the occlusion test compares like coordinates.
+        depthBuffer.prepare(w, h);
+
         // The model is 32 px tall. Fit it, leaving headroom for the cape to swing and room to the
         // right for the pet to trot beside the character.
         float scale = Math.min(w / 52f, h / 42f);
@@ -339,21 +381,17 @@ public class CapePreviewView extends View {
         // in the foreground pass, where they belong.
         drawAccessoryBehind(canvas, originX, originY, scale);
 
-        // The cape hangs just behind the body, so whether it should be painted before or after the
-        // body depends on which side the camera is on: viewed from behind the cloth is nearest and
-        // must paint over the body, viewed from the front it is occluded and must paint first.
-        // Drawing it unconditionally before the body (the old order) hid it whenever the camera
-        // was behind the player — which the idle spin reaches half the time — so the cape was
-        // effectively invisible, the "barely visible cape" defect.
-        boolean capeNearest = false;
-        if (cape != null) {
-            projectCape(originX, originY, scale);
-            projectPoint(0f, 18f, 0f, scale, originX, originY);
-            capeNearest = capeAverageDepth > projected[2];
-        }
-        if (cape != null && !capeNearest) paintCape(canvas);
+        // The cape is drawn through a per-quad depth test against the body, not a whole-cape
+        // before/after choice. The cape hangs just before the back plane (z around -2.4) while the
+        // body occupies z in [-2, 2], so a whole-cape decision is wrong for any camera that is not
+        // squarely behind or in front: whichever side calls it, part of the cloth is nearer than
+        // the skin and part is behind it. The visible defect was the cape's far/edge quads being
+        // painted over the torso — the cape "showing through the skin". The body is rasterised
+        // first into a depth buffer, then each cape quad is drawn only where it is actually in
+        // front of the skin, so the cape can never appear through the character.
+        if (cape != null) projectCape(originX, originY, scale);
         drawModel(canvas, originX, originY, scale);
-        if (cape != null && capeNearest) paintCape(canvas);
+        if (cape != null) paintCape(canvas);
         if (accessory != null) drawAccessoryFront(canvas, originX, originY, scale);
     }
 
@@ -586,6 +624,8 @@ public class CapePreviewView extends View {
 
     private void drawModel(Canvas canvas, float originX, float originY, float scale) {
         drawList.clear();
+        // The depth buffer was sized in drawScene to the logical (unscaled) frame, matching the
+        // coordinates the quads are projected into. This method only records into it.
 
         List<SkinModel.Box> boxes = SkinModel.boxes();
         for (int b = 0; b < boxes.size(); b++) {
@@ -605,6 +645,9 @@ public class CapePreviewView extends View {
                     depthSum += projected[2];
                 }
                 quad.depth = depthSum / 4f;
+                // Record this opaque face into the depth buffer too, so the cape test below sees
+                // exactly the body silhouette at this camera angle.
+                depthBuffer.accept(quad.verts, quad.depth);
                 // The box's own centroid depth orders whole boxes before their faces, so two
                 // boxes' faces can never interleave — that interleave is what tore holes at the
                 // head/torso and arm/torso seams.
@@ -788,6 +831,18 @@ public class CapePreviewView extends View {
                 cloth = cape.accentColor;
             }
             int color = PreviewLighting.shadeColorForNormal(cloth, nx3, ny3, nz3);
+
+            // Per-quad depth test against the body. The whole quad is drawn only when it is in
+            // front of the skin at all four corners; otherwise it is skipped, so the cape can never
+            // paint over the character it hangs behind. This is what fixes the cape showing through
+            // the skin — a whole-cape before/after decision cannot, because at most camera angles
+            // part of the cloth is nearer than the body and part is farther.
+            if (!depthBuffer.test(capeXs[i00], capeYs[i00], capeQuadDepth[q])
+                    || !depthBuffer.test(capeXs[i10], capeYs[i10], capeQuadDepth[q])
+                    || !depthBuffer.test(capeXs[i11], capeYs[i11], capeQuadDepth[q])
+                    || !depthBuffer.test(capeXs[i01], capeYs[i01], capeQuadDepth[q])) {
+                continue;
+            }
             paint.setColor(color);
             path.reset();
             path.moveTo(capeXs[i00], capeYs[i00]);
