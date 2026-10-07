@@ -11,6 +11,11 @@ build/
 .cxx/
 target/
 
+# Downloaded Minecraft packages used for native reverse-engineering (large; not source)
+app.apk
+*.apk
+*.xapk
+
 # Dependencies
 .gradle/
 node_modules/

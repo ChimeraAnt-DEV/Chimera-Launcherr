@@ -1398,3 +1398,33 @@ these are the conclusions.
   Blue palette by default, accent when enabled; white is only the core. Sparks are pooled; the
   driver self-cancels when nothing is alive. Package is `org.chimeramc.client.ui.views` (the file
   path has an extra `launcher/` segment — keep the package as the import sites expect).
+
+## Native cosmetics seams — verified offsets (1.26.60.28 arm64-v8a)
+Recovered from the real `lib/arm64-v8a/libminecraftpe.so` (368,150,880 bytes) extracted from
+`minecraft-26-60-28.apk` (mcpedl.org, `file_id` 7572 -> `https://file.mcpedl.org/uploads_files/22-09-2026/minecraft-26-60-28.apk`).
+Method: standalone typeinfo-name strings in `.rodata`, vtables resolved through the
+`R_AARCH64_RELATIVE` entries in `.rela.dyn`, function identified by the diagnostic strings its body
+references (the same method `Vtable.cpp` uses). These are pinned in
+`resources/preloader/preloader_signature_rules_source.json`.
+
+- **`Skin` is not polymorphic.** The binary has **no `Skin` typeinfo name**, so there is no
+  `Skin::getCapeImage` vtable to hook. The reachable 2D-cape seam is the renderer that holds the
+  skin: **`18LivePlayerRenderer`**, vtable address point `0x15144a78`, **slot 17 -> `0xaeaefb4`**
+  (the same render entry the player-render feed already uses; `playerRenderVtableIndex` = 17). The
+  `SerializedSkinRef::getCapeImageData` / `getCapeImageDataCereal` methods exist but are plain
+  (non-virtual) methods on a non-polymorphic type, so they cannot be reached by slot.
+- **Player-join packet seam: `20ClientNetworkHandler`**, vtable address point `0x1520ef98`,
+  **slot 40 -> `0xb80f518`**, whose body reaches the `AddPlayerPacket` handler at `0xb82dbcc`
+  (identified by `"AddPlayerPacket: NaN position sent by server"`). The `PlayerListPacketPayload::
+  AddEntry` / `RemoveEntry` handlers sit at `0xb8007d0` / `0xb8007ec` and peers but their exact
+  slot mapping is unconfirmed, so no index is set from them.
+- `GamePlayerRender` (existing) and `GameCosmetics` (new) both target the `LivePlayerRenderer`
+  slot; the cosmetics module owns the registry (per-player cape pixels, per-texture-id pixels, the
+  render-geometry blob + hash) and the JNI surface. All detours are **pure passthroughs** — they
+  forward the full argument register set and dereference nothing, so an unverified slot cannot fault
+  the render thread; the texture-bind seam has no verified slot and stays fail-closed.
+- **Still not implemented:** the pixel substitution itself (writing the override into the cape
+  buffer / binding a swapped texture). The seams, registry and JNI are real and build; substituting
+  needs each function's argument layout, which the stripped binary does not expose. The game-hook
+  section's conclusion stands: game classes export no symbols, so this is a disassembler pass, not a
+  symbol lookup.
