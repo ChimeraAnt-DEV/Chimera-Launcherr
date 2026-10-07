@@ -1428,3 +1428,23 @@ references (the same method `Vtable.cpp` uses). These are pinned in
   needs each function's argument layout, which the stripped binary does not expose. The game-hook
   section's conclusion stands: game classes export no symbols, so this is a disassembler pass, not a
   symbol lookup.
+
+### SerializedSkinRef layout (recovered from 1.26.60.28) — the cape substitution map
+Each `SerializedSkinRef::getX()` accessor logs its own name and returns `this + offset`; the
+constant-folded `add x0, x19, #imm` before the `ret` is the field offset. Recovered:
+
+- `getImageData()` → `+0x78` (base skin, `mce::Image`)
+- `getCapeImageData()` → `+0xa8` (**the cape**, `mce::Image`)
+- `getAnimatedImageData()` → `+0xd8`; `getGeometryData()` `+0x100`; `getGeometryDataMutable()`
+  `+0x120`; `getAnimationData()` `+0x130`; `getCapeId()` `+0x148`; `getSkinColor()` `+0x1a8`;
+  `getIsTrustedSkinFlag()` `+0x1b8`; `getProfileHash()` `+0x1c0`.
+- `+0x78 → +0xa8` is exactly 0x30 with nothing between, so **`mce::Image` is 0x30 bytes** and the
+  cape is one struct at `ref + 0xa8`.
+
+`SwapCapeImage(ref, image)` copies a caller-supplied **0x30-byte image struct** over `ref + 0xa8`
+(null ref/image/short buffer refused; exactly 0x30 bytes written). It copies the whole struct, not a
+pointer inside it, because **`mce::Image`'s internal field layout is not recoverable** from the
+stripped binary. Feeding it a valid image therefore needs an `mce::Image` the *engine* built (its
+own loader); the launcher cannot synthesise one whose internal buffer pointer is correct. That is
+the remaining piece — a data problem, not an offset problem. The render seam itself is
+`LivePlayerRenderer` slot 17 (see above).
