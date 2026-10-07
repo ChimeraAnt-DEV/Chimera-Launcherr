@@ -126,6 +126,15 @@ public class PreloaderInput {
      */
     public static native boolean nativeSwapCapeImage(long skinRefAddress, byte[] imageBytes);
 
+    /** The address of the engine's image loader, or 0 when unresolved on this build. */
+    public static native long nativeImageLoaderAddress();
+
+    /**
+     * Builds a valid engine {@code mce::Image} (0x30 bytes) from PNG bytes, or null when the loader
+     * is unresolved or the engine rejects the bytes.
+     */
+    public static native byte[] nativeBuildCapeImage(byte[] pngBytes);
+
     /** True once the native cosmetics skin/cape or texture hook has fired this session. */
     public static native boolean nativeIsCosmeticsHookLive();
 
@@ -382,6 +391,22 @@ public class PreloaderInput {
             return nativeSwapCapeImage(skinRefAddress, imageBytes);
         } catch (UnsatisfiedLinkError e) {
             return false;
+        }
+    }
+
+    public static long imageLoaderAddress() {
+        try {
+            return nativeImageLoaderAddress();
+        } catch (UnsatisfiedLinkError e) {
+            return 0L;
+        }
+    }
+
+    public static byte[] buildCapeImage(byte[] pngBytes) {
+        try {
+            return nativeBuildCapeImage(pngBytes);
+        } catch (UnsatisfiedLinkError e) {
+            return null;
         }
     }
 

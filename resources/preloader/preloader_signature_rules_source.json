@@ -13,7 +13,8 @@
       "isShowingMenuVtableIndex": 151,
       "playerRenderVtableIndex": 17,
       "skinCapeVtableIndex": 17,
-      "packetReadVtableIndex": 40
+      "packetReadVtableIndex": 40,
+      "imageLoaderSig": "FF 43 04 D1 FD 7B 0B A9 FC 6F 0C A9 FA 67 0D A9 F8 5F 0E A9 F6 57 0F A9 F4 4F 10 A9 FD C3 02 91 5A D0 3B D5 F3 03 08 AA F4 03 00 AA 48 17 40 F9 E0 63 01 91 F6 03 04 2A"
     },
     {
       "min": "1.26.40.00",

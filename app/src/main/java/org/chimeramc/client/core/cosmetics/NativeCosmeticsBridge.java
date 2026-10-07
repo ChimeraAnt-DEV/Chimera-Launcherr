@@ -169,6 +169,36 @@ public final class NativeCosmeticsBridge {
         return SkinImageLayout.capeImageAddress(skinRefAddress);
     }
 
+    /** The engine's image-loader address, or 0 when unresolved on this build. */
+    public static long imageLoaderAddress() {
+        return PreloaderInput.imageLoaderAddress();
+    }
+
+    /** True when the engine can build an image, so the PNG→image→swap path can run. */
+    public static boolean canBuildImages() {
+        return imageLoaderAddress() != 0L;
+    }
+
+    /**
+     * The complete cape replacement: build a valid {@code mce::Image} from PNG bytes with the
+     * engine's own loader, then copy it over the cape member of the player's skin.
+     *
+     * <p>This is the end-to-end path. The engine constructs the image (so its internal buffer
+     * pointer is correct by construction), and {@link #swapCapeImage} writes it at the verified
+     * offset. Every step fails closed: no loader, bad PNG, or a null skin address simply returns
+     * false and leaves the vanilla cape alone.
+     *
+     * @param skinRefAddress the address of the player's {@code SerializedSkinRef}
+     * @param capePng        the custom cape as PNG bytes
+     * @return true when the engine built the image and it was installed
+     */
+    public static boolean applyCapePng(long skinRefAddress, byte[] capePng) {
+        if (skinRefAddress == 0L || capePng == null || capePng.length == 0) return false;
+        byte[] image = PreloaderInput.buildCapeImage(capePng);
+        if (image == null || image.length < SkinImageLayout.IMAGE_SIZE) return false;
+        return swapCapeImage(skinRefAddress, image);
+    }
+
     /** Clears every native override. Called when cosmetics are unequipped or a session ends. */
     public static void clear() {
         PreloaderInput.clearCapeOverrides();
