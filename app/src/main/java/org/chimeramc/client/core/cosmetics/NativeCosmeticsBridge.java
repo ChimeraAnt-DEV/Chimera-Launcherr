@@ -139,6 +139,36 @@ public final class NativeCosmeticsBridge {
         }
     }
 
+    /**
+     * Replaces the cape image on a live {@code SerializedSkinRef}.
+     *
+     * <p>This is the actual pixel substitution: the cape the renderer samples is the
+     * {@code mce::Image} at {@code skinRef + 0xa8} (see {@link SkinImageLayout}), and this copies a
+     * supplied image struct over it. The image must be a struct the <em>engine</em> built (via its
+     * own loader), not raw RGBA — the binary does not expose {@code mce::Image}'s internal fields,
+     * so the launcher cannot synthesise a valid one and must not guess at where the buffer pointer
+     * sits.
+     *
+     * <p>Fails closed: a null address or an image shorter than {@link SkinImageLayout#IMAGE_SIZE}
+     * is refused rather than written, and without the native library the call is a no-op.
+     *
+     * @param skinRefAddress the address of a {@code SerializedSkinRef} (a player's skin)
+     * @param imageStruct    the engine-built image struct, at least {@code IMAGE_SIZE} bytes
+     * @return true when the struct was copied
+     */
+    public static boolean swapCapeImage(long skinRefAddress, byte[] imageStruct) {
+        if (skinRefAddress == 0L || imageStruct == null
+                || imageStruct.length < SkinImageLayout.IMAGE_SIZE) {
+            return false;
+        }
+        return PreloaderInput.swapCapeImage(skinRefAddress, imageStruct);
+    }
+
+    /** The address of the cape image inside a skin struct, or 0 when the base is null. */
+    public static long capeImageAddress(long skinRefAddress) {
+        return SkinImageLayout.capeImageAddress(skinRefAddress);
+    }
+
     /** Clears every native override. Called when cosmetics are unequipped or a session ends. */
     public static void clear() {
         PreloaderInput.clearCapeOverrides();

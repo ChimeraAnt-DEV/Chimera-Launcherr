@@ -120,6 +120,12 @@ public class PreloaderInput {
     /** Publishes the geometry blob the render hook should draw for the local player. */
     public static native void nativeSetRenderGeometry(byte[] data);
 
+    /**
+     * Replaces the cape image inside a {@code SerializedSkinRef} at a raw address. The image must
+     * be the engine's own 0x30-byte {@code mce::Image} struct (built by its loader), not raw RGBA.
+     */
+    public static native boolean nativeSwapCapeImage(long skinRefAddress, byte[] imageBytes);
+
     /** True once the native cosmetics skin/cape or texture hook has fired this session. */
     public static native boolean nativeIsCosmeticsHookLive();
 
@@ -368,6 +374,14 @@ public class PreloaderInput {
         try {
             nativeSetRenderGeometry(data);
         } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    public static boolean swapCapeImage(long skinRefAddress, byte[] imageBytes) {
+        try {
+            return nativeSwapCapeImage(skinRefAddress, imageBytes);
+        } catch (UnsatisfiedLinkError e) {
+            return false;
         }
     }
 
