@@ -1603,6 +1603,30 @@ path: PNG → engine image → swap at `SerializedSkinRef + 0xa8`. Fail-closed e
 bad PNG, or a null skin address leaves the vanilla cape alone, and an unmatched signature keeps the
 resource pack.
 
+- **The loader call was previously declared with the WRONG ABI, and that was the crash/black-texture
+  cause. Fixed in `mce_image_hook.cpp` (preloader).** The real convention, read from the disassembly
+  at `0x14df7ce4`, is: the return aggregate goes through **`x8`** (`mov x19, x8` in the prologue,
+  payload byte written at `[x19, #0x10]`), and the arguments are **`x0 = out image`, `x1 =
+  ImageFormat`, `x2 = data`, `x3 = size`, `x4 = bool`**. The old `using LoadImageFn =
+  void(*)(void* sret, void* out, u32 format, const u8* data, size_t size, bool)` mapped `x0 = sret,
+  x1 = out, x2 = format, ...` and never supplied `x8` at all — so it passed the out-struct where the
+  format belongs and returned the wrong way. The fix is a *type* fix: declare the return type as a
+  struct >16 bytes (`LoaderReturn`) and Clang emits the `x8` sret ABI itself (verified in the built
+  object: `add x8, sp, #0x8` before the `blr`, flag read from `sret+0x10`). Do not reintroduce a
+  hand-written `void(...)` signature.
+- **`ImageFormat` values the loader accepts are `{0, 1, 3, 4}`** (from the dispatch in the same
+  routine). `0` is auto-detect → `stb_image`, which decodes PNG (the cape/hat texture route); `4` is
+  RGBA8 (a memcpy). `renoir::ThirdParty::stbi_*` is present in the binary, confirming the PNG path.
+- **The detour is gated on a live probe, not a version list.** `InitMceImageHook` builds a real 1×1
+  PNG through the loader first; success proves both the address and the ABI, and only then is the
+  `loadImageFromMemory` detour installed (it forwards the same `x8` return pointer, so it is
+  transparent). A failed probe refuses the detour and keeps the already-proven `SerializedSkinRef`
+  struct-swap at `+0xa8`, so the feature does not regress. Substitutions are keyed by the FNV-1a of
+  the incoming bytes (`SetContentSubstitution`) plus a one-shot `ArmNextImageOverride`, because the
+  loader seam carries no player/texture id. The texture-cache flush is a caller-proven callback
+  (`SetTextureCacheFlusher`), not fabricated — `mce::TextureGroup`/`SkinRepository` are not
+  RTTI-resolvable. See `preloader/docs/mce-image-pipeline.md`.
+
 - **The `SerializedSkinRef` accessor-name strings do NOT survive 1.26.60.30.** Only `getImageData`
   (1 hit) and `loadImageFromMemory` (1 hit) are still present in `.rodata`; `getCapeImageData`,
   `getCapeImageDataCereal`, `getAnimatedImageData`, `getGeometryData`, `getAnimationData`,
