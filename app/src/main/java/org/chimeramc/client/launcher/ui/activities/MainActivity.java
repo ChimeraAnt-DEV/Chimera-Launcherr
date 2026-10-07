@@ -1494,15 +1494,15 @@ import okhttp3.OkHttpClient;
     }
 
     private void setupSectionHeaders() {
-        bindSectionHeader(R.id.section_quick, R.string.quick_actions_title, 0);
-        bindSectionHeader(R.id.section_launch, R.string.home_edition, 0);
+        bindSectionHeader(R.id.section_quick, R.string.quick_actions_title, R.drawable.ic_nav_launch, 0);
+        bindSectionHeader(R.id.section_launch, R.string.home_edition, R.drawable.ic_qa_launch, 0);
         View contentAction = bindSectionHeader(R.id.section_content,
                 R.string.home_content_library, R.string.view_all);
         if (contentAction != null) {
             contentAction.setOnClickListener(v -> openContentManagement());
             DynamicAnim.applyPressScale(contentAction);
         }
-        bindSectionHeader(R.id.section_more, R.string.home_more, 0);
+        bindSectionHeader(R.id.section_more, R.string.home_more, R.drawable.ic_modules, 0);
     }
 
     /**
@@ -1514,10 +1514,23 @@ import okhttp3.OkHttpClient;
      *         {@code null} when the section has no action
      */
     private View bindSectionHeader(int includeId, int titleRes, int actionRes) {
+        return bindSectionHeader(includeId, titleRes, 0, actionRes);
+    }
+
+    private View bindSectionHeader(int includeId, int titleRes, int iconRes, int actionRes) {
         View include = findViewById(includeId);
         if (include == null) return null;
         TextView title = include.findViewById(R.id.section_title);
         if (title != null) title.setText(titleRes);
+        ImageView icon = include.findViewById(R.id.section_icon);
+        if (icon != null) {
+            if (iconRes != 0) {
+                icon.setImageResource(iconRes);
+                icon.setVisibility(View.VISIBLE);
+            } else {
+                icon.setVisibility(View.GONE);
+            }
+        }
         TextView action = include.findViewById(R.id.section_action);
         if (action == null) return null;
         if (actionRes == 0) {

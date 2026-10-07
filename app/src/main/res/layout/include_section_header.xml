@@ -19,10 +19,23 @@
     android:paddingHorizontal="12dp"
     android:paddingVertical="9dp">
 
-    <View
-        android:layout_width="14dp"
-        android:layout_height="28dp"
-        android:background="@drawable/section_marker" />
+    <FrameLayout
+        android:layout_width="34dp"
+        android:layout_height="34dp">
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/section_marker" />
+
+        <ImageView
+            android:id="@+id/section_icon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            app:tint="@color/on_header_gradient" />
+    </FrameLayout>
 
     <TextView
         android:id="@+id/section_title"

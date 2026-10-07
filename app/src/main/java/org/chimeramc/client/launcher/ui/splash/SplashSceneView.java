@@ -53,6 +53,7 @@ public final class SplashSceneView extends View {
 
     private final SplashParticles particles = new SplashParticles();
     private final SplashWorld world = new SplashWorld();
+    private final SplashIsland island = new SplashIsland();
     private final Random random = new Random();
 
     private ValueAnimator driver;
@@ -72,12 +73,21 @@ public final class SplashSceneView extends View {
     private final int[] blockSide = new int[SplashWorld.BLOCK_COUNT];
     private final int[] blockFront = new int[SplashWorld.BLOCK_COUNT];
 
+    // Island block colours per material kind, resolved once per palette change.
+    private final int[] islandTop = new int[5];
+    private final int[] islandSide = new int[5];
+    private final int[] islandFront = new int[5];
+
     // Reusable projection scratch for one cube, so drawing allocates nothing per frame.
     private final float[] cubeX = new float[8];
     private final float[] cubeY = new float[8];
     private final float[] cubeDepth = new float[8];
     private final float[] faceDepth = new float[6];
     private final int[] faceOrder = {0, 1, 2, 3, 4, 5};
+
+    // Island draw order (far to near), rebuilt per frame without allocating.
+    private final int[] islandOrder = new int[SplashIsland.MAX_BLOCKS];
+    private final float[] islandDepth = new float[SplashIsland.MAX_BLOCKS];
 
     public SplashSceneView(Context context) {
         super(context);
@@ -106,6 +116,7 @@ public final class SplashSceneView extends View {
         }
         particles.seed(random, 0x5EEDL);
         world.seed(random, 0xC0FFEEL);
+        island.seed(random, 0x15EAF00DL);
         rebuildBlockPalette();
     }
 
@@ -225,6 +236,24 @@ public final class SplashSceneView extends View {
             blockSide[i] = shade(base, 0.78f);
             blockFront[i] = shade(base, 0.58f);
         }
+
+        // The island's materials, matching the cubes' palette so the scene is one world: grass,
+        // dirt, stone, a bark log and leaves.
+        islandTop[SplashIsland.KIND_GRASS] = 0xFF5FBF46;
+        islandSide[SplashIsland.KIND_GRASS] = 0xFF7A5230;
+        islandFront[SplashIsland.KIND_GRASS] = 0xFF5C3D24;
+        islandTop[SplashIsland.KIND_DIRT] = 0xFF8A5E36;
+        islandSide[SplashIsland.KIND_DIRT] = 0xFF7A5230;
+        islandFront[SplashIsland.KIND_DIRT] = 0xFF5C3D24;
+        islandTop[SplashIsland.KIND_STONE] = 0xFFB9BEC7;
+        islandSide[SplashIsland.KIND_STONE] = 0xFF8A8F99;
+        islandFront[SplashIsland.KIND_STONE] = 0xFF6E737C;
+        islandTop[SplashIsland.KIND_LOG] = 0xFFB08A4E;
+        islandSide[SplashIsland.KIND_LOG] = 0xFF8A6A3C;
+        islandFront[SplashIsland.KIND_LOG] = 0xFF6E5230;
+        islandTop[SplashIsland.KIND_LEAVES] = 0xFF57A83A;
+        islandSide[SplashIsland.KIND_LEAVES] = 0xFF4A9231;
+        islandFront[SplashIsland.KIND_LEAVES] = 0xFF3C7A28;
     }
 
     @Override
@@ -246,8 +275,81 @@ public final class SplashSceneView extends View {
         drawStars(canvas, w, h, density);
         drawShootingStar(canvas, w, h, density);
         drawTerrain(canvas, w, h, density);
+        drawIsland(canvas, w, h, density, t);
         drawBlocks(canvas, w, h, density);
         drawEmbers(canvas, w, h, density);
+    }
+
+    /**
+     * Draws the floating island hero: the whole block model projected, back-face culled and depth
+     * sorted, then painted one block at a time.
+     *
+     * <p>Every block is a full cube drawn with the same flat-shaded pass as the floating cubes, and
+     * the blocks are ordered far to near by their projected depth so a nearer block paints over one
+     * behind it. Without that sort the island would read as a jumble of see-through cubes. The whole
+     * model is turned by {@link SplashIsland#yaw(float)} so the island slowly orbits, which is what
+     * keeps the backdrop from ever looking static.
+     */
+    private void drawIsland(Canvas canvas, int w, int h, float density, float t) {
+        int blocks = island.blockCount();
+        if (blocks == 0) return;
+
+        float cx = w * 0.5f;
+        float cy = h * 0.68f;
+
+        // The island is modelled in integer block units; scale so the 7-block-wide cap fills about
+        // a third of the shorter screen edge.
+        float scale = Math.min(w, h) * 0.036f * density;
+        double yaw = Math.toRadians(island.yaw(t));
+        double pitch = Math.toRadians(16.0);
+        double cosY = Math.cos(yaw), sinY = Math.sin(yaw);
+        double cosP = Math.cos(pitch), sinP = Math.sin(pitch);
+
+        // A gentle bob, in phase with nothing else, so the island breathes on its own.
+        float bob = (float) Math.sin(t * 0.7f) * h * 0.006f;
+
+        int drawable = 0;
+        for (int i = 0; i < blocks; i++) {
+            float bx = island.x(i);
+            float bz = island.z(i);
+            // Rotate the block centre about Y then pitch about X (a fixed viewing tilt).
+            double z1 = -bx * sinY + bz * cosY;
+            double z2 = island.y(i) * sinP + z1 * cosP;
+            islandDepth[i] = (float) z2;
+            islandOrder[i] = i;
+            drawable++;
+        }
+        if (drawable == 0) return;
+        // Insertion sort by depth (small z is far), so we paint far to near. Blocks are few and
+        // mostly pre-sorted, so this is near-linear and allocates nothing.
+        for (int i = 1; i < blocks; i++) {
+            int key = islandOrder[i];
+            float keyDepth = islandDepth[key];
+            int j = i - 1;
+            while (j >= 0 && islandDepth[islandOrder[j]] > keyDepth) {
+                islandOrder[j + 1] = islandOrder[j];
+                j--;
+            }
+            islandOrder[j + 1] = key;
+        }
+
+        for (int n = 0; n < blocks; n++) {
+            int i = islandOrder[n];
+            float bx = island.x(i);
+            float by = island.y(i);
+            float bz = island.z(i);
+            double x1 = bx * cosY + bz * sinY;
+            double z1 = -bx * sinY + bz * cosY;
+            double y1 = by * cosP - z1 * sinP;
+            double z2 = by * sinP + z1 * cosP;
+            float px = cx + (float) (x1 * scale);
+            float py = cy - (float) (y1 * scale) + bob;
+            int k = island.kind(i);
+            // The block positions carry the island's turn; each block stays axis-aligned so the
+            // voxel model reads as a turntable rather than every cube tumbling independently.
+            drawVoxelCube(canvas, px, py, scale * 1.02f, 0f,
+                    islandTop[k], islandSide[k], islandFront[k]);
+        }
     }
 
     private void drawStars(Canvas canvas, int w, int h, float density) {
