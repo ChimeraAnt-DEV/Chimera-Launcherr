@@ -981,6 +981,9 @@ public class InbuiltOverlayManager {
                                 manager.getVoiceRelayPassword(),
                                 manager.getVoiceChannel(),
                                 manager.getCosmeticManualPeer());
+                // The zero-setup public relay topic, so two users reach each other across the
+                // internet with no server to deploy. Defaults to the world/channel topic.
+                config = config.withCloudTopic(manager.getCosmeticCloudTopic());
                 cosmeticSyncModule = new org.chimeramc.client.core.cosmetics.CosmeticSyncModule(
                         activity, manager.getVoiceDeviceId(), deviceName(), config);
             }

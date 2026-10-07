@@ -101,6 +101,14 @@ public final class CosmeticSyncModule {
     // Manual route: unicast straight to a pasted host:port, no server.
     private InetSocketAddress manualPeer;
 
+    // Cloud route: the zero-setup public relay, so two users reach each other across the internet
+    // with no server to deploy. Runs alongside the LAN path; either can be the one that delivers.
+    private CosmeticSyncCloudRelay cloudRelay;
+    private String cloudTopic;
+    private Thread cloudThread;
+    private volatile long cloudSinceSeconds;
+    private CosmeticSyncCache cache;
+
     /**
      * The running module, or null.
      *
@@ -130,6 +138,7 @@ public final class CosmeticSyncModule {
         this.config = config == null
                 ? CosmeticSyncConfig.resolve(true, false, "", "", "world", "")
                 : config;
+        this.cache = new CosmeticSyncCache(this.context);
     }
 
     /** The running module, or null. */
@@ -204,8 +213,16 @@ public final class CosmeticSyncModule {
         receiveThread.setDaemon(true);
         receiveThread.start();
 
-        // The relay/manual routes are opened after the LAN one and independently: a failure here
-        // must not stop the LAN path that already works.
+        // Seed the registry from the local cache, so a peer seen in a previous session shows their
+        // cosmetics immediately rather than after the first network round trip. The live beacons
+        // refresh these entries, so a changed cosmetic still updates.
+        if (cache != null) {
+            for (CosmeticSyncProtocol.Advert cached : cache.load()) registry.put(cached);
+        }
+
+        // The relay/manual/cloud routes are opened after the LAN one and independently: a failure
+        // in any must not stop the path that already works.
+        if (config.hasCloudTopic()) startCloud();
         if (config.relayEnabled) startRelay();
         else if (config.hasManualPeer()) resolveManualPeer();
 
@@ -251,6 +268,7 @@ public final class CosmeticSyncModule {
             target.close();
         }
         stopRelay();
+        stopCloud();
         releaseMulticastLock();
         registry.clear();
     }
@@ -304,6 +322,9 @@ public final class CosmeticSyncModule {
         }
         // Relay: wrap the manifest in a v4 frame the relay fans out.
         sendRelay(data);
+        // Cloud relay: publish the same manifest to the public topic. Runs on the broadcaster
+        // thread (never the UI thread), so the blocking HTTP call is safe here.
+        publishCloud(data);
         // Manual unicast peer.
         DatagramSocket manual = relaySocket; // reuse the same unicast socket when present
         if (manualPeer != null) {
@@ -313,6 +334,82 @@ public final class CosmeticSyncModule {
                 }
             } catch (IOException e) {
                 // The peer may be offline; the next tick retries.
+            }
+        }
+    }
+
+    // --- Cloud route (zero-setup public relay) ----------------------------------------------
+
+    /** Opens the cloud poll loop. The publish side happens inside {@link #broadcast}. */
+    private void startCloud() {
+        if (cloudRelay == null) cloudRelay = new CosmeticSyncCloudRelay();
+        cloudTopic = config.cloudTopic;
+        // Start the cursor an hour back so a peer that advertised before we joined is picked up on
+        // the first poll; ntfy caches messages for a window, so this is cheap and finite.
+        cloudSinceSeconds = System.currentTimeMillis() / 1000L - 3600L;
+        cloudThread = new Thread(this::cloudLoop, "cosmetic-sync-cloud");
+        cloudThread.setDaemon(true);
+        cloudThread.start();
+    }
+
+    private void stopCloud() {
+        Thread thread = cloudThread;
+        cloudThread = null;
+        cloudRelay = null;
+        if (thread != null) {
+            thread.interrupt();
+            try {
+                thread.join(300);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    /** Publishes the manifest to the cloud topic. Called from the broadcaster thread. */
+    private void publishCloud(byte[] data) {
+        CosmeticSyncCloudRelay relay = cloudRelay;
+        String topic = cloudTopic;
+        if (relay == null || topic == null || topic.isEmpty()) return;
+        // Base64 so the binary datagram survives a text transport; URL_SAFE with padding keeps it
+        // a single token.
+        String payload = android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP);
+        relay.publish(topic, payload);
+    }
+
+    /**
+     * Polls the cloud topic and feeds every message through the same handler the LAN path uses, so
+     * a cloud manifest and a LAN one cannot be interpreted differently.
+     */
+    private void cloudLoop() {
+        while (running.get()) {
+            CosmeticSyncCloudRelay relay = cloudRelay;
+            String topic = cloudTopic;
+            if (relay == null || topic == null) break;
+            try {
+                java.util.List<CosmeticSyncCloudRelay.Message> messages =
+                        relay.poll(topic, cloudSinceSeconds);
+                long now = System.currentTimeMillis() / 1000L;
+                for (CosmeticSyncCloudRelay.Message message : messages) {
+                    try {
+                        byte[] raw = android.util.Base64.decode(message.payloadBase64,
+                                android.util.Base64.NO_WRAP);
+                        handleIncoming(raw);
+                    } catch (RuntimeException ignored) {
+                        // A malformed payload is skipped; it cannot be a real advertisement.
+                    }
+                }
+                // Advance the cursor so the next poll only returns newer messages.
+                cloudSinceSeconds = now;
+            } catch (Throwable t) {
+                // A network blip must not kill the route; the next loop retries.
+                Log.w(TAG, "Cloud poll failed", t);
+            }
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
             }
         }
     }
@@ -352,6 +449,9 @@ public final class CosmeticSyncModule {
         // player who joined after us is not invisible until their next timer tick.
         boolean firstSight = !registry.contains(advert.peerId);
         registry.put(advert);
+        // Persist the raw advertisement so this peer shows instantly on the next session, before
+        // the first network round trip. Only on a real (non-request) advert.
+        if (cache != null) cache.put(advert, data);
         if (firstSight) requestAll();
     }
 

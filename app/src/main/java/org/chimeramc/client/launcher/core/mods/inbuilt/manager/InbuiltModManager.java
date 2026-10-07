@@ -107,6 +107,7 @@ public class InbuiltModManager {
     /** Whether the equipped cape/accessory/pet is advertised to other Chimera users in the world. */
     private static final String KEY_COSMETIC_SYNC_ENABLED = "cosmetic_sync_enabled";
     private static final String KEY_COSMETIC_MANUAL_PEER = "cosmetic_sync_manual_peer";
+    private static final String KEY_COSMETIC_CLOUD_TOPIC = "cosmetic_sync_cloud_topic";
     private static final int DEFAULT_AIM_SMOOTHING = 40;
     private static final int DEFAULT_AIM_SENSITIVITY = 100;
     private static final int DEFAULT_AIM_CROSSHAIR_COLOR = 0xFF3DDC84;
@@ -951,6 +952,26 @@ public class InbuiltModManager {
     public void setCosmeticManualPeer(String peer) {
         prefs.edit().putString(KEY_COSMETIC_MANUAL_PEER,
                 peer == null ? "" : peer.trim()).apply();
+    }
+
+    /**
+     * The cloud relay topic two clients meet on.
+     *
+     * <p>Defaults to the LAN world topic, so a player who sets nothing still gets cross-network
+     * sync through the public relay: two players who enter the same world key meet on the same
+     * topic. A player can override it with a private code so only people who know the code see
+     * their cosmetics.
+     */
+    public String getCosmeticCloudTopic() {
+        String stored = prefs.getString(KEY_COSMETIC_CLOUD_TOPIC, "");
+        if (stored != null && !stored.trim().isEmpty()) return stored.trim();
+        return org.chimeramc.client.core.cosmetics.CosmeticSyncCloudRelay
+                .topicForWorld(getVoiceChannel());
+    }
+
+    public void setCosmeticCloudTopic(String topic) {
+        prefs.edit().putString(KEY_COSMETIC_CLOUD_TOPIC,
+                topic == null ? "" : topic.trim()).apply();
     }
 
     /** Resets the channel to the open one, used by the panel's "World" button. */

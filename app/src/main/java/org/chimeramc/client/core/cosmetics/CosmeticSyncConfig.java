@@ -43,10 +43,12 @@ public final class CosmeticSyncConfig {
     public final String channel;
     /** The manual unicast peer as {@code host:port}, or "" when none was pasted. */
     public final String manualPeer;
+    /** The zero-setup public relay topic, or "" to disable the cloud route. */
+    public final String cloudTopic;
 
     private CosmeticSyncConfig(boolean enabled, boolean relayEnabled, String relayHost,
                                int relayPort, String relayPassword, String channel,
-                               String manualPeer) {
+                               String manualPeer, String cloudTopic) {
         this.enabled = enabled;
         this.relayEnabled = relayEnabled;
         this.relayHost = relayHost;
@@ -54,6 +56,13 @@ public final class CosmeticSyncConfig {
         this.relayPassword = relayPassword;
         this.channel = channel;
         this.manualPeer = manualPeer;
+        this.cloudTopic = cloudTopic == null ? "" : cloudTopic;
+    }
+
+    /** A copy with the cloud topic set; keeps the other fields, so callers need no re-resolve. */
+    public CosmeticSyncConfig withCloudTopic(String topic) {
+        return new CosmeticSyncConfig(enabled, relayEnabled, relayHost, relayPort,
+                relayPassword, channel, manualPeer, topic);
     }
 
     /**
@@ -84,7 +93,7 @@ public final class CosmeticSyncConfig {
         return new CosmeticSyncConfig(enabled, relay, host, port,
                 relayPassword == null ? "" : relayPassword,
                 channel == null || channel.trim().isEmpty() ? "world" : channel.trim(),
-                manual);
+                manual, "");
     }
 
     /** Whether a manual unicast peer is configured and usable (host:port with a numeric port). */
@@ -93,8 +102,14 @@ public final class CosmeticSyncConfig {
                 && org.chimeramc.client.core.voice.VoiceRelayAddress.parse(manualPeer) != null;
     }
 
+    /** Whether the zero-setup cloud relay is in use. */
+    public boolean hasCloudTopic() {
+        return !cloudTopic.isEmpty();
+    }
+
     /** A short label for the status line: which route is carrying advertisements. */
     public String routeLabel() {
+        if (hasCloudTopic()) return "cloud";
         if (relayEnabled) return "relay";
         if (hasManualPeer()) return "manual";
         return "lan";
