@@ -331,9 +331,15 @@ public class VipModMenuOverlay {
         adapter.setListener(new VipModuleAdapter.Listener() {
             @Override
             public void onToggle(UnifiedMod mod, boolean enabled) {
-                mod.applyEnabled(enabled);
-                InbuiltOverlayManager manager = InbuiltOverlayManager.getInstance();
-                if (manager != null) manager.applyConfigurationChanges(mod.getId());
+                // A toggle applies live into the running game; if any overlay setup throws, the
+                // menu must survive it. Swallow and refresh rather than letting it reach the
+                // handler, which would take the whole session down with it.
+                try {
+                    mod.applyEnabled(enabled);
+                    InbuiltOverlayManager manager = InbuiltOverlayManager.getInstance();
+                    if (manager != null) manager.applyConfigurationChanges(mod.getId());
+                } catch (Throwable ignored) {
+                }
                 adapter.refreshStates();
                 updateCounts();
             }
@@ -562,13 +568,29 @@ public class VipModMenuOverlay {
         }
         if (emptyState != null) emptyState.setVisibility(View.GONE);
         allMods.clear();
-        allMods.addAll(InbuiltModuleProvider.load(activity));
-        allMods.addAll(ExternalModuleProvider.load(activity));
+        // Each provider is isolated: one malformed external manifest (or a module whose config
+        // build throws) must not empty the whole grid or, worse, take the menu down. The menu is
+        // opened over a running game, so a crash here would kill the session.
+        allMods.addAll(safeLoad(() -> InbuiltModuleProvider.load(activity)));
+        allMods.addAll(safeLoad(() -> ExternalModuleProvider.load(activity)));
         applySearch();
         long elapsed = SystemClock.uptimeMillis() - shownAtMs;
         handler.postDelayed(() -> {
             if (isShowing && skeleton != null) skeleton.setVisibility(View.GONE);
         }, Math.max(0L, SKELETON_MIN_MS - elapsed));
+    }
+
+    private interface ModLoader {
+        List<UnifiedMod> load();
+    }
+
+    private static List<UnifiedMod> safeLoad(ModLoader loader) {
+        try {
+            List<UnifiedMod> mods = loader.load();
+            return mods != null ? mods : Collections.<UnifiedMod>emptyList();
+        } catch (Throwable t) {
+            return Collections.emptyList();
+        }
     }
 
     private void applySearch() {
@@ -626,10 +648,16 @@ public class VipModMenuOverlay {
         if (configTitle != null) configTitle.setText(mod.getName());
         if (configContent != null) {
             configContent.removeAllViews();
-            ModConfigView.render(activity, configContent, mod, false, () -> {
-                InbuiltOverlayManager manager = InbuiltOverlayManager.getInstance();
-                if (manager != null) manager.applyConfigurationChanges(mod.getId());
-            });
+            try {
+                ModConfigView.render(activity, configContent, mod, false, () -> {
+                    InbuiltOverlayManager manager = InbuiltOverlayManager.getInstance();
+                    if (manager != null) manager.applyConfigurationChanges(mod.getId());
+                });
+            } catch (Throwable t) {
+                // A single module's config failing to build must not crash the menu over the game;
+                // show the title and an empty body instead, exactly as an empty config would.
+                configContent.removeAllViews();
+            }
         }
         if (configView != null) {
             configView.setVisibility(View.VISIBLE);
