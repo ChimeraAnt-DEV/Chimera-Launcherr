@@ -1800,6 +1800,13 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="voice_share_body" formatted="false">Join my Glowberry voice channel with code %1$s - open the Voice tab and paste it into "Join by code".</string>
     <string name="voice_share_chooser">Share channel code</string>
     <string name="voice_members_none">No one else is on this channel yet.</string>
+
+    <!-- Glowberry peer identity -->
+    <string name="glowberry_user_badge">GlowberryClient user</string>
+    <string name="cosmetics_peers_title">Glowberry users in this world</string>
+    <string name="cosmetics_peers_none">No other Glowberry users detected yet. Only Glowberry users can see your cosmetics.</string>
+    <string name="cosmetics_peer_wearing">Wearing: %1$s</string>
+    <string name="cosmetics_peer_wearing_none">Wearing: nothing</string>
     <plurals name="voice_members">
         <item quantity="one">%1$d member on your channel</item>
         <item quantity="other">%1$d members on your channel</item>

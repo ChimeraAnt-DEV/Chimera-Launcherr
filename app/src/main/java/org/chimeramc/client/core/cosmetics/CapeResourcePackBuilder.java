@@ -233,22 +233,36 @@ public final class CapeResourcePackBuilder {
 
         // The pet is written whenever one is equipped; its geometry is per-species. As with the
         // hat, an empty geometry is written when none is equipped so the reference resolves.
-        String petModel = AuthoredGeometry.loadFromAssets(assets, AuthoredGeometry.ASSET_DIR,
-                AuthoredGeometry.PET_FILE, PetGeometry.GEOMETRY_ID);
+        // A hand-authored Blockbench export wins over the procedural mesh, so a species with a real
+        // model (dragon, parrot, dragonfly, axolotl, wolf) looks sculpted rather than box-stacked.
+        // Its own texture is shipped alongside it; the procedural species keep the painted atlas.
+        String petModel = AuthoredPetModels.loadFromAssets(assets,
+                pet == null ? null : pet.species);
+        byte[] petTexture = null;
+        if (petModel != null) {
+            petTexture = readAsset(assets, AuthoredPetModels.DIR,
+                    AuthoredPetModels.textureFor(pet.species));
+        }
+        if (petModel == null) {
+            petModel = AuthoredGeometry.loadFromAssets(assets, AuthoredGeometry.ASSET_DIR,
+                    AuthoredGeometry.PET_FILE, PetGeometry.GEOMETRY_ID);
+        }
         if (petModel == null) petModel = PetGeometry.geometryJson(pet);
         if (petModel == null) petModel = PetGeometry.emptyGeometryJson();
         writeAt(targetDir, PET_MODEL_PATH, petModel.getBytes(StandardCharsets.UTF_8));
         writeAt(targetDir, PET_RENDER_CONTROLLER_PATH,
                 petRenderControllerJson().getBytes(StandardCharsets.UTF_8));
-        writeAt(targetDir, PET_TEXTURE_PATH,
-                pet == null
-                        ? FlatColorAtlas.paint(0x00000000, 0x00000000,
-                                PetGeometry.TEXTURE_WIDTH, PetGeometry.TEXTURE_HEIGHT,
-                                PetGeometry.UV_ACCENT_Y)
-                        : PaintedAtlas.paint(pet.color, pet.accentColor,
-                                PetGeometry.TEXTURE_WIDTH, PetGeometry.TEXTURE_HEIGHT,
-                                PetGeometry.UV_ACCENT_Y,
-                                pet.color ^ (pet.species.ordinal() * 131)));
+        if (petTexture == null) {
+            petTexture = pet == null
+                    ? FlatColorAtlas.paint(0x00000000, 0x00000000,
+                            PetGeometry.TEXTURE_WIDTH, PetGeometry.TEXTURE_HEIGHT,
+                            PetGeometry.UV_ACCENT_Y)
+                    : PaintedAtlas.paint(pet.color, pet.accentColor,
+                            PetGeometry.TEXTURE_WIDTH, PetGeometry.TEXTURE_HEIGHT,
+                            PetGeometry.UV_ACCENT_Y,
+                            pet.color ^ (pet.species.ordinal() * 131));
+        }
+        writeAt(targetDir, PET_TEXTURE_PATH, petTexture);
         // The gait animations and their controller are always written so the entity's reference to
         // the controller always resolves. The controller plays exactly one gait at a time; the
         // entity's animate list names the controller, not the individual animations (which would
@@ -289,6 +303,27 @@ public final class CapeResourcePackBuilder {
 
     private static CosmeticCatalog.AccessoryKind accessoryKind(CosmeticCatalog.Accessory accessory) {
         return accessory == null ? CosmeticCatalog.AccessoryKind.NONE : accessory.kind;
+    }
+
+    /**
+     * Reads a raw asset byte-for-byte, or null when the opener is null or the file is missing.
+     *
+     * <p>Used for an authored pet texture: it must be copied verbatim, not re-encoded, so the
+     * artist's pixels reach the game unchanged.
+     */
+    private static byte[] readAsset(AuthoredGeometry.AssetOpener assets, String dir, String file) {
+        if (assets == null || dir == null || file == null) return null;
+        String path = dir.isEmpty() ? file : dir + "/" + file;
+        try (java.io.InputStream in = assets.open(path)) {
+            if (in == null) return null;
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
+            return out.toByteArray();
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
     }
 
     private static void writeAt(File root, String relativePath, byte[] data) throws IOException {

@@ -449,6 +449,11 @@ final class VoicePanel {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(0, dp(3), 0, dp(3));
 
+        // Every member of this list is another GlowberryClient user -- only this client speaks the
+        // voice protocol -- so the mark beside the name is the "I can see you're a Glowberry user"
+        // badge, and therefore whose cosmetics sync to us.
+        row.addView(GlowberryBadge.create(activity, compact));
+
         TextView name = new TextView(activity);
         name.setText(peer.name);
         name.setTextSize(compact ? 11f : 12f);

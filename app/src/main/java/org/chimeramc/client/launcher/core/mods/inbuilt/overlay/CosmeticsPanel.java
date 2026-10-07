@@ -23,6 +23,7 @@ import org.chimeramc.client.core.content.SkinPackActivator;
 import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
 import org.chimeramc.client.core.cosmetics.CosmeticStore;
 import org.chimeramc.client.core.cosmetics.CosmeticSyncModule;
+import org.chimeramc.client.core.cosmetics.CosmeticSyncProtocol;
 import org.chimeramc.client.core.versions.GameVersion;
 import org.chimeramc.client.core.versions.VersionManager;
 import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
@@ -70,8 +71,12 @@ final class CosmeticsPanel {
     private TextView gameStatus;
     private TextView syncStatus;
     private TextView syncToggle;
+    private LinearLayout peersContainer;
     private LinearLayout manualPeerRow;
     private EditText manualPeerInput;
+
+    /** Compact layout, so the peer list can size itself without re-deriving it. */
+    private final boolean compact;
 
     /** True while the panel is programmatically setting a spinner, so its callback is ignored. */
     private boolean suppressSelection;
@@ -91,6 +96,7 @@ final class CosmeticsPanel {
 
     CosmeticsPanel(Activity activity, boolean compact) {
         this.activity = activity;
+        this.compact = compact;
         this.store = new CosmeticStore(activity);
 
         root = new LinearLayout(activity);
@@ -188,6 +194,15 @@ final class CosmeticsPanel {
         });
         column.addView(syncToggle);
 
+        // The peers we can see. Every entry is another GlowberryClient user (only this client
+        // speaks the sync protocol), shown with the Glowberry mark and what they are wearing, so
+        // "who can see my cosmetics, and whose can I see" is answered directly rather than as a
+        // bare count.
+        column.addView(sectionTitle(R.string.cosmetics_peers_title));
+        peersContainer = new LinearLayout(activity);
+        peersContainer.setOrientation(LinearLayout.VERTICAL);
+        column.addView(peersContainer);
+
         // The manual peer fallback: when no Go relay is configured, a player can paste a direct
         // host:port so a peer not on the same Wi-Fi still sees the cosmetics. It is hidden while a
         // relay is configured, because the relay is the better route and the manual address is
@@ -283,6 +298,7 @@ final class CosmeticsPanel {
         }
         if (!enabled) {
             syncStatus.setText(R.string.cosmetics_sync_off);
+            renderPeers(null);
             return;
         }
         CosmeticSyncModule module = CosmeticSyncModule.peek();
@@ -290,11 +306,86 @@ final class CosmeticsPanel {
             // The link only runs during a game session (the overlay manager starts it there), so
             // outside a session the honest status is "starts with the game", not "off".
             syncStatus.setText(R.string.cosmetics_sync_with_game);
+            renderPeers(null);
             return;
         }
         String route = module.routeLabel();
         syncStatus.setText(activity.getString(R.string.cosmetics_sync_seen,
                 module.registry().size(), route));
+        renderPeers(module);
+    }
+
+    /**
+     * Lists the GlowberryClient users whose cosmetics we can see.
+     *
+     * <p>Every entry carries the Glowberry mark — only this client speaks the sync protocol, so a
+     * peer in this list is a Glowberry user by construction — and what they are wearing, resolved
+     * against our own catalogue. That answers both halves of the question directly: who can see my
+     * cosmetics, and whose cosmetics I can see.
+     */
+    private void renderPeers(CosmeticSyncModule module) {
+        if (peersContainer == null) return;
+        peersContainer.removeAllViews();
+        if (module == null) {
+            peersContainer.addView(peerLine(activity.getString(R.string.cosmetics_peers_none)));
+            return;
+        }
+        java.util.List<CosmeticSyncProtocol.Advert> peers = module.registry().snapshot();
+        if (peers.isEmpty()) {
+            peersContainer.addView(peerLine(activity.getString(R.string.cosmetics_peers_none)));
+            return;
+        }
+        for (CosmeticSyncProtocol.Advert peer : peers) {
+            peersContainer.addView(buildPeerRow(module, peer));
+        }
+    }
+
+    /** One peer row: the Glowberry mark, the peer's name, and what they are wearing. */
+    private View buildPeerRow(CosmeticSyncModule module, CosmeticSyncProtocol.Advert peer) {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(3), 0, dp(3));
+        row.addView(GlowberryBadge.create(activity, compact));
+
+        LinearLayout labels = new LinearLayout(activity);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        TextView name = new TextView(activity);
+        name.setText(peer.name.isEmpty() ? peer.peerId : peer.name);
+        name.setTextSize(compact ? 11f : 12f);
+        name.setTextColor(0xFFE6E9EC);
+        labels.addView(name);
+        TextView wearing = new TextView(activity);
+        wearing.setText(peerWearingLine(peer));
+        wearing.setTextSize(compact ? 9f : 10f);
+        wearing.setTextColor(0xFF8F979F);
+        labels.addView(wearing);
+        row.addView(labels, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return row;
+    }
+
+    /** "Wearing: <cape / accessory / pet>", or "Wearing: nothing" when the set is empty. */
+    private String peerWearingLine(CosmeticSyncProtocol.Advert peer) {
+        java.util.List<String> parts = new ArrayList<>();
+        CosmeticCatalog.Cape cape = CosmeticCatalog.equippedCape(peer.capeId);
+        CosmeticCatalog.Accessory accessory = CosmeticCatalog.equippedAccessory(peer.accessoryId);
+        CosmeticCatalog.Pet pet = CosmeticCatalog.equippedPet(peer.petId);
+        if (cape != null) parts.add(cape.name);
+        if (accessory != null) parts.add(accessory.name);
+        if (pet != null) parts.add(pet.name);
+        if (parts.isEmpty()) return activity.getString(R.string.cosmetics_peer_wearing_none);
+        return activity.getString(R.string.cosmetics_peer_wearing,
+                android.text.TextUtils.join(", ", parts));
+    }
+
+    private TextView peerLine(String text) {
+        TextView line = new TextView(activity);
+        line.setText(text);
+        line.setTextSize(compact ? 9f : 10f);
+        line.setTextColor(0xFF8F979F);
+        line.setPadding(0, dp(2), 0, dp(2));
+        return line;
     }
 
     // ---- Dropdowns -----------------------------------------------------------------------
