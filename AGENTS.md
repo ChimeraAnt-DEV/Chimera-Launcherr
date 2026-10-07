@@ -1460,3 +1460,28 @@ pointer rather than the launcher guessing at it. `NativeCosmeticsBridge.applyCap
 path: PNG → engine image → swap at `SerializedSkinRef + 0xa8`. Fail-closed everywhere: no loader, a
 bad PNG, or a null skin address leaves the vanilla cape alone, and an unmatched signature keeps the
 resource pack.
+
+### Preview occlusion and quality
+- **The cape is clipped against the body with a real depth buffer** (`PreviewDepthBuffer`), not a
+  whole-cape before/after choice. The cape hangs just outside the back plane while the body spans a
+  volume in front of it, so no whole-object order is correct at most camera angles — part of the
+  cloth is always nearer than the skin and part farther, which is why the cape "showed through the
+  skin". The body's faces are recorded per pixel and each cape quad is drawn only where it is at
+  least as near as the skin. **Smaller depth is nearer** (the camera projects `distance - z2`;
+  `SkinModelTest` pins it), so the buffer keeps the *minimum* depth. `PreviewDepthBufferTest`
+  pins the rule — including that an empty pixel never occludes and that a nearer surface wins.
+- The frame is drawn at **2x** into an offscreen bitmap and scaled down, so cloth edges and the
+  silhouette are anti-aliased instead of jagged (the "low quality preview" complaint).
+- **The cape size is correct, and was never actually thin.** Measured, the cloth projects to
+  roughly 12.2 x 17.1 model px versus vanilla's 10 x 16 — slightly *larger* than vanilla. The
+  "thin" appearance was the occlusion bug hiding most of the cloth plus edge-on viewing angles, not
+  a geometry error. `CapeSimulator` is 9x11 over a 0.625 x 1.0 block quad; `CapeGeometry` is already
+  a 16-segment chain.
+
+### Java Edition renderer code does not apply
+This is a **Bedrock Edition** launcher (`namespace`/`applicationId` `org.chimeramc.client`, no
+`libminecraftpe` Java API). The Java Edition `LayerRenderer`/`PlayerRenderer`/`NativeImage`/
+`DynamicTexture` classes (`net.minecraft.client.*`, `com.mojang.blaze3d.*`) do not exist here and
+cannot compile or run. `MinecraftActivity` extends the game's `com.mojang.minecraftpe.MainActivity`.
+Cosmetics reach Bedrock through the generated resource pack plus the native seams documented above,
+not through an entity-layer renderer.
