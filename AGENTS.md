@@ -1448,3 +1448,15 @@ stripped binary. Feeding it a valid image therefore needs an `mce::Image` the *e
 own loader); the launcher cannot synthesise one whose internal buffer pointer is correct. That is
 the remaining piece — a data problem, not an offset problem. The render seam itself is
 `LivePlayerRenderer` slot 17 (see above).
+
+### Engine image loader — the cape's PNG → `mce::Image` path
+`mce::ImageUtils::loadImageFromMemory(mce::Image &out, ImageFormat, const unsigned char *, size_t, bool)`
+returns `brstd::expected<void, error_condition>` via the hidden sret pointer in `x8`. The class
+exports no symbol, so it is resolved by a per-version byte signature (`imageLoaderSig` in the rules);
+the pinned pattern matches **exactly once** at `0x14df7ce4` in 1.26.60.28. `BuildCapeImageFromPng`
+calls it with custom PNG bytes and gets back a fully **engine-constructed** `0x30`-byte `mce::Image`
+— which is what makes `SwapCapeImage` usable, because the engine fills the struct's internal buffer
+pointer rather than the launcher guessing at it. `NativeCosmeticsBridge.applyCapePng` is the whole
+path: PNG → engine image → swap at `SerializedSkinRef + 0xa8`. Fail-closed everywhere: no loader, a
+bad PNG, or a null skin address leaves the vanilla cape alone, and an unmatched signature keeps the
+resource pack.
