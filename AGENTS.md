@@ -561,13 +561,15 @@ single-section invariant.
 - Tests (no mocks): `TrajectorySolverTest`, `ReachIndicatorTest`, `VelocitySmootherTest`,
   `HitPredictorTest`, `KillCreditRegistryTest`, `PvpSuiteModulesTest`.
 
-## Native entity/camera feed — what is and is not reachable (verified against 1.26.50.04_RC3 and 1.26.60.28)
+## Native entity/camera feed — what is and is not reachable (verified against 1.26.50.04_RC3, 1.26.60.28 and 1.26.60.30)
 Verified by downloading the real `lib/arm64-v8a/libminecraftpe.so`. First against `26-50-arm64-v8a`
 (363,050,262-byte APK; the `.so` is stored deflated at 98,404,093 bytes so only that range needs
 fetching, then inflate with a raw zlib stream). Then re-verified independently against
 `26-60-28` (382,360,914-byte APK from mcpedl.org, `file_id` 7572 -> `minecraft-26-60-28.apk`;
-`libminecraftpe.so` is 368,150,880 bytes, deflate ratio ~0.30). Do not re-run this RE from scratch;
-these are the conclusions.
+`libminecraftpe.so` is 368,150,880 bytes, deflate ratio ~0.30), and again against `26-60-30`
+(386,141,547-byte APK, `file_id` 7618 -> `minecraft-26-60-30.apk`; `.so` is 370,379,104 bytes).
+Do not re-run this RE from scratch; these are the conclusions.
+
 
 - **Game classes are stripped of exported symbols.** The 90,665 defined dynamic symbols in
   1.26.60.28 are third-party only (v8/cohtml/webrtc/Xal/xbox/leveldb/`std`). There is no
@@ -598,6 +600,35 @@ these are the conclusions.
   strings exist -- so they cannot be xref'd via the vtable structures. Finding the function that
   reads a player's position needs a disassembler pass over the 220 MB `.text`; `resolveVtableFunction`
   gives a vtable, but a static vtable address alone does not yield a live `Actor*`.
+- **The RTTI seams survive the newest build (re-verified on 1.26.60.30, `.so` 370,379,104 bytes).**
+  Emulating the `Vtable.cpp` algorithm against `.rela.dyn` (1,055,159 entries) resolves, by RTTI name
+  with **no per-build code address**:
+  - `14ClientInstance` typeinfo `0x15364468`, vtable address point `0x15363398`, **slot 31 ->
+    `0xb0fbd7c`** (the local-player accessor the Voice nametag/position feed hooks);
+  - `18LivePlayerRenderer` typeinfo `0x15353670`, vtable `0x15352bc8`, **slot 17 -> `0xaf98e28`**
+    (the player-render feed / cosmetics render seam);
+  - `20ClientNetworkHandler` typeinfo `0x1541fd88`, vtable `0x1541eb68`, **slot 40 -> `0xb8fcc9c`**
+    (the player-join packet seam).
+  `LocalPlayer` also resolves (vtable `0x154ccda0`), but its primary vtable is the pure-virtual
+  interface base — slots 0,1,4,5 are identical to `Player`'s — the same shared-base pattern as
+  1.26.60.28, so it does not yield a live `Actor*` on its own.
+- **The byte-pattern rules DO drift on the newest build; the RTTI seams do not.** Re-running the
+  bundled `1.26.50.00` signatures against 1.26.60.30 `.text` (`0x7cfd000`, size `0xd3a8700`):
+  `pauseMenuDtorSig` 0 hits, `hudScreenOpenSig` 0 hits, `pauseMenuOpenSig` 2 hits (ambiguous, first
+  is wrong), `hudScreenDtorSig` 1 hit. The pinned `imageLoaderSig` matches **0** times. This is the
+  concrete evidence that a byte-pattern feed needs a fresh pattern per build, while the
+  `isShowingMenuVtableIndex` / `playerRenderVtableIndex` / `packetReadVtableIndex` slots resolve by
+  RTTI name across 1.26.50 → 1.26.60.30.
+- **A fresh image-loader pattern is derivable.** `mce::ImageUtils::loadImageFromMemory`'s
+  "loadImageFromMemory" string sits at `.rodata 0x2de856a`; its function prologue was located by
+  scanning `.text` backwards from the string xref (`ADRP`+`ADD` to the string at `0x15002824`) to
+  the enclosing frame prologue at **`0x1500257c`**. The 1.26.60.28 function started
+  `FF 43 04 D1 FD 7B 0B A9 ...`; the 1.26.60.30 one starts `FD 7B 0C A9 A9 0D 6F FC ...` (a
+  different frame layout), which is why the inherited pattern misses. Deriving the new pattern needs
+  a disassembler pass (available: `llvm-objdump` in the NDK toolchain) — but note the shipped
+  cosmetics path is **fail-closed**: an unmatched `imageLoaderSig` simply leaves the resource-pack
+  fallback in place, so the cosmetic still works via the pack.
+
 - **The *entity* feed a hitbox/crystal/armor/nametag module needs is therefore not derivable
   statically.** A `dynamic_cast` on a live `Actor*` would identify `LocalPlayer`, but there is no
   way to obtain the `Level*`/`ClientInstance*` to start from without either a byte-pattern signature
@@ -1567,6 +1598,16 @@ pointer rather than the launcher guessing at it. `NativeCosmeticsBridge.applyCap
 path: PNG → engine image → swap at `SerializedSkinRef + 0xa8`. Fail-closed everywhere: no loader, a
 bad PNG, or a null skin address leaves the vanilla cape alone, and an unmatched signature keeps the
 resource pack.
+
+- **The `SerializedSkinRef` accessor-name strings do NOT survive 1.26.60.30.** Only `getImageData`
+  (1 hit) and `loadImageFromMemory` (1 hit) are still present in `.rodata`; `getCapeImageData`,
+  `getCapeImageDataCereal`, `getAnimatedImageData`, `getGeometryData`, `getAnimationData`,
+  `getCapeId`, `getSkinColor`, `getIsTrustedSkinFlag`, `getProfileHash` and `SerializedSkinRef` are
+  all **0 hits**. The `+0xa8` cape offset was recovered from those accessors on 1.26.60.28, so on
+  1.26.60.30 it is unconfirmed and `SwapCapeImage` must stay fail-closed (it already is: a null/
+  mismatched skin address leaves the vanilla cape alone). Re-deriving the offset on a new build means
+  the accessor-name route is gone — it needs a different anchor.
+
 
 ### Preview occlusion and quality
 - **The cape is clipped against the body with a real depth buffer** (`PreviewDepthBuffer`), not a
