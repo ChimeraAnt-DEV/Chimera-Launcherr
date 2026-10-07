@@ -217,11 +217,12 @@ public final class CapeResourcePackBuilder {
         // A hand-authored Blockbench export wins over the procedural mesh, so a hat is a sculpted
         // model with its own texture rather than stacked boxes. Its texture is copied verbatim;
         // the procedural kinds keep the painted atlas.
-        String hatModel = AuthoredHatModels.loadFromAssets(assets, accessoryKind(accessory));
+        String hatModel = AuthoredHatModels.loadFromAssets(assets,
+                accessory == null ? null : accessory.modelId);
         byte[] hatTexture = null;
         if (hatModel != null) {
             hatTexture = readAsset(assets, AuthoredHatModels.DIR,
-                    AuthoredHatModels.textureFor(accessoryKind(accessory)));
+                    AuthoredHatModels.textureFor(accessory.modelId));
         }
         if (hatModel == null) {
             hatModel = AuthoredGeometry.loadFromAssets(assets, AuthoredGeometry.ASSET_DIR,
@@ -250,11 +251,11 @@ public final class CapeResourcePackBuilder {
         // model (dragon, parrot, dragonfly, axolotl, wolf) looks sculpted rather than box-stacked.
         // Its own texture is shipped alongside it; the procedural species keep the painted atlas.
         String petModel = AuthoredPetModels.loadFromAssets(assets,
-                pet == null ? null : pet.species);
+                pet == null ? null : pet.modelId);
         byte[] petTexture = null;
         if (petModel != null) {
             petTexture = readAsset(assets, AuthoredPetModels.DIR,
-                    AuthoredPetModels.textureFor(pet.species));
+                    AuthoredPetModels.textureFor(pet.modelId));
         }
         if (petModel == null) {
             petModel = AuthoredGeometry.loadFromAssets(assets, AuthoredGeometry.ASSET_DIR,
@@ -870,23 +871,57 @@ public final class CapeResourcePackBuilder {
      * head rather than orbiting a point inside it.
      */
     static String hatAnimationJson() {
-        return "{\n"
-                + "  \"format_version\": \"1.8.0\",\n"
-                + "  \"animations\": {\n"
-                + "    \"" + HAT_ANIMATION_ID + "\": {\n"
-                + "      \"loop\": true,\n"
-                + "      \"bones\": {\n"
-                + "        \"acc\": {\n"
-                + "          \"rotation\": [\n"
-                + "            \"query.target_x_rotation\",\n"
-                + "            \"query.target_y_rotation\",\n"
-                + "            0.0\n"
-                + "          ]\n"
-                + "        }\n"
-                + "      }\n"
-                + "    }\n"
-                + "  }\n"
-                + "}\n";
+        // The `acc` bone carries the head look, so a hat follows the head. The `ear_l`/`ear_r` and
+        // `tail*` bones are only present on the cat-ears model; a hat without them ignores the
+        // entries, so one accessory animation can serve both. The ears twitch and the tail wags
+        // with a per-segment phase lag, so the chain trails rather than moving as one stick.
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"format_version\": \"1.8.0\",\n");
+        sb.append("  \"animations\": {\n");
+        sb.append("    \"").append(HAT_ANIMATION_ID).append("\": {\n");
+        sb.append("      \"loop\": true,\n");
+        sb.append("      \"bones\": {\n");
+        sb.append("        \"acc\": {\n");
+        sb.append("          \"rotation\": [\n");
+        sb.append("            \"query.target_x_rotation\",\n");
+        sb.append("            \"query.target_y_rotation\",\n");
+        sb.append("            0.0\n");
+        sb.append("          ]\n");
+        sb.append("        },\n");
+        // Ears: a small counter-phase twitch, so they flick independently.
+        sb.append("        \"ear_l\": {\n");
+        sb.append("          \"rotation\": [0.0, 0.0, \"math.sin(query.anim_time * 260) * 6\"]\n");
+        sb.append("        },\n");
+        sb.append("        \"ear_r\": {\n");
+        sb.append("          \"rotation\": [0.0, 0.0, \"math.sin(query.anim_time * 260 + 180) * 6\"]\n");
+        sb.append("        },\n");
+        // Tail: a travelling wag down the segment chain. Each segment lags the one above it, and
+        // the idle sway rises with speed so the tail streams while the player runs.
+        String[] tailBones = {"tail", "tail_1", "tail_2", "tail_3", "tail_4", "tail_tip"};
+        for (int i = 0; i < tailBones.length; i++) {
+            double phase = i * 26.0;
+            sb.append("        \"").append(tailBones[i]).append("\": {\n");
+            sb.append("          \"rotation\": [\n");
+            sb.append("            \"math.sin(query.anim_time * 150 + ").append(trim(phase))
+                    .append(") * 7\",\n");
+            sb.append("            \"math.sin(query.anim_time * 190 + ").append(trim(phase + 40))
+                    .append(") * (6 + math.clamp(query.modified_move_speed, 0.0, 1.0) * 16)\",\n");
+            sb.append("            0.0\n");
+            sb.append("          ]\n");
+            sb.append("        }");
+            sb.append(i < tailBones.length - 1 ? ",\n" : "\n");
+        }
+        sb.append("      }\n");
+        sb.append("    }\n");
+        sb.append("  }\n");
+        sb.append("}\n");
+        return sb.toString();
+    }
+
+    /** A whole-number Molang literal, so the JSON does not carry a trailing {@code .0}. */
+    private static String trim(double value) {
+        return value == Math.rint(value) ? String.valueOf((long) value) : String.valueOf(value);
     }
 
     /**

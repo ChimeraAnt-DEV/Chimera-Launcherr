@@ -1,0 +1,199 @@
+{
+ "format_version": "1.12.0",
+ "minecraft:geometry": [
+  {
+   "description": {
+    "identifier": "geometry.glow_hat_mushroom_green",
+    "texture_width": 128,
+    "texture_height": 128,
+    "visible_bounds_width": 3,
+    "visible_bounds_height": 3,
+    "visible_bounds_offset": [
+     0,
+     2,
+     0
+    ]
+   },
+   "bones": [
+    {
+     "name": "hat",
+     "pivot": [
+      0,
+      32,
+      0
+     ],
+     "cubes": [
+      {
+       "origin": [
+        -72.1,
+        29,
+        -3.85
+       ],
+       "size": [
+        12.2,
+        4,
+        12.2
+       ],
+       "uv": {
+        "west": {
+         "uv": [
+          36,
+          71
+         ],
+         "uv_size": [
+          -12,
+          -4
+         ]
+        },
+        "east": {
+         "uv": [
+          70,
+          112
+         ],
+         "uv_size": [
+          -12,
+          -4
+         ]
+        },
+        "up": {
+         "uv": [
+          0,
+          92
+         ],
+         "uv_size": [
+          12,
+          12
+         ]
+        },
+        "down": {
+         "uv": [
+          24,
+          128
+         ],
+         "uv_size": [
+          12,
+          -12
+         ]
+        },
+        "south": {
+         "uv": [
+          70,
+          116
+         ],
+         "uv_size": [
+          -12,
+          -4
+         ]
+        },
+        "north": {
+         "uv": [
+          68,
+          104
+         ],
+         "uv_size": [
+          -12,
+          -4
+         ]
+        }
+       },
+       "pivot": [
+        -33,
+        29,
+        1
+       ],
+       "rotation": [
+        -165,
+        0,
+        180
+       ]
+      },
+      {
+       "origin": [
+        -70.1,
+        33,
+        -1.85
+       ],
+       "size": [
+        8.2,
+        4,
+        8.2
+       ],
+       "uv": {
+        "west": {
+         "uv": [
+          75,
+          92
+         ],
+         "uv_size": [
+          -8,
+          -4
+         ]
+        },
+        "east": {
+         "uv": [
+          75,
+          88
+         ],
+         "uv_size": [
+          -8,
+          -4
+         ]
+        },
+        "up": {
+         "uv": [
+          16,
+          69
+         ],
+         "uv_size": [
+          8,
+          8
+         ]
+        },
+        "down": {
+         "uv": [
+          52,
+          128
+         ],
+         "uv_size": [
+          8,
+          -8
+         ]
+        },
+        "south": {
+         "uv": [
+          48,
+          61
+         ],
+         "uv_size": [
+          -8,
+          -4
+         ]
+        },
+        "north": {
+         "uv": [
+          75,
+          96
+         ],
+         "uv_size": [
+          -8,
+          -4
+         ]
+        }
+       },
+       "pivot": [
+        -33,
+        29,
+        1
+       ],
+       "rotation": [
+        -165,
+        0,
+        180
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

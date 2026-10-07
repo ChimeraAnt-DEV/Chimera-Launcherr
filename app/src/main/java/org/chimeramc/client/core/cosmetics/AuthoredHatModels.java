@@ -1,19 +1,21 @@
 package org.chimeramc.client.core.cosmetics;
 
 import java.io.File;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /**
- * The hand-authored hat meshes, one per accessory kind, loaded from the pack's assets.
+ * The hand-authored hat meshes, keyed by catalogue accessory id, loaded from the pack's assets.
  *
- * <p>The procedural {@link AccessoryGeometry} stacks boxes; a real Blockbench export is a sculpted
- * hat with its own UV-mapped texture. This maps an {@link CosmeticCatalog.AccessoryKind} to its
- * authored model and texture; {@link CapeResourcePackBuilder} asks it first and falls back to the
- * procedural mesh when the asset is absent. The accessory geometry always carries a single
- * {@code acc} bone pivoted at the neck (0, 24, 0), which the pack's
- * {@code animation.chimera_hat_tilt} turns by the head's look — so an authored model named
- * {@code acc} follows the head automatically. A model with a different root bone is retargeted.
+ * <p>The procedural {@link AccessoryGeometry} stacks boxes; these are real Blockbench exports with
+ * their own UV-mapped textures (see {@code resources/cosmetics/models/hats}). The catalogue id is
+ * the file base name, so {@code orig_witch} maps to {@code orig_witch.geo.json} with no separate
+ * table — adding a hat is a file plus one catalogue entry.
+ *
+ * <p>{@link #IDS} is the single source of truth for which cosmetic ids are authored; the catalogue
+ * and the pack builder both read it, so a file and a catalogue entry cannot drift apart.
  */
 public final class AuthoredHatModels {
 
@@ -21,60 +23,57 @@ public final class AuthoredHatModels {
     public static final String DIR = "cosmetics/models/hats";
 
     /**
-     * Accessory kind to authored-model file. Only kinds with a real export are listed; the rest
-     * keep the procedural mesh. Adding a hat is a file plus one entry here.
+     * Every authored accessory id. An id that is not here keeps the procedural mesh. The ids match
+     * both the catalogue entry and the asset file name.
      */
-    private static final Map<CosmeticCatalog.AccessoryKind, String> FILES = new LinkedHashMap<>();
-
-    static {
-        FILES.put(CosmeticCatalog.AccessoryKind.CAP, "cap.geo.json");
-        FILES.put(CosmeticCatalog.AccessoryKind.BEANIE, "beanie.geo.json");
-        FILES.put(CosmeticCatalog.AccessoryKind.CROWN, "crown.geo.json");
-        FILES.put(CosmeticCatalog.AccessoryKind.TOPHAT, "tophat.geo.json");
-        FILES.put(CosmeticCatalog.AccessoryKind.WIZARD_HAT, "wizard_hat.geo.json");
-        FILES.put(CosmeticCatalog.AccessoryKind.HALO, "halo.geo.json");
-        FILES.put(CosmeticCatalog.AccessoryKind.FLOWER, "flower.geo.json");
-        FILES.put(CosmeticCatalog.AccessoryKind.MASK, "mask.geo.json");
-        FILES.put(CosmeticCatalog.AccessoryKind.EAR, "ear.geo.json");
-    }
+    public static final Set<String> IDS = Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList(
+            // Original models (made for this project).
+            "orig_acorn_cap", "orig_bat_headband", "orig_cat_ears_tail", "orig_cozy_beanie",
+            "orig_halo_blocky", "orig_leaf_crown", "orig_mushroom_cap", "orig_pumpkin",
+            "orig_straw_hat", "orig_witch",
+            // VoxelBear hats (CC BY - see resources/cosmetics/CREDITS.md).
+            "vb_cap_blue", "vb_cap_green", "vb_cap_rainbow", "vb_cardboard_box", "vb_chef_hat",
+            "vb_clown_nose_wig", "vb_crown", "vb_hard_hat", "vb_leprechaun_hat", "vb_mage_hat",
+            "vb_miner_helmet", "vb_mushroom_blue", "vb_mushroom_green", "vb_mushroom_red",
+            "vb_paper_bag", "vb_santa_hat", "vb_straw_hat", "vb_striped_cone_hat",
+            "vb_top_hat_black", "vb_ushanka", "vb_warm_hat_red"
+    )));
 
     private AuthoredHatModels() {
     }
 
-    /** The authored model file for a kind, or null when it has none. */
-    public static String fileFor(CosmeticCatalog.AccessoryKind kind) {
-        return kind == null ? null : FILES.get(kind);
+    /** True when a catalogue accessory id has a hand-authored mesh. */
+    public static boolean hasAuthoredModel(String accessoryId) {
+        return accessoryId != null && IDS.contains(accessoryId);
     }
 
-    /** True when a kind has a hand-authored mesh. */
-    public static boolean hasAuthoredModel(CosmeticCatalog.AccessoryKind kind) {
-        return fileFor(kind) != null;
+    /** The authored model file for an accessory id, or null when it has none. */
+    public static String fileFor(String accessoryId) {
+        return hasAuthoredModel(accessoryId) ? accessoryId + ".geo.json" : null;
     }
 
-    /** The texture file for a kind, or null when it has no authored model. */
-    public static String textureFor(CosmeticCatalog.AccessoryKind kind) {
-        String model = fileFor(kind);
-        return model == null ? null : model.replace(".geo.json", ".png");
+    /** The texture file for an accessory id, or null when it has no authored model. */
+    public static String textureFor(String accessoryId) {
+        return hasAuthoredModel(accessoryId) ? accessoryId + ".png" : null;
     }
 
     /**
-     * Loads a kind's authored model from the pack assets, retargeted to the hat geometry id, and
+     * Loads an accessory's authored model from the pack assets, retargeted to the hat geometry id,
      * with its root bone renamed to {@code acc} so the head-tilt animation drives it.
      *
-     * @return the model JSON, or null when the kind has no model or the asset is missing/bad
+     * @return the model JSON, or null when the id has no model or the asset is missing/bad
      */
-    public static String loadFromAssets(AuthoredGeometry.AssetOpener assets,
-                                        CosmeticCatalog.AccessoryKind kind) {
-        String file = fileFor(kind);
+    public static String loadFromAssets(AuthoredGeometry.AssetOpener assets, String accessoryId) {
+        String file = fileFor(accessoryId);
         if (assets == null || file == null) return null;
         String model = AuthoredGeometry.loadFromAssets(assets, DIR, file,
                 AccessoryGeometry.GEOMETRY_ID);
         return model == null ? null : AccBoneRetarget.apply(model);
     }
 
-    /** Loads a kind's authored model from a directory on disk (used by the JVM tests), or null. */
-    public static String loadFromDir(File dir, CosmeticCatalog.AccessoryKind kind) {
-        String file = fileFor(kind);
+    /** Loads an accessory's authored model from a directory on disk (used by the JVM tests). */
+    public static String loadFromDir(File dir, String accessoryId) {
+        String file = fileFor(accessoryId);
         if (dir == null || file == null) return null;
         String model = AuthoredGeometry.loadFromFile(new File(dir, file),
                 AccessoryGeometry.GEOMETRY_ID);

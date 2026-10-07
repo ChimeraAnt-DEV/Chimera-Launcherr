@@ -44,38 +44,76 @@ public final class AccBoneRetarget {
         JsonArray bones = geos.get(0).getAsJsonObject().getAsJsonArray("bones");
         if (bones == null || bones.size() == 0) return modelJson;
 
-        int rootIndex = -1;
-        String rootName = null;
+        // The head-attach bone is the one the head-look rotation should turn. For a plain hat that
+        // is the single root bone (a hat is one bone at the head top). For a multi-bone model the
+        // root can be at the feet — the cat's root is at (0,0,0) with its ears and tail beneath it —
+        // so rotating the root would swing the whole animal about the ground. The attach point is
+        // therefore the bone that has children and sits highest, which picks the hat root for a
+        // hat and the `ears` bone (at the neck) for the cat, leaving the tail's own chain alone.
+        int attachIndex = -1;
+        double bestY = -Double.MAX_VALUE;
         for (int i = 0; i < bones.size(); i++) {
             JsonObject bone = bones.get(i).getAsJsonObject();
-            String name = nameOf(bone);
-            // The bone no other bone names as its parent is the root.
-            boolean isParent = false;
+            boolean hasChildren = false;
             for (int j = 0; j < bones.size(); j++) {
                 if (j == i) continue;
                 JsonElement parent = bones.get(j).getAsJsonObject().get("parent");
-                if (parent != null && !parent.isJsonNull() && name.equals(parent.getAsString())) {
-                    isParent = true;
+                if (parent != null && !parent.isJsonNull()
+                        && nameOf(bone).equals(parent.getAsString())) {
+                    hasChildren = true;
                     break;
                 }
             }
-            if (!isParent) {
-                rootIndex = i;
-                rootName = name;
-                // Prefer an explicit root (no parent) over a childless leaf.
-                JsonElement parent = bone.get("parent");
-                if (parent == null || parent.isJsonNull()) break;
+            if (!hasChildren) continue;
+            double y = pivotY(bone);
+            if (y > bestY) {
+                bestY = y;
+                attachIndex = i;
             }
         }
-        if (rootIndex < 0) return modelJson;
+        // A single-bone hat has no parent bone: its one bone is the attach point. Fall back to the
+        // topmost root (a bone with no parent), then to the first bone.
+        if (attachIndex < 0) {
+            for (int i = 0; i < bones.size(); i++) {
+                JsonElement parent = bones.get(i).getAsJsonObject().get("parent");
+                if (parent == null || parent.isJsonNull()) {
+                    attachIndex = i;
+                    break;
+                }
+            }
+        }
+        if (attachIndex < 0) attachIndex = 0;
 
+        String oldName = nameOf(bones.get(attachIndex).getAsJsonObject());
         // Already named acc: nothing to do.
-        if (ACC.equals(rootName)) return modelJson;
+        if (ACC.equals(oldName)) return modelJson;
 
-        JsonObject root = bones.get(rootIndex).getAsJsonObject();
-        root.addProperty("name", ACC);
-        root.remove("parent");
+        JsonObject attach = bones.get(attachIndex).getAsJsonObject();
+        attach.addProperty("name", ACC);
+
+        // Every child that named the old bone as its parent must be repointed, or it would hang
+        // from a bone that no longer exists and the child chain (a cat's ears and tail) would
+        // detach from the model.
+        if (oldName != null && !oldName.isEmpty()) {
+            for (int i = 0; i < bones.size(); i++) {
+                if (i == attachIndex) continue;
+                JsonObject bone = bones.get(i).getAsJsonObject();
+                JsonElement parent = bone.get("parent");
+                if (parent != null && !parent.isJsonNull()
+                        && oldName.equals(parent.getAsString())) {
+                    bone.addProperty("parent", ACC);
+                }
+            }
+        }
         return model.toString();
+    }
+
+    /** A bone's pivot Y, or 0 when it has none. */
+    private static double pivotY(JsonObject bone) {
+        JsonElement pivot = bone.get("pivot");
+        if (pivot == null || !pivot.isJsonArray()) return 0.0;
+        JsonArray arr = pivot.getAsJsonArray();
+        return arr.size() >= 2 ? arr.get(1).getAsDouble() : 0.0;
     }
 
     private static String nameOf(JsonObject bone) {

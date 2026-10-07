@@ -124,13 +124,27 @@ public final class CosmeticCatalog {
         public final int color;
         /** Secondary colour for two-tone pieces (cups, wings, straps). */
         public final int accentColor;
+        /**
+         * The authored-model key when this accessory ships a real Blockbench mesh, else null.
+         *
+         * <p>Most ids are their own model key (the asset file base name), but a stored selection can
+         * point at a hand-authored id whose asset predates the catalogue, so the key is carried
+         * explicitly rather than assumed. Null means "use the procedural mesh for {@link #kind}".
+         */
+        public final String modelId;
 
         public Accessory(String id, String name, AccessoryKind kind, int color, int accentColor) {
+            this(id, name, kind, color, accentColor, null);
+        }
+
+        public Accessory(String id, String name, AccessoryKind kind, int color, int accentColor,
+                         String modelId) {
             this.id = id;
             this.name = name;
             this.kind = kind == null ? AccessoryKind.NONE : kind;
             this.color = color;
             this.accentColor = accentColor;
+            this.modelId = modelId;
         }
     }
 
@@ -143,15 +157,23 @@ public final class CosmeticCatalog {
         public final int accentColor;
         /** Body scale relative to the default pet, so a "giant" variant reads as bigger. */
         public final float scale;
+        /** The authored-model key when this pet ships a real Blockbench mesh, else null. */
+        public final String modelId;
 
         public Pet(String id, String name, PetSpecies species, int color, int accentColor,
                    float scale) {
+            this(id, name, species, color, accentColor, scale, null);
+        }
+
+        public Pet(String id, String name, PetSpecies species, int color, int accentColor,
+                   float scale, String modelId) {
             this.id = id;
             this.name = name;
             this.species = species == null ? PetSpecies.CAT : species;
             this.color = color;
             this.accentColor = accentColor;
             this.scale = scale;
+            this.modelId = modelId;
         }
 
         /** Whether this pet animates for the given locomotion. */
@@ -393,6 +415,11 @@ public final class CosmeticCatalog {
                         pal[0], pal[1]));
             }
         }
+
+        // Hand-authored hats, each a real Blockbench mesh with its own texture. The id is the
+        // asset base name, so the catalogue entry and the file cannot drift.
+        addAuthoredHats(accessories);
+
         ACCESSORIES = Collections.unmodifiableList(accessories);
 
         // Pets are the distinct species only. Each species is a separate authored model with its
@@ -401,10 +428,108 @@ public final class CosmeticCatalog {
         // as the same animal tinted, which is not what a cosmetics catalogue should be.
         List<Pet> pets = new ArrayList<>();
         for (PetSpecies species : PetSpecies.values()) {
-            pets.add(new Pet(slug(species.displayName), species.displayName,
-                    species, species.baseColor, species.accentColor, 1f));
+            String id = slug(species.displayName);
+            pets.add(new Pet(id, species.displayName,
+                    species, species.baseColor, species.accentColor, 1f,
+                    AuthoredPetModels.hasAuthoredModel(id) ? id : null));
         }
+        // The hand-authored pets, each a real Blockbench mesh with its own texture, added as extra
+        // entries on top of the per-species defaults. The species controls the gait and the preview
+        // body plan; the model id selects the sculpted mesh.
+        addAuthoredPets(pets);
         PETS = Collections.unmodifiableList(pets);
+    }
+
+    /**
+     * A hand-authored hat: an accessory whose {@code modelId} selects a real Blockbench mesh. The
+     * kind drives the fallback procedural mesh and (for a hat) the head attach point.
+     */
+    private static Accessory authoredHat(String id, String name, AccessoryKind kind,
+                                         int color, int accentColor) {
+        return new Accessory(id, name, kind, color, accentColor, id);
+    }
+
+    /** The 31 hand-authored hats (originals plus the VoxelBear set). */
+    private static void addAuthoredHats(List<Accessory> accessories) {
+        // Original models (made for this project).
+        accessories.add(authoredHat("orig_acorn_cap", "Acorn Cap", AccessoryKind.CAP,
+                0xFF8B5A2B, 0xFFC79A5B));
+        accessories.add(authoredHat("orig_bat_headband", "Bat Headband", AccessoryKind.EAR,
+                0xFF2B2F36, 0xFF6C757D));
+        accessories.add(authoredHat("orig_cat_ears_tail", "Cat Ears & Tail", AccessoryKind.EAR,
+                0xFF6B6B6B, 0xFFEDE7DC));
+        accessories.add(authoredHat("orig_cozy_beanie", "Cozy Beanie", AccessoryKind.BEANIE,
+                0xFF3F6FA8, 0xFFE8EEF5));
+        accessories.add(authoredHat("orig_halo_blocky", "Blocky Halo", AccessoryKind.HALO,
+                0xFFFFD86B, 0xFFFFF3C4));
+        accessories.add(authoredHat("orig_leaf_crown", "Leaf Crown", AccessoryKind.FLOWER,
+                0xFF3F8B3F, 0xFF9BD96B));
+        accessories.add(authoredHat("orig_mushroom_cap", "Mushroom Cap", AccessoryKind.CAP,
+                0xFFB03A2E, 0xFFF2E8D5));
+        accessories.add(authoredHat("orig_pumpkin", "Pumpkin Head", AccessoryKind.MASK,
+                0xFFD2691E, 0xFF3B2A12));
+        accessories.add(authoredHat("orig_straw_hat", "Straw Hat", AccessoryKind.CAP,
+                0xFFD9B44A, 0xFF7A5C22));
+        accessories.add(authoredHat("orig_witch", "Witch Hat", AccessoryKind.WIZARD_HAT,
+                0xFF2E2140, 0xFF7B5BD6));
+
+        // VoxelBear hats (CC BY — see resources/cosmetics/CREDITS.md).
+        accessories.add(authoredHat("vb_cap_blue", "Blue Baseball Cap", AccessoryKind.CAP,
+                0xFF2A6FD8, 0xFFEAF1FB));
+        accessories.add(authoredHat("vb_cap_green", "Green Baseball Cap", AccessoryKind.CAP,
+                0xFF2E7D32, 0xFFEAF7EA));
+        accessories.add(authoredHat("vb_cap_rainbow", "Rainbow Cap", AccessoryKind.CAP,
+                0xFFA82E9E, 0xFFFFD86B));
+        accessories.add(authoredHat("vb_cardboard_box", "Cardboard Box", AccessoryKind.MASK,
+                0xFFB98A55, 0xFF7A5A32));
+        accessories.add(authoredHat("vb_chef_hat", "Chef's Toque", AccessoryKind.CAP,
+                0xFFF5F5F5, 0xFFD9D9D9));
+        accessories.add(authoredHat("vb_clown_nose_wig", "Clown Nose & Wig", AccessoryKind.MASK,
+                0xFFE5484D, 0xFFE8B93A));
+        accessories.add(authoredHat("vb_crown", "Golden Crown", AccessoryKind.CROWN,
+                0xFFC9A227, 0xFFFFD86B));
+        accessories.add(authoredHat("vb_hard_hat", "Hard Hat", AccessoryKind.CAP,
+                0xFFF2B632, 0xFF8A6A14));
+        accessories.add(authoredHat("vb_leprechaun_hat", "Leprechaun Hat", AccessoryKind.TOPHAT,
+                0xFF2E7D32, 0xFFC9A227));
+        accessories.add(authoredHat("vb_mage_hat", "Mage Hat", AccessoryKind.WIZARD_HAT,
+                0xFF3B2E6B, 0xFFB07CE8));
+        accessories.add(authoredHat("vb_miner_helmet", "Miner's Helmet", AccessoryKind.CAP,
+                0xFFF2B632, 0xFFFFF3C4));
+        accessories.add(authoredHat("vb_mushroom_blue", "Blue Mushroom Cap", AccessoryKind.CAP,
+                0xFF3F6FA8, 0xFFE8EEF5));
+        accessories.add(authoredHat("vb_mushroom_green", "Green Mushroom Cap", AccessoryKind.CAP,
+                0xFF2E7D32, 0xFFDCEFD0));
+        accessories.add(authoredHat("vb_mushroom_red", "Red Mushroom Cap", AccessoryKind.CAP,
+                0xFFB03A2E, 0xFFF2E8D5));
+        accessories.add(authoredHat("vb_paper_bag", "Paper Bag", AccessoryKind.MASK,
+                0xFFC7A97B, 0xFF8A6A3A));
+        accessories.add(authoredHat("vb_santa_hat", "Santa Hat", AccessoryKind.BEANIE,
+                0xFFC62828, 0xFFF5F5F5));
+        accessories.add(authoredHat("vb_straw_hat", "Wide Straw Hat", AccessoryKind.CAP,
+                0xFFD9B44A, 0xFF7A5C22));
+        accessories.add(authoredHat("vb_striped_cone_hat", "Striped Cone Hat", AccessoryKind.WIZARD_HAT,
+                0xFFE5484D, 0xFFF5F5F5));
+        accessories.add(authoredHat("vb_top_hat_black", "Black Top Hat", AccessoryKind.TOPHAT,
+                0xFF141418, 0xFF3A3A44));
+        accessories.add(authoredHat("vb_ushanka", "Ushanka", AccessoryKind.BEANIE,
+                0xFF5A4A3A, 0xFFEDE7DC));
+        accessories.add(authoredHat("vb_warm_hat_red", "Red Warm Hat", AccessoryKind.BEANIE,
+                0xFFB03A2E, 0xFFF2E8D5));
+    }
+
+    /** The 5 hand-authored pets. The species sets the gait; the model id selects the mesh. */
+    private static void addAuthoredPets(List<Pet> pets) {
+        pets.add(new Pet("pet_fire_dragon", "Fire Dragon", PetSpecies.DRAGON,
+                0xFF5A2E8C, 0xFFD6A84A, 1.4f, "pet_fire_dragon"));
+        pets.add(new Pet("pet_owl", "Owl", PetSpecies.PARROT,
+                0xFF8A6A3A, 0xFFEDE7DC, 1.1f, "pet_owl"));
+        pets.add(new Pet("pet_seraphim", "Seraphim", PetSpecies.DRAGONFLY,
+                0xFFF0E6C8, 0xFFFFD86B, 1.2f, "pet_seraphim"));
+        pets.add(new Pet("pet_shark", "Shark", PetSpecies.AXOLOTL,
+                0xFF4A6B8A, 0xFFDCE6F0, 1.2f, "pet_shark"));
+        pets.add(new Pet("pet_copper_golem", "Copper Golem", PetSpecies.WOLF,
+                0xFFB87333, 0xFF7A4A1E, 1.1f, "pet_copper_golem"));
     }
 
     /** The accessory silhouettes the catalogue generates, index-aligned with {@link #ACCESSORY_NAMES}. */

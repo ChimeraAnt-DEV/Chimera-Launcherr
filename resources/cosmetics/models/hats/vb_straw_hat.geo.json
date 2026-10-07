@@ -1,0 +1,199 @@
+{
+ "format_version": "1.12.0",
+ "minecraft:geometry": [
+  {
+   "description": {
+    "identifier": "geometry.glow_hat_straw_hat",
+    "texture_width": 64,
+    "texture_height": 64,
+    "visible_bounds_width": 3,
+    "visible_bounds_height": 3,
+    "visible_bounds_offset": [
+     0,
+     2,
+     0
+    ]
+   },
+   "bones": [
+    {
+     "name": "hat",
+     "pivot": [
+      0,
+      32,
+      0
+     ],
+     "cubes": [
+      {
+       "origin": [
+        -6.25,
+        30.75,
+        -2.25
+       ],
+       "size": [
+        8.5,
+        3,
+        8.5
+       ],
+       "uv": {
+        "west": {
+         "uv": [
+          48,
+          48
+         ],
+         "uv_size": [
+          -9,
+          -3
+         ]
+        },
+        "east": {
+         "uv": [
+          48,
+          42
+         ],
+         "uv_size": [
+          -9,
+          -3
+         ]
+        },
+        "up": {
+         "uv": [
+          0,
+          27
+         ],
+         "uv_size": [
+          9,
+          9
+         ]
+        },
+        "down": {
+         "uv": [
+          30,
+          48
+         ],
+         "uv_size": [
+          9,
+          -9
+         ]
+        },
+        "south": {
+         "uv": [
+          48,
+          45
+         ],
+         "uv_size": [
+          -9,
+          -3
+         ]
+        },
+        "north": {
+         "uv": [
+          9,
+          27
+         ],
+         "uv_size": [
+          -9,
+          -3
+         ]
+        }
+       },
+       "pivot": [
+        -1,
+        30.75,
+        1
+       ],
+       "rotation": [
+        -180,
+        0,
+        180
+       ]
+      },
+      {
+       "origin": [
+        -9,
+        30.75,
+        -5
+       ],
+       "size": [
+        14,
+        0.001,
+        14
+       ],
+       "uv": {
+        "west": {
+         "uv": [
+          14,
+          64
+         ],
+         "uv_size": [
+          -14,
+          0
+         ]
+        },
+        "east": {
+         "uv": [
+          14,
+          64
+         ],
+         "uv_size": [
+          -14,
+          0
+         ]
+        },
+        "up": {
+         "uv": [
+          0,
+          50
+         ],
+         "uv_size": [
+          14,
+          14
+         ]
+        },
+        "down": {
+         "uv": [
+          0,
+          50
+         ],
+         "uv_size": [
+          14,
+          -14
+         ]
+        },
+        "south": {
+         "uv": [
+          14,
+          64
+         ],
+         "uv_size": [
+          -14,
+          0
+         ]
+        },
+        "north": {
+         "uv": [
+          14,
+          64
+         ],
+         "uv_size": [
+          -14,
+          0
+         ]
+        }
+       },
+       "pivot": [
+        -1,
+        30.75,
+        1
+       ],
+       "rotation": [
+        -180,
+        0,
+        180
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

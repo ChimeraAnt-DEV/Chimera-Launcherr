@@ -1,0 +1,199 @@
+{
+ "format_version": "1.12.0",
+ "minecraft:geometry": [
+  {
+   "description": {
+    "identifier": "geometry.glow_hat_clown_nose_wig",
+    "texture_width": 32,
+    "texture_height": 32,
+    "visible_bounds_width": 3,
+    "visible_bounds_height": 3,
+    "visible_bounds_offset": [
+     0,
+     2,
+     0
+    ]
+   },
+   "bones": [
+    {
+     "name": "hat",
+     "pivot": [
+      0,
+      32,
+      0
+     ],
+     "cubes": [
+      {
+       "origin": [
+        15.2,
+        25.7,
+        32
+       ],
+       "size": [
+        1.6,
+        1.6,
+        1.05
+       ],
+       "uv": {
+        "west": {
+         "uv": [
+          5,
+          16
+         ],
+         "uv_size": [
+          -1,
+          -2
+         ]
+        },
+        "east": {
+         "uv": [
+          6,
+          16
+         ],
+         "uv_size": [
+          -1,
+          -2
+         ]
+        },
+        "up": {
+         "uv": [
+          6,
+          15
+         ],
+         "uv_size": [
+          2,
+          1
+         ]
+        },
+        "down": {
+         "uv": [
+          8,
+          16
+         ],
+         "uv_size": [
+          2,
+          -1
+         ]
+        },
+        "south": {
+         "uv": [
+          4,
+          16
+         ],
+         "uv_size": [
+          -2,
+          -2
+         ]
+        },
+        "north": {
+         "uv": [
+          2,
+          16
+         ],
+         "uv_size": [
+          -2,
+          -2
+         ]
+        }
+       },
+       "pivot": [
+        8,
+        20,
+        14
+       ],
+       "rotation": [
+        -180,
+        0,
+        180
+       ]
+      },
+      {
+       "origin": [
+        10.5,
+        25.75,
+        22.5
+       ],
+       "size": [
+        11,
+        4,
+        8.25
+       ],
+       "uv": {
+        "west": {
+         "uv": [
+          19,
+          24
+         ],
+         "uv_size": [
+          -8,
+          -4
+         ]
+        },
+        "east": {
+         "uv": [
+          19,
+          20
+         ],
+         "uv_size": [
+          -8,
+          -4
+         ]
+        },
+        "up": {
+         "uv": [
+          0,
+          24
+         ],
+         "uv_size": [
+          11,
+          8
+         ]
+        },
+        "down": {
+         "uv": [
+          0,
+          24
+         ],
+         "uv_size": [
+          11,
+          -8
+         ]
+        },
+        "south": {
+         "uv": [
+          22,
+          28
+         ],
+         "uv_size": [
+          -11,
+          -4
+         ]
+        },
+        "north": {
+         "uv": [
+          22,
+          32
+         ],
+         "uv_size": [
+          -11,
+          -4
+         ]
+        }
+       },
+       "pivot": [
+        8,
+        20,
+        14
+       ],
+       "rotation": [
+        -180,
+        0,
+        180
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
