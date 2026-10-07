@@ -74,7 +74,29 @@ public final class CosmeticCatalog {
         ANTLERS,
         PLUME,
         TRICORN,
-        MORTARBOARD
+        MORTARBOARD;
+
+        /**
+         * Whether the accessory is worn on the head and must follow the head-look.
+         *
+         * <p>Everything anchored at the head box (hats, glasses, a veil, antlers) turns with the
+         * head; the neck and back pieces (scarf, bow tie, backpack, wings) and the beard — which
+         * hangs from the jaw, not the crown — do not. The preview and the in-game head-tilt
+         * animation both read this so a hat cannot track the head in one place and not the other.
+         */
+        public boolean followsHead() {
+            switch (this) {
+                case SCARF:
+                case BACKPACK:
+                case WINGS:
+                case BOWTIE:
+                case BEARD:
+                case NONE:
+                    return false;
+                default:
+                    return true;
+            }
+        }
     }
 
     /** What a pet can do; a species advertises which of these it animates for. */

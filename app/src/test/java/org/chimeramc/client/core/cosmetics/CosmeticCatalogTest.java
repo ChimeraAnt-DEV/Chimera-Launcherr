@@ -84,4 +84,26 @@ public class CosmeticCatalogTest {
         assertTrue("wings must sit behind the cape", CosmeticLayering.wingsBehindCape());
         assertTrue("cape must sit behind the body", CosmeticLayering.capeBehindBody());
     }
+
+    /**
+     * A hat, glasses, a veil or antlers turns with the head; a scarf, bow tie, backpack, wings and
+     * the beard do not. The preview and the in-game head-tilt animation both read this rule, so a
+     * hat cannot track the head in the preview while sitting bolt-upright in the game.
+     */
+    @Test
+    public void headWornAccessoriesFollowTheHeadAndNeckBackPiecesDoNot() {
+        assertTrue(CosmeticCatalog.AccessoryKind.TOPHAT.followsHead());
+        assertTrue(CosmeticCatalog.AccessoryKind.CROWN.followsHead());
+        assertTrue(CosmeticCatalog.AccessoryKind.GLASSES.followsHead());
+        assertTrue(CosmeticCatalog.AccessoryKind.VEIL.followsHead());
+        assertTrue(CosmeticCatalog.AccessoryKind.ANTLERS.followsHead());
+
+        assertFalse(CosmeticCatalog.AccessoryKind.SCARF.followsHead());
+        assertFalse(CosmeticCatalog.AccessoryKind.BOWTIE.followsHead());
+        assertFalse(CosmeticCatalog.AccessoryKind.BACKPACK.followsHead());
+        assertFalse(CosmeticCatalog.AccessoryKind.WINGS.followsHead());
+        // The beard hangs from the jaw, not the crown, so it does not turn with the head look.
+        assertFalse(CosmeticCatalog.AccessoryKind.BEARD.followsHead());
+        assertFalse(CosmeticCatalog.AccessoryKind.NONE.followsHead());
+    }
 }

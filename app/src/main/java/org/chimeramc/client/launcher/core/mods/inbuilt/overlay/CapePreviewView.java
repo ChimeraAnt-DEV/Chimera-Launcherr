@@ -6,6 +6,8 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -13,6 +15,7 @@ import org.chimeramc.client.core.cosmetics.CapePatterns;
 import org.chimeramc.client.core.cosmetics.CapeSimulator;
 import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
 import org.chimeramc.client.core.cosmetics.CosmeticLayering;
+import org.chimeramc.client.core.cosmetics.HeadLookTransform;
 import org.chimeramc.client.core.cosmetics.AuthoredHatModels;
 import org.chimeramc.client.core.cosmetics.AuthoredGeometry;
 import org.chimeramc.client.core.cosmetics.AuthoredPetModels;
@@ -22,6 +25,7 @@ import org.chimeramc.client.core.cosmetics.PlayerSkinProvider;
 import org.chimeramc.client.core.cosmetics.PreviewDepthBuffer;
 import org.chimeramc.client.core.cosmetics.PreviewLighting;
 import org.chimeramc.client.core.cosmetics.QuadDepthSorter;
+import org.chimeramc.client.core.cosmetics.SkinAlphaFilter;
 import org.chimeramc.client.core.cosmetics.SkinModel;
 import org.chimeramc.client.core.cosmetics.geometry.BedrockGeometry;
 import org.chimeramc.client.core.cosmetics.geometry.BedrockGeometryParser;
@@ -66,10 +70,24 @@ public class CapePreviewView extends View {
     /** Idle spin, in degrees per second, so the character keeps showing its depth. */
     private static final float IDLE_SPIN_DEG_PER_SEC = 14f;
 
+    /**
+     * The preview's own head look, in degrees, animated so a worn hat visibly tracks the head — the
+     * preview counterpart of the pack's {@code animation.chimera_hat_tilt}. The head box and the
+     * accessory are rotated by the same angles about the same neck pivot, so they cannot detach.
+     */
+    private float headPitchDeg;
+    private float headYawDeg;
+    private float headLookMs;
+
     private static final float DEFAULT_PITCH = 18f;
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint pixelPaint = new Paint();
+    /**
+     * The alpha-test cutout pass. Unfiltered and un-anti-aliased so the mask's 0/255 alpha cuts a
+     * crisp edge (the 2x supersample handles the final anti-aliasing), matching a GPU alpha test.
+     */
+    private final Paint maskPaint = new Paint();
     private final Path path = new Path();
     private final float[] projected = new float[3];
     private final float[] corners = new float[8];
@@ -79,6 +97,17 @@ public class CapePreviewView extends View {
     /** Per-face cropped textures, indexed by box then face. Built once per skin. */
     private Bitmap[][] baseFaceCrops;
     private Bitmap[][] overlayFaceCrops;
+    /**
+     * Per-face alpha cutout masks, indexed by box then face. Built once per skin.
+     *
+     * <p>{@code drawBitmapMesh} bilinear-filters the face, which smears a texture's transparent
+     * background into its opaque texels and makes the body read as hollow. The mask is a hard-edged
+     * copy of the face's alpha (drawn unfiltered with {@code DST_IN}) that restores a crisp edge —
+     * the preview's alpha test. A face that is fully opaque, or fully transparent, gets {@code null}
+     * here and skips the extra pass.
+     */
+    private Bitmap[][] baseFaceMasks;
+    private Bitmap[][] overlayFaceMasks;
 
     private final PlayerSkinProvider.SkinBitmap skin;
     private CosmeticCatalog.Cape cape;
@@ -170,6 +199,8 @@ public class CapePreviewView extends View {
     /** A projected textured quad, held until it is sorted and drawn. */
     private static final class FaceQuad {
         Bitmap texture;
+        /** The hard-edged alpha mask for {@link #texture}, or null when the face needs no cutout. */
+        Bitmap mask;
         final float[] verts = new float[8];
         /** The owning box's centroid depth; the primary painter's key (see QuadDepthSorter). */
         float groupDepth;
@@ -250,10 +281,12 @@ public class CapePreviewView extends View {
 
         accessoryMesh = boxes;
         accessoryMeshTextureFile = AuthoredHatModels.textureFor(accessory.modelId);
-        // A new accessory means a new atlas; drop the cached decode so the next frame reloads it.
+        // A new accessory means a new atlas; drop the cached decode so the next frame reloads it,
+        // and drop the cutout masks keyed on the old atlas's rects.
         if (accessoryAtlas != null && !accessoryAtlas.isRecycled()) accessoryAtlas.recycle();
         accessoryAtlas = null;
         accessoryAtlasLoaded = false;
+        meshMaskCache.clear();
     }
 
     /** Opens a pack asset, matching the {@link AuthoredGeometry.AssetOpener} contract. */
@@ -294,6 +327,7 @@ public class CapePreviewView extends View {
         if (petAtlas != null && !petAtlas.isRecycled()) petAtlas.recycle();
         petAtlas = null;
         petAtlasLoaded = false;
+        meshMaskCache.clear();
     }
 
     /** The gait the equipped pet is currently animating; the panel offers the ones it supports. */
@@ -343,10 +377,14 @@ public class CapePreviewView extends View {
     }
 
     /**
-     * Runs the frame callback only while something is actually moving: the idle turn, a finger
-     * on the model, or an animated cape. Reduced motion leaves the character static rather than
-     * redrawing identical frames forever.
+     * Stops the frame callback. Called when the host panel is hidden so an off-screen preview does
+     * not keep driving Choreographer frames; {@link #syncAnimation()} restarts it when the view is
+     * shown again.
      */
+    public void stopPreview() {
+        stopAnimation();
+    }
+
     private void syncAnimation() {
         boolean want = DynamicAnim.areAnimationsEnabled() && getVisibility() == VISIBLE && attached
                 && (pet != null || cape != null);
@@ -394,6 +432,33 @@ public class CapePreviewView extends View {
             if (petPhase > 1f) petPhase -= (float) Math.floor(petPhase);
             petPose.compute(pet.species, petLocomotion, petPhase);
         }
+        // A slow idle head look, so a worn hat is visibly on the head rather than a static block
+        // that only lines up at one angle. Bounded and gentle: the character glances, it does not
+        // swivel. The accessory applies these angles only when it is a head-worn piece.
+        headLookMs += dt * 1000f;
+        float[] look = headLookScratch;
+        HeadLookTransform.idleLook((long) headLookMs, look);
+        headPitchDeg = look[0];
+        headYawDeg = look[1];
+    }
+
+    private final float[] headLookScratch = new float[2];
+    private final float[] headPointScratch = new float[3];
+    private final float[] headNormalScratch = new float[3];
+
+    /**
+     * Rotates a model-space point by the current head look about the neck pivot, writing into
+     * {@code out}.
+     *
+     * <p>Applied to the head box's corners and to the worn accessory's mesh corners with the same
+     * angles and the same pivot, so the hat and the head move as one — the preview's equivalent of
+     * the pack's {@code acc} bone being driven by the head-look queries.
+     */
+    private void applyHeadLook(float x, float y, float z, float[] out) {
+        out[0] = x;
+        out[1] = y;
+        out[2] = z;
+        HeadLookTransform.apply(headPitchDeg, headYawDeg, out);
     }
 
     // ---- Touch: drag to spin, flick to set it turning -----------------------------------
@@ -798,16 +863,35 @@ public class CapePreviewView extends View {
         List<SkinModel.Box> boxes = SkinModel.boxes();
         for (int b = 0; b < boxes.size(); b++) {
             SkinModel.Box box = boxes.get(b);
+            // The head box (and its overlay) follows the preview's idle head look; every other box
+            // is unrotated. The accessory pass uses the same angles, so a worn hat and the head move
+            // together instead of the hat floating off a turning head.
+            boolean head = "head".equals(box.id);
             for (SkinModel.Face face : SkinModel.Face.values()) {
-                if (!camera.faceVisible(face)) continue;
+                if (head) {
+                    float[] n = headNormalScratch;
+                    n[0] = face.nx;
+                    n[1] = face.ny;
+                    n[2] = face.nz;
+                    HeadLookTransform.applyVector(headPitchDeg, headYawDeg, n);
+                    if (!camera.faceVisibleNormal(n[0], n[1], n[2])) continue;
+                } else if (!camera.faceVisible(face)) {
+                    continue;
+                }
 
                 float[][] modelCorners = box.faceCorners(face);
                 FaceQuad quad = new FaceQuad();
 
                 float depthSum = 0f;
                 for (int c = 0; c < 4; c++) {
-                    projectPoint(modelCorners[c][0], modelCorners[c][1], modelCorners[c][2],
-                            scale, originX, originY);
+                    float[] mc = modelCorners[c];
+                    if (head) {
+                        applyHeadLook(mc[0], mc[1], mc[2], headPointScratch);
+                        projectPoint(headPointScratch[0], headPointScratch[1], headPointScratch[2],
+                                scale, originX, originY);
+                    } else {
+                        projectPoint(mc[0], mc[1], mc[2], scale, originX, originY);
+                    }
                     quad.verts[c * 2] = projected[0];
                     quad.verts[c * 2 + 1] = projected[1];
                     depthSum += projected[2];
@@ -822,6 +906,7 @@ public class CapePreviewView extends View {
                 projectPoint(box.cx, box.cy, box.cz, scale, originX, originY);
                 quad.groupDepth = projected[2];
                 quad.texture = baseFaceCrops == null ? null : baseFaceCrops[b][face.ordinal()];
+                quad.mask = baseFaceMasks == null ? null : baseFaceMasks[b][face.ordinal()];
                 float persp = camera.perspectiveAt(box.cx, box.cy, box.cz);
                 // Black overlay at an alpha the light model derives from the face normal, so the
                 // brightness runs continuously around the model instead of flipping at an edge.
@@ -837,6 +922,8 @@ public class CapePreviewView extends View {
                     overlayQuad.groupDepth = quad.groupDepth + 0.5f;
                     overlayQuad.depth = quad.depth + 0.5f;
                     overlayQuad.texture = over;
+                    overlayQuad.mask = overlayFaceMasks == null ? null
+                            : overlayFaceMasks[b][face.ordinal()];
                     // Hats, hair and eyes live on this layer; shading it as hard as the base would
                     // dim the very detail it exists to show.
                     overlayQuad.tint =
@@ -859,13 +946,44 @@ public class CapePreviewView extends View {
         for (FaceQuad quad : drawList) {
             if (quad.texture != null) {
                 canvas.drawBitmapMesh(quad.texture, 1, 1, quad.verts, 0, null, 0, pixelPaint);
-            }
-            if (Color.alpha(quad.tint) > 0) {
+                // The shading overlay is painted before the cutout so the cutout also removes the
+                // tint from the transparent texels — otherwise a translucent black film would be
+                // re-laid over the holes and the body would still read as hollow.
+                if (Color.alpha(quad.tint) > 0) {
+                    paint.setShader(null);
+                    paint.setColor(quad.tint);
+                    drawQuad(canvas, quad.verts);
+                }
+                // Alpha test: cut the bilinear-blended transparent edge back to a hard silhouette,
+                // or the body reads as hollow through its own semi-transparent skin.
+                applyAlphaCutout(canvas, quad.mask, quad.verts);
+            } else if (Color.alpha(quad.tint) > 0) {
                 paint.setShader(null);
                 paint.setColor(quad.tint);
                 drawQuad(canvas, quad.verts);
             }
         }
+    }
+
+    /**
+     * Applies a face's alpha mask to the quad just textured into {@code verts}, discarding texels
+     * below the alpha threshold — the preview's equivalent of a GPU {@code alphaTest} / shader
+     * {@code discard}.
+     *
+     * <p>The mask is a hard-edged 0/255 copy of the face's alpha; drawing it unfiltered with
+     * {@code DST_IN} multiplies the destination's alpha by the mask, so a transparent texel becomes
+     * fully transparent instead of a soft blend. It is skipped when the face has no mask (fully
+     * opaque, so nothing to cut) or the quad is degenerate.
+     */
+    private void applyAlphaCutout(Canvas canvas, Bitmap mask, float[] verts) {
+        if (mask == null) return;
+        if (Math.abs(verts[2] - verts[0]) < 0.5f && Math.abs(verts[4] - verts[0]) < 0.5f) return;
+        maskPaint.reset();
+        maskPaint.setAntiAlias(false);
+        maskPaint.setFilterBitmap(false);
+        maskPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
+        canvas.drawBitmapMesh(mask, 1, 1, verts, 0, null, 0, maskPaint);
+        maskPaint.setXfermode(null);
     }
 
     /**
@@ -1223,10 +1341,14 @@ public class CapePreviewView extends View {
      */
     private void drawAccessoryFront(Canvas canvas, float originX, float originY, float scale) {
         if (accessory == null || accessory.kind == CosmeticCatalog.AccessoryKind.NONE) return;
+        // A head-worn piece turns with the head; a neck/back piece stays put. The same rule drives
+        // the authored mesh and the procedural boxes below, so both track the head identically.
+        headLookBoxes = accessory.kind.followsHead();
         // An authored Blockbench mesh is the exact model the in-game pack draws, so prefer it over
         // the procedural box stack whenever the accessory has one.
         if (accessoryMesh != null) {
             drawAuthoredMesh(canvas, originX, originY, scale);
+            headLookBoxes = false;
             return;
         }
         paint.setShader(null);
@@ -1515,7 +1637,7 @@ public class CapePreviewView extends View {
         if (accessoryMesh == null || accessoryMesh.isEmpty()) return;
         int fallback = accessory == null ? 0xFFB0B0B0 : accessory.color;
         drawAuthoredMeshAt(canvas, accessoryMesh, ensureAccessoryAtlas(),
-                0f, 0f, 0f, fallback, scale, originX, originY);
+                0f, 0f, 0f, fallback, scale, originX, originY, headLookBoxes);
     }
 
     /**
@@ -1529,6 +1651,24 @@ public class CapePreviewView extends View {
     private void drawAuthoredMeshAt(Canvas canvas, List<PreviewMeshModel.Box> mesh, Bitmap atlas,
                                     float offsetX, float offsetY, float offsetZ, int fallbackColor,
                                     float scale, float originX, float originY) {
+        drawAuthoredMeshAt(canvas, mesh, atlas, offsetX, offsetY, offsetZ, fallbackColor,
+                scale, originX, originY, false);
+    }
+
+    /**
+     * Draws an authored mesh at a model-space offset.
+     *
+     * <p>Shared by the accessory (offset zero) and the pet (offset to the player's side), so the two
+     * cannot drift on projection, depth sorting, lighting or UV mirroring. The offset is applied to
+     * each corner before projection, which is the same as translating the mesh in the world without
+     * rebuilding it.
+     *
+     * @param headLooked true for a worn head accessory: its corners are rotated by the same head-look
+     *                   angles and neck pivot the head box uses, so the hat tracks the head
+     */
+    private void drawAuthoredMeshAt(Canvas canvas, List<PreviewMeshModel.Box> mesh, Bitmap atlas,
+                                    float offsetX, float offsetY, float offsetZ, int fallbackColor,
+                                    float scale, float originX, float originY, boolean headLooked) {
         if (mesh == null || mesh.isEmpty()) return;
 
         meshDrawList.clear();
@@ -1538,14 +1678,24 @@ public class CapePreviewView extends View {
             float groupDepth = centroidDepth(box, offsetX, offsetY, offsetZ, scale, originX, originY);
             for (int face = 0; face < 6; face++) {
                 float[] normal = faceNormal(box, face);
+                if (headLooked) {
+                    HeadLookTransform.applyVector(headPitchDeg, headYawDeg, normal);
+                }
                 if (!camera.faceVisibleNormal(normal[0], normal[1], normal[2])) continue;
                 int[] indices = PreviewMeshModel.faceCornerIndices(face);
                 MeshQuad quad = new MeshQuad();
                 float depthSum = 0f;
                 for (int i = 0; i < 4; i++) {
                     float[] corner = box.corners[indices[i]];
-                    projectPoint(corner[0] + offsetX, corner[1] + offsetY, corner[2] + offsetZ,
-                            scale, originX, originY);
+                    if (headLooked) {
+                        applyHeadLook(corner[0], corner[1], corner[2], headPointScratch);
+                        projectPoint(headPointScratch[0] + offsetX,
+                                headPointScratch[1] + offsetY,
+                                headPointScratch[2] + offsetZ, scale, originX, originY);
+                    } else {
+                        projectPoint(corner[0] + offsetX, corner[1] + offsetY, corner[2] + offsetZ,
+                                scale, originX, originY);
+                    }
                     quad.verts[i * 2] = projected[0];
                     quad.verts[i * 2 + 1] = projected[1];
                     depthSum += projected[2];
@@ -1611,7 +1761,54 @@ public class CapePreviewView extends View {
         canvas.save();
         canvas.clipPath(quadPath(quad.verts));
         canvas.drawBitmap(atlas, matrix, pixelPaint);
+        // Alpha test on the authored mesh too: a cosmetic atlas is mostly transparent, so without
+        // this the crown/wing/tail reads as a translucent rectangle rather than a hard shape.
+        Bitmap mask = meshMaskFor(atlas, u, v, w, h, quad.flipH, quad.flipV);
+        if (mask != null) {
+            android.graphics.Matrix maskMatrix = new android.graphics.Matrix();
+            maskMatrix.setPolyToPoly(new float[]{0, 0, mask.getWidth(), 0, 0, mask.getHeight(),
+                    mask.getWidth(), mask.getHeight()}, 0, quad.verts, 0, 4);
+            maskPaint.reset();
+            maskPaint.setAntiAlias(false);
+            maskPaint.setFilterBitmap(false);
+            maskPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
+            canvas.drawBitmap(mask, maskMatrix, maskPaint);
+            maskPaint.setXfermode(null);
+        }
         canvas.restore();
+    }
+
+    /** Authored-mesh alpha masks, keyed by "u,v,w,h,flipH,flipV" so each face builds once. */
+    private final java.util.HashMap<String, Bitmap> meshMaskCache = new java.util.HashMap<>();
+
+    /**
+     * The hard-edged alpha mask for one authored-mesh face rect, or null when the rect is fully
+     * opaque. Cached because the atlas is decoded once and its faces repeat every frame.
+     */
+    private Bitmap meshMaskFor(Bitmap atlas, int u, int v, int w, int h,
+                               boolean flipH, boolean flipV) {
+        String key = u + "," + v + "," + w + "," + h + "," + flipH + "," + flipV;
+        if (meshMaskCache.containsKey(key)) return meshMaskCache.get(key);
+        int[] pixels = new int[w * h];
+        atlas.getPixels(pixels, 0, w, u, v, w, h);
+        boolean anyTransparent = false;
+        for (int p : pixels) {
+            if (SkinAlphaFilter.alphaOf(p) < 255) {
+                anyTransparent = true;
+                break;
+            }
+        }
+        Bitmap mask = null;
+        if (anyTransparent) {
+            int[] maskPixels = new int[w * h];
+            for (int i = 0; i < pixels.length; i++) {
+                maskPixels[i] = SkinAlphaFilter.isOpaque(pixels[i]) ? 0xFFFFFFFF : 0x00000000;
+            }
+            mask = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            mask.setPixels(maskPixels, 0, w, 0, 0, w, h);
+        }
+        meshMaskCache.put(key, mask);
+        return mask;
     }
 
     private final Path meshClip = new Path();
@@ -1677,11 +1874,27 @@ public class CapePreviewView extends View {
         // taken from the paint the caller set, so a piece keeps its own palette.
         int base = paint.getColor();
         float persp = camera.perspectiveAt(cx, cy, cz);
+        boolean head = headLookBoxes;
         for (SkinModel.Face face : SkinModel.Face.values()) {
-            if (!camera.faceVisible(face)) continue;
+            if (head) {
+                float[] n = headNormalScratch;
+                n[0] = face.nx;
+                n[1] = face.ny;
+                n[2] = face.nz;
+                HeadLookTransform.applyVector(headPitchDeg, headYawDeg, n);
+                if (!camera.faceVisibleNormal(n[0], n[1], n[2])) continue;
+            } else if (!camera.faceVisible(face)) {
+                continue;
+            }
             float[][] c = box.faceCorners(face);
             for (int i = 0; i < 4; i++) {
-                projectPoint(c[i][0], c[i][1], c[i][2], scale, originX, originY);
+                if (head) {
+                    applyHeadLook(c[i][0], c[i][1], c[i][2], headPointScratch);
+                    projectPoint(headPointScratch[0], headPointScratch[1], headPointScratch[2],
+                            scale, originX, originY);
+                } else {
+                    projectPoint(c[i][0], c[i][1], c[i][2], scale, originX, originY);
+                }
                 corners[i * 2] = projected[0];
                 corners[i * 2 + 1] = projected[1];
             }
@@ -1690,6 +1903,13 @@ public class CapePreviewView extends View {
         }
         paint.setColor(base);
     }
+
+    /**
+     * True while the accessory currently being drawn is a head-worn piece, so {@link #drawBox}
+     * rotates its boxes by the head look. Set by {@link #drawAccessoryFront} from
+     * {@link CosmeticCatalog.AccessoryKind#followsHead()}.
+     */
+    private boolean headLookBoxes;
 
     // ---- Face texture crops --------------------------------------------------------------
 
@@ -1705,18 +1925,28 @@ public class CapePreviewView extends View {
         if (atlas == null) {
             baseFaceCrops = null;
             overlayFaceCrops = null;
+            baseFaceMasks = null;
+            overlayFaceMasks = null;
             return;
         }
         List<SkinModel.Box> boxes = SkinModel.boxes();
+        int faces = SkinModel.Face.values().length;
         baseFaceCrops = new Bitmap[boxes.size()][];
         overlayFaceCrops = new Bitmap[boxes.size()][];
+        baseFaceMasks = new Bitmap[boxes.size()][];
+        overlayFaceMasks = new Bitmap[boxes.size()][];
         for (int b = 0; b < boxes.size(); b++) {
             SkinModel.Box box = boxes.get(b);
-            baseFaceCrops[b] = new Bitmap[SkinModel.Face.values().length];
-            overlayFaceCrops[b] = new Bitmap[SkinModel.Face.values().length];
+            baseFaceCrops[b] = new Bitmap[faces];
+            overlayFaceCrops[b] = new Bitmap[faces];
+            baseFaceMasks[b] = new Bitmap[faces];
+            overlayFaceMasks[b] = new Bitmap[faces];
             for (SkinModel.Face face : SkinModel.Face.values()) {
-                baseFaceCrops[b][face.ordinal()] = crop(atlas, box.baseUv(face));
-                overlayFaceCrops[b][face.ordinal()] = crop(atlas, box.overlayUv(face));
+                int f = face.ordinal();
+                baseFaceCrops[b][f] = crop(atlas, box.baseUv(face));
+                baseFaceMasks[b][f] = maskFor(baseFaceCrops[b][f]);
+                overlayFaceCrops[b][f] = crop(atlas, box.overlayUv(face));
+                overlayFaceMasks[b][f] = maskFor(overlayFaceCrops[b][f]);
             }
         }
     }
@@ -1730,11 +1960,44 @@ public class CapePreviewView extends View {
         return isBlank(out) ? null : out;
     }
 
-    private static boolean isBlank(Bitmap b) {
-        for (int y = 0; y < b.getHeight(); y++) {
-            for (int x = 0; x < b.getWidth(); x++) {
-                if (Color.alpha(b.getPixel(x, y)) > 8) return false;
+    /**
+     * A hard-edged alpha mask for a face crop, or null when the face needs none.
+     *
+     * <p>Null for a fully transparent crop (dropped already) and for a fully opaque one — the common
+     * case for a skin's base layer — so the extra {@code DST_IN} pass runs only on the layers that
+     * actually have holes. The mask turns the bilinear blend at every transparent edge back into a
+     * crisp cutout, which is what stops the body reading as hollow.
+     */
+    private static Bitmap maskFor(Bitmap crop) {
+        if (crop == null) return null;
+        int w = crop.getWidth();
+        int h = crop.getHeight();
+        int[] pixels = new int[w * h];
+        crop.getPixels(pixels, 0, w, 0, 0, w, h);
+        boolean anyTransparent = false;
+        for (int p : pixels) {
+            if (SkinAlphaFilter.alphaOf(p) < 255) {
+                anyTransparent = true;
+                break;
             }
+        }
+        if (!anyTransparent) return null;
+        Bitmap mask = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        int[] maskPixels = new int[w * h];
+        for (int i = 0; i < pixels.length; i++) {
+            maskPixels[i] = SkinAlphaFilter.isOpaque(pixels[i]) ? 0xFFFFFFFF : 0x00000000;
+        }
+        mask.setPixels(maskPixels, 0, w, 0, 0, w, h);
+        return mask;
+    }
+
+    private static boolean isBlank(Bitmap b) {
+        int w = b.getWidth();
+        int h = b.getHeight();
+        int[] pixels = new int[w * h];
+        b.getPixels(pixels, 0, w, 0, 0, w, h);
+        for (int p : pixels) {
+            if (SkinAlphaFilter.isOpaque(p)) return false;
         }
         return true;
     }

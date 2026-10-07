@@ -1427,6 +1427,33 @@ these are the conclusions.
   amplitudes were raised (13/10 deg) so the in-game chain visibly folds; `CapeAnimationCurveTest`
   pins the literals.
 
+## Cosmetics preview alpha cutout + head-look (Phase 2)
+- **`drawBitmapMesh` bilinear-filters and has no source rect, so a transparent atlas edge bleeds into
+  every opaque texel.** That is why the character read as a hollow, see-through sheet. The fix is
+  alpha testing, realised as a hard-edged cutout mask applied with `PorterDuff.DST_IN`:
+  `SkinAlphaFilter` owns the rule (`ALPHA_THRESHOLD = 25`, `hasAnyOpaque`, `isFullyOpaque`,
+  `buildMask`) and is Android-free through its `PixelSource`, so `SkinAlphaFilterTest` covers it with
+  no device. `CapePreviewView.maskFor` builds a per-face mask only when the crop has a hole (a fully
+  opaque base layer needs none), and the shading tint must be applied **before** the cutout — tinting
+  after re-fills the discarded pixels and the hole returns. The cutout is wired into both the quad
+  pass and the authored-mesh pass. The per-face masks are cached in `baseFaceMasks`/`overlayFaceMasks`
+  and rebuilt with the skin, and the authored-mesh mask cache is cleared whenever an accessory/pet
+  mesh is rebuilt, or a new hat would keep the previous atlas's masks.
+- **A hat must turn with the head in the preview, exactly as the in-game `acc` bone does.**
+  `HeadLookTransform` (pure, Android-free, `HeadLookTransformTest`) rotates a point/direction by head
+  pitch (X) then yaw (Y) about the neck pivot `(0, 24, 0)` — the same pivot the `acc` bone uses and
+  the same queries (`target_x_rotation`/`target_y_rotation`) the in-game `animation.chimera_hat_tilt`
+  reads. `CosmeticCatalog.AccessoryKind.followsHead()` is the single rule for which accessories track
+  the head (TOPHAT/CROWN/GLASSES/VEIL/ANTLERS yes; SCARF/BOWTIE/BACKPACK/WINGS/BEARD no) and is
+  pinned by `CosmeticCatalogTest`. The preview applies it to the head box corners and to a head-worn
+  accessory's authored mesh, so the two cannot disagree.
+- **Dropdowns must be dismissed when the menu closes or a session starts.** `Spinner` opens its
+  popup in a separate window that outlives the host view, so a `CosmeticsPanel` left open over the
+  game kept a stale popup floating. `CosmeticsPanel.DismissibleSpinner` (a subclass, because
+  `Spinner.onDetachedFromWindow()` is protected) records itself in `dropdowns`; `dismissDropdowns()`
+  and `onHidden()` close them, and `ModMenuOverlay.hide()`/`hideCosmetics()` call both plus
+  `CapePreviewView.stopPreview()` so the idle animation stops when the panel is not visible.
+
 ## Default Optifine cape (`CosmeticCatalog` + `CosmeticStore`)
 - Optifine Mode + no equipped cape implies the classic all-black Optifine cape with an "OF" monogram.
   `CosmeticCatalog.resolveEquippedCape(id, optifineMode)` is the single rule; an explicit selection

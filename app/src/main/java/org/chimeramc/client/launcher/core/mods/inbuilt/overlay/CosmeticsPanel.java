@@ -64,6 +64,24 @@ final class CosmeticsPanel {
         }
     }
 
+    /**
+     * A {@code MODE_DROPDOWN} spinner whose list window can be collapsed on demand.
+     *
+     * <p>{@code Spinner} opens its list in a separate window and offers no public dismiss, so a list
+     * left open outlives the panel's view. {@code onDetachedFromWindow} is protected, so this
+     * subclass exposes it as {@link #dismiss()}, which is what lets the panel close every open list
+     * when the Mod Menu is hidden.
+     */
+    private static final class DismissibleSpinner extends Spinner {
+        DismissibleSpinner(Activity activity) {
+            super(activity, MODE_DROPDOWN);
+        }
+
+        void dismiss() {
+            if (getWindowToken() != null) onDetachedFromWindow();
+        }
+    }
+
     private final Activity activity;
     private final CosmeticStore store;
     private final LinearLayout root;
@@ -80,6 +98,15 @@ final class CosmeticsPanel {
 
     /** True while the panel is programmatically setting a spinner, so its callback is ignored. */
     private boolean suppressSelection;
+
+    /**
+     * The dropdown spinners currently attached, so they can be collapsed when the panel is hidden.
+     *
+     * <p>A {@code MODE_DROPDOWN} spinner opens its list in a separate window that outlives this
+     * view: closing the Mod Menu (or starting a game session) while a list is open leaves it
+     * floating over whatever comes next. {@link #dismissDropdowns()} collapses every one of them.
+     */
+    private final List<DismissibleSpinner> dropdowns = new ArrayList<>();
 
     /**
      * Serialises pack writes off the UI thread. Every dropdown pick re-applies the pack, and a
@@ -468,7 +495,7 @@ final class CosmeticsPanel {
         List<String> labels = new ArrayList<>(options.size());
         for (Option o : options) labels.add(o.label);
 
-        Spinner spinner = new Spinner(activity, Spinner.MODE_DROPDOWN);
+        DismissibleSpinner spinner = new DismissibleSpinner(activity);
         spinner.setAdapter(new ArrayAdapter<>(activity,
                 android.R.layout.simple_spinner_dropdown_item, labels));
 
@@ -497,6 +524,7 @@ final class CosmeticsPanel {
         lp.setMargins(0, 0, 0, dp(6));
         spinner.setLayoutParams(lp);
         spinner.setBackground(dropdownBackground());
+        dropdowns.add(spinner);
         return spinner;
     }
 
@@ -524,7 +552,7 @@ final class CosmeticsPanel {
         List<String> labels = new ArrayList<>();
         for (CosmeticCatalog.PetLocomotion g : gaits) labels.add(gaitName(g));
 
-        Spinner spinner = new Spinner(activity, Spinner.MODE_DROPDOWN);
+        DismissibleSpinner spinner = new DismissibleSpinner(activity);
         spinner.setAdapter(new ArrayAdapter<>(activity,
                 android.R.layout.simple_spinner_dropdown_item, labels));
         int current = gaits.indexOf(preview.getPetLocomotion());
@@ -542,6 +570,7 @@ final class CosmeticsPanel {
         });
         row.addView(spinner, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        dropdowns.add(spinner);
         return row;
     }
 
@@ -695,6 +724,26 @@ final class CosmeticsPanel {
 
     View getView() {
         return root;
+    }
+
+    /**
+     * Collapses every open dropdown and stops the preview's animation.
+     *
+     * <p>Called when the Mod Menu is hidden and when a game session starts. A {@code MODE_DROPDOWN}
+     * spinner's list is a separate window; dismissing the panel's view does not close it, so without
+     * this a cape/accessory/pet list stays floating over the game or the launcher after the menu is
+     * gone. Stopping the preview here also keeps an off-screen view from driving a frame callback.
+     */
+    void onHidden() {
+        dismissDropdowns();
+        if (preview != null) preview.stopPreview();
+    }
+
+    /** Collapses every tracked dropdown. Safe to call repeatedly and when none is open. */
+    void dismissDropdowns() {
+        for (DismissibleSpinner spinner : dropdowns) {
+            if (spinner != null) spinner.dismiss();
+        }
     }
 
     private TextView sectionTitle(int res) {

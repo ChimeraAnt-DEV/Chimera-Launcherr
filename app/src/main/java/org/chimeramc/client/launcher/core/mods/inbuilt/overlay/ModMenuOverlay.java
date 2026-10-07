@@ -1118,6 +1118,9 @@ public class ModMenuOverlay {
     }
 
     private void hideCosmetics() {
+        // A spinner's dropdown list is a separate window that survives hiding the container, so it
+        // must be collapsed explicitly or it floats over the game after the menu closes.
+        if (cosmeticsPanel != null) cosmeticsPanel.onHidden();
         if (cosmeticsContainer != null) cosmeticsContainer.setVisibility(View.GONE);
     }
 
@@ -1881,6 +1884,9 @@ public class ModMenuOverlay {
 
         handler.removeCallbacks(statsTick);
         if (replayPanel != null) replayPanel.onHidden();
+        // Collapse any open cosmetics dropdown before the tree is removed; a spinner's list is a
+        // separate window and would otherwise stay floating over the game after the menu closes.
+        if (cosmeticsPanel != null) cosmeticsPanel.onHidden();
 
         InbuiltOverlayManager overlayManager = InbuiltOverlayManager.getInstance();
         if (overlayManager != null) {
