@@ -120,12 +120,32 @@ public final class PlayerSkinProvider {
         }
 
         // No imported skin: show Steve, the standard character, rather than a grey stand-in. The
-        // grey placeholder is now only reached if the Steve atlas cannot be produced at all.
-        Bitmap steve = steveSkin();
+        // shipped atlas is preferred (it is the exact skin the project uses), and the procedural
+        // painter is the fallback when the asset cannot be read. The grey placeholder is only
+        // reached if neither works.
+        Bitmap steve = steveSkinFromAssets(context);
+        if (steve == null) steve = steveSkin();
         if (steve != null) {
             return new SkinBitmap(steve, false, true, "Steve");
         }
         return new SkinBitmap(fallbackSkin(), true, false, "Chimera default");
+    }
+
+    /**
+     * The shipped Steve skin atlas, or null when it is missing or unreadable.
+     *
+     * <p>This is the project's own 64x64 skin (the same art the preview is meant to show), shipped
+     * as an asset rather than painted, so the character in the preview is the real one. Opaque by
+     * construction; a decode failure falls back to the procedural painter, never to a crash.
+     */
+    public static Bitmap steveSkinFromAssets(Context context) {
+        if (context == null) return null;
+        try (java.io.InputStream in = context.getAssets().open("cosmetics/steve.png")) {
+            Bitmap decoded = BitmapFactory.decodeStream(in);
+            return decoded == null ? null : normalise(decoded);
+        } catch (java.io.IOException | RuntimeException e) {
+            return null;
+        }
     }
 
     private static SharedPreferences prefs(Context context) {

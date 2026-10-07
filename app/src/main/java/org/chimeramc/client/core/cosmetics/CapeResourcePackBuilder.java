@@ -214,8 +214,19 @@ public final class CapeResourcePackBuilder {
         // and a backpack are genuinely different meshes rather than one recoloured box. With none
         // equipped a resolving-but-empty geometry is written instead, because the entity always
         // names it and a missing identifier can fail the whole client entity.
-        String hatModel = AuthoredGeometry.loadFromAssets(assets, AuthoredGeometry.ASSET_DIR,
-                AuthoredGeometry.HAT_FILE, AccessoryGeometry.GEOMETRY_ID);
+        // A hand-authored Blockbench export wins over the procedural mesh, so a hat is a sculpted
+        // model with its own texture rather than stacked boxes. Its texture is copied verbatim;
+        // the procedural kinds keep the painted atlas.
+        String hatModel = AuthoredHatModels.loadFromAssets(assets, accessoryKind(accessory));
+        byte[] hatTexture = null;
+        if (hatModel != null) {
+            hatTexture = readAsset(assets, AuthoredHatModels.DIR,
+                    AuthoredHatModels.textureFor(accessoryKind(accessory)));
+        }
+        if (hatModel == null) {
+            hatModel = AuthoredGeometry.loadFromAssets(assets, AuthoredGeometry.ASSET_DIR,
+                    AuthoredGeometry.HAT_FILE, AccessoryGeometry.GEOMETRY_ID);
+        }
         if (hatModel == null) hatModel = AccessoryGeometry.geometryJson(accessoryKind(accessory));
         if (hatModel == null) hatModel = AccessoryGeometry.emptyGeometryJson();
         writeAt(targetDir, HAT_MODEL_PATH, hatModel.getBytes(StandardCharsets.UTF_8));
@@ -224,12 +235,14 @@ public final class CapeResourcePackBuilder {
         // Always written so the entity's reference to it resolves even with no accessory.
         writeAt(targetDir, HAT_ANIMATION_PATH,
                 hatAnimationJson().getBytes(StandardCharsets.UTF_8));
-        writeAt(targetDir, HAT_TEXTURE_PATH,
-                accessory == null
-                        ? FlatColorAtlas.paint(0x00000000, 0x00000000,
-                                AccessoryGeometry.TEXTURE_WIDTH, AccessoryGeometry.TEXTURE_HEIGHT,
-                                AccessoryGeometry.UV_ACCENT_Y)
-                        : AccessoryTexturePainter.paint(accessory.color, accessory.accentColor));
+        if (hatTexture == null) {
+            hatTexture = accessory == null
+                    ? FlatColorAtlas.paint(0x00000000, 0x00000000,
+                            AccessoryGeometry.TEXTURE_WIDTH, AccessoryGeometry.TEXTURE_HEIGHT,
+                            AccessoryGeometry.UV_ACCENT_Y)
+                    : AccessoryTexturePainter.paint(accessory.color, accessory.accentColor);
+        }
+        writeAt(targetDir, HAT_TEXTURE_PATH, hatTexture);
 
         // The pet is written whenever one is equipped; its geometry is per-species. As with the
         // hat, an empty geometry is written when none is equipped so the reference resolves.

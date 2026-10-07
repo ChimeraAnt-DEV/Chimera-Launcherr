@@ -1,0 +1,115 @@
+{
+ "format_version": "1.12.0",
+ "minecraft:geometry": [
+  {
+   "description": {
+    "identifier": "geometry.glow_hat_paper_bag",
+    "texture_width": 64,
+    "texture_height": 64,
+    "visible_bounds_width": 3,
+    "visible_bounds_height": 3,
+    "visible_bounds_offset": [
+     0,
+     2,
+     0
+    ]
+   },
+   "bones": [
+    {
+     "name": "hat",
+     "pivot": [
+      0,
+      32,
+      0
+     ],
+     "cubes": [
+      {
+       "origin": [
+        10.75,
+        22.75,
+        11.95
+       ],
+       "size": [
+        10.5,
+        11,
+        8.1
+       ],
+       "uv": {
+        "west": {
+         "uv": [
+          22,
+          42
+         ],
+         "uv_size": [
+          -8,
+          -11
+         ]
+        },
+        "east": {
+         "uv": [
+          30,
+          42
+         ],
+         "uv_size": [
+          -8,
+          -11
+         ]
+        },
+        "up": {
+         "uv": [
+          25,
+          56
+         ],
+         "uv_size": [
+          11,
+          8
+         ]
+        },
+        "down": {
+         "uv": [
+          25,
+          56
+         ],
+         "uv_size": [
+          11,
+          -8
+         ]
+        },
+        "south": {
+         "uv": [
+          25,
+          53
+         ],
+         "uv_size": [
+          -11,
+          -11
+         ]
+        },
+        "north": {
+         "uv": [
+          25,
+          64
+         ],
+         "uv_size": [
+          -11,
+          -11
+         ]
+        }
+       },
+       "pivot": [
+        8,
+        20,
+        8
+       ],
+       "rotation": [
+        -180,
+        0,
+        180
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
