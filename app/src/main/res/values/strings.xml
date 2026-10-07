@@ -2028,4 +2028,18 @@ Migration must complete before GlowberryClient can continue.</string>
     <string name="javabridge_partial_none">Nothing is partial.</string>
     <string name="javabridge_kept_none">Nothing is kept.</string>
     <string name="javabridge_load_failed">The ported mod was saved but could not be loaded. See the Mods tab for the reason.</string>
+
+    <!-- Launch tab dock + quick toggles -->
+    <string name="dock_profile_default">Default Profile</string>
+    <string name="launch_toggle_antegg">AntEgg Mod Packs</string>
+    <string name="launch_toggle_voice">Voice Chat</string>
+    <string name="launch_toggle_replay">Replays</string>
+    <string name="launch_antegg_status_ready">%1$d mod packs installed</string>
+    <string name="launch_antegg_status_none">No mod packs installed</string>
+    <string name="launch_antegg_status_loading">Preparing\u2026</string>
+    <string name="launch_voice_status_on">On \u00b7 %1$s</string>
+    <string name="launch_voice_status_off">Off</string>
+    <string name="launch_replay_status_count">%1$d clips saved</string>
+    <string name="launch_replay_status_none">No clips yet</string>
+    <string name="launch_preparing">Preparing launcher\u2026</string>
 </resources>

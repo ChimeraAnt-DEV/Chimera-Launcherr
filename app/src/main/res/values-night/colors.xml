@@ -65,4 +65,15 @@
     <color name="on_hero_card">#FFFFFF</color>
     <color name="on_hero_card_secondary">#E3D8FF</color>
 
+
+    <!-- Dock + glass surfaces stay dark at night; the light variants are the day-mode overrides. -->
+    <color name="launch_dock_bg">#D91A1A20</color>
+    <color name="launch_dock_stroke">#33FFFFFF</color>
+    <color name="dock_version_bg">#22FFFFFF</color>
+    <color name="dock_text_primary">#FFFFFF</color>
+    <color name="dock_text_secondary">#B9B2CC</color>
+    <color name="glass_panel_bg">#CC121212</color>
+    <color name="glass_panel_stroke">#33FFFFFF</color>
+    <color name="glass_panel_bg_light">#1FFFFFFF</color>
+    <color name="glass_panel_stroke_light">#33FFFFFF</color>
 </resources>

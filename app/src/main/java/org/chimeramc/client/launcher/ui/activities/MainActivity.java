@@ -157,6 +157,10 @@ import okhttp3.OkHttpClient;
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private Runnable pulseRunnable;
     private boolean pulseRunning;
+    private View launchShimmer;
+    private Runnable shimmerRunnable;
+    private boolean shimmerRunning;
+    private org.chimeramc.client.core.mods.inbuilt.overlay.CapePreviewView launchPreview;
     /** True while a launch is in flight, so the hero card and Play button cannot double-fire. */
     private boolean launchInProgress;
     private ValueAnimator activeProgressAnimator;
@@ -244,9 +248,9 @@ import okhttp3.OkHttpClient;
     private void animateHomeCardsArrival() {
         int[] order = {
                 R.id.last_played_card,
-                R.id.quick_versions_card,
-                R.id.quick_mods_card,
-                R.id.quick_content_card,
+                R.id.launch_toggle_antegg,
+                R.id.launch_toggle_voice,
+                R.id.launch_toggle_replay,
         };
         for (int i = 0; i < order.length; i++) {
             View view = findViewById(order[i]);
@@ -656,7 +660,7 @@ import okhttp3.OkHttpClient;
     }
 
     private void initializeVersionManager() {
-        binding.launchButton.setEnabled(false);
+        binding.launchDock.launchButton.setEnabled(false);
         versionManager = VersionManager.getIfInitialized();
         if (versionManager != null) {
             onVersionManagerReady();
@@ -1156,6 +1160,11 @@ import okhttp3.OkHttpClient;
         if (binding != null && versionManager != null) {
             resetLaunchButton();
         }
+        // The equipped cosmetics can change on the Cosmetics screen, so re-apply them and restart
+        // the hero preview's animation on every resume.
+        bindLaunchPreviewCosmetics();
+        if (launchPreview != null) launchPreview.startPreview();
+        refreshLaunchToggles();
     }
 
     private void applyPersonalization() {
@@ -1207,13 +1216,13 @@ import okhttp3.OkHttpClient;
         float radiusPx = roundingDp * density;
         
         // Apply to launch button
-        if (binding.launchButton.getBackground() instanceof GradientDrawable) {
-            ((GradientDrawable) binding.launchButton.getBackground()).setCornerRadius(radiusPx);
+        if (binding.launchDock.launchButton.getBackground() instanceof GradientDrawable) {
+            ((GradientDrawable) binding.launchDock.launchButton.getBackground()).setCornerRadius(radiusPx);
         }
         
         // Apply to select version button
-        if (binding.selectVersionButton.getBackground() instanceof GradientDrawable) {
-            ((GradientDrawable) binding.selectVersionButton.getBackground()).setCornerRadius(radiusPx);
+        if (binding.launchDock.selectVersionButton.getBackground() instanceof GradientDrawable) {
+            ((GradientDrawable) binding.launchDock.selectVersionButton.getBackground()).setCornerRadius(radiusPx);
         }
     }
     
@@ -1244,15 +1253,15 @@ import okhttp3.OkHttpClient;
         float cardElevation = enabled ? dp(3f) : dp(0f);
 
         if (binding != null) {
-            if (binding.launchButton != null) binding.launchButton.setElevation(glowElevation);
-            if (binding.premiumLaunchCard != null) binding.premiumLaunchCard.setElevation(cardElevation);
+            if (binding.launchDock.launchButton != null) binding.launchDock.launchButton.setElevation(glowElevation);
+            if (binding.launchDock.getRoot() != null) binding.launchDock.getRoot().setElevation(cardElevation);
         }
 
         int[] cardIds = {
                 R.id.last_played_card,
-                R.id.quick_versions_card,
-                R.id.quick_mods_card,
-                R.id.quick_content_card
+                R.id.launch_toggle_antegg,
+                R.id.launch_toggle_voice,
+                R.id.launch_toggle_replay
         };
         for (int id : cardIds) {
             View card = findViewById(id);
@@ -1353,26 +1362,26 @@ import okhttp3.OkHttpClient;
      * and hidden again once any file import finishes.
      */
     private void animateProgressTo(int target) {
-        if (binding == null || binding.progressLoader == null) return;
+        if (binding == null || binding.launchDock.progressLoader == null) return;
         if (activeProgressAnimator != null) {
             activeProgressAnimator.cancel();
         }
-        if (binding.progressLoader.getVisibility() != View.VISIBLE) {
-            binding.progressLoader.setIndeterminate(false);
-            binding.progressLoader.setProgress(0);
-            binding.progressLoader.setVisibility(View.VISIBLE);
+        if (binding.launchDock.progressLoader.getVisibility() != View.VISIBLE) {
+            binding.launchDock.progressLoader.setIndeterminate(false);
+            binding.launchDock.progressLoader.setProgress(0);
+            binding.launchDock.progressLoader.setVisibility(View.VISIBLE);
         }
         PersonalizationManager pm = new PersonalizationManager(this);
-        int from = binding.progressLoader.getProgress();
+        int from = binding.launchDock.progressLoader.getProgress();
         int duration = pm.isShowAnimations() ? 350 : 0;
         if (duration == 0) {
-            binding.progressLoader.setProgress(target);
+            binding.launchDock.progressLoader.setProgress(target);
             return;
         }
         activeProgressAnimator = ValueAnimator.ofInt(from, target).setDuration(duration);
         activeProgressAnimator.setInterpolator(DynamicAnim.getDefaultInterpolator());
         activeProgressAnimator.addUpdateListener(animator ->
-                binding.progressLoader.setProgress((Integer) animator.getAnimatedValue()));
+                binding.launchDock.progressLoader.setProgress((Integer) animator.getAnimatedValue()));
         activeProgressAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
@@ -1383,13 +1392,13 @@ import okhttp3.OkHttpClient;
     }
 
     private void hideProgressLoader() {
-        if (binding == null || binding.progressLoader == null) return;
+        if (binding == null || binding.launchDock.progressLoader == null) return;
         if (activeProgressAnimator != null) {
             activeProgressAnimator.cancel();
             activeProgressAnimator = null;
         }
-        binding.progressLoader.setProgress(0);
-        binding.progressLoader.setVisibility(View.GONE);
+        binding.launchDock.progressLoader.setProgress(0);
+        binding.launchDock.progressLoader.setVisibility(View.GONE);
     }
 
     private float dp(float value) {
@@ -1399,6 +1408,8 @@ import okhttp3.OkHttpClient;
     @Override
     protected void onStop() {
         stopHeroCardPulse();
+        stopLaunchShimmer();
+        if (launchPreview != null) launchPreview.stopPreview();
         if (activeProgressAnimator != null) {
             activeProgressAnimator.cancel();
             activeProgressAnimator = null;
@@ -1422,14 +1433,20 @@ import okhttp3.OkHttpClient;
 
     @SuppressLint({"ClickableViewAccessibility", "UnsafeIntentLaunch"})
     private void initListeners() {
-        binding.launchButton.setEnabled(false);
-        binding.launchButton.setOnClickListener(v -> launchGame());
-        DynamicAnim.applyPressScale(binding.launchButton);
-        binding.selectVersionButton.setOnClickListener(v -> showVersionSelectDialog());
-        DynamicAnim.applyPressScale(binding.selectVersionButton);
+        binding.launchDock.launchButton.setEnabled(false);
+        binding.launchDock.launchButton.setOnClickListener(v -> launchGame());
+        DynamicAnim.applyPressScale(binding.launchDock.launchButton);
+        binding.launchDock.selectVersionButton.setOnClickListener(v -> showVersionSelectDialog());
+        DynamicAnim.applyPressScale(binding.launchDock.selectVersionButton);
 
         // Setup Quick Actions Grid
         setupQuickActions();
+
+        // Setup Launch-tab quick toggles (AntEgg / Voice / Replays)
+        setupLaunchToggles();
+
+        // Setup the docked launch controls' shimmer feedback
+        setupDockFeedback();
 
         // Setup Account Header
         setupAccountHeader();
@@ -1453,26 +1470,186 @@ import okhttp3.OkHttpClient;
         refreshLastPlayedCard();
         startHeroCardPulse();
 
-        // Quick Launch Card was removed: the hero card and PLAY MINECRAFT already launch.
-        // Quick Versions Card
-        View quickVersionsCard = findViewById(R.id.quick_versions_card);
-        if (quickVersionsCard != null) {
-            quickVersionsCard.setOnClickListener(v -> showVersionSelectDialog());
-            DynamicAnim.applyPressScale(quickVersionsCard);
+        // Quick Launch Card was removed: the hero card and PLAY MINECRAFT already launch, and
+        // version selection now lives on the dock's Select Version button.
+
+        // Quick Mods Card and Quick Content Card were removed with the old quick-action grid:
+        // the Launch tab now uses purpose-built quick toggles (AntEgg packs, Voice, Replays)
+        // and the content rows below.
+    }
+
+    /**
+     * Wires the Launch tab's quick-toggle cards. Each card is a shortcut into a feature and shows
+     * that feature's live state on its own status line, refreshed whenever the tab resumes.
+     */
+    private void setupLaunchToggles() {
+        View hero = findViewById(R.id.launch_hero);
+        if (hero != null) {
+            launchPreview = hero.findViewById(R.id.launch_player_preview);
+            if (launchPreview != null) {
+                launchPreview.setAlwaysAnimate(true);
+                bindLaunchPreviewCosmetics();
+                launchPreview.startPreview();
+            }
+        }
+        View antEgg = findViewById(R.id.launch_toggle_antegg);
+        if (antEgg != null) {
+            antEgg.setOnClickListener(v -> openModsFullscreen());
+            DynamicAnim.applyPressScale(antEgg);
+        }
+        View voice = findViewById(R.id.launch_toggle_voice);
+        if (voice != null) {
+            voice.setOnClickListener(v -> startActivity(
+                    new Intent(this, org.chimeramc.client.ui.activities.VoiceChatActivity.class)));
+            DynamicAnim.applyPressScale(voice);
+        }
+        View replay = findViewById(R.id.launch_toggle_replay);
+        if (replay != null) {
+            replay.setOnClickListener(v -> startActivity(
+                    new Intent(this, org.chimeramc.client.ui.activities.ReplayActivity.class)));
+            DynamicAnim.applyPressScale(replay);
+        }
+        refreshLaunchToggles();
+    }
+
+    /**
+     * Wires the docked launch controls' feedback: the sweeping shimmer that runs while the launcher
+     * is still preparing (assets/native bridges loading), and the mirror of the Play button's
+     * enabled state onto the dock.
+     */
+    private void setupDockFeedback() {
+        launchShimmer = findViewById(R.id.launch_button_shimmer);
+        Button play = binding != null ? binding.launchDock.launchButton : null;
+        if (play == null) return;
+        // The button starts disabled until the version manager is ready; start the shimmer now and
+        // let resetLaunchButton() stop it, so the control never reads as frozen on a cold start.
+        startLaunchShimmer();
+    }
+
+    private void startLaunchShimmer() {
+        if (launchShimmer == null) return;
+        PersonalizationManager pm = new PersonalizationManager(this);
+        if (!pm.isShowAnimations()) {
+            launchShimmer.setVisibility(View.GONE);
+            return;
+        }
+        if (shimmerRunning) return;
+        shimmerRunning = true;
+        launchShimmer.setVisibility(View.VISIBLE);
+        launchShimmer.setTranslationX(-launchShimmer.getWidth());
+        shimmerRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!shimmerRunning || launchShimmer == null) return;
+                float width = launchShimmer.getWidth() > 0
+                        ? launchShimmer.getWidth()
+                        : getResources().getDisplayMetrics().widthPixels;
+                launchShimmer.setTranslationX(-width);
+                launchShimmer.animate()
+                        .translationX(width)
+                        .setDuration(1100L)
+                        .setInterpolator(new android.view.animation.LinearInterpolator())
+                        .withEndAction(() -> {
+                            if (!shimmerRunning) return;
+                            uiHandler.postDelayed(shimmerRunnable, 350L);
+                        })
+                        .start();
+            }
+        };
+        uiHandler.post(shimmerRunnable);
+    }
+
+    private void stopLaunchShimmer() {
+        shimmerRunning = false;
+        if (shimmerRunnable != null) {
+            uiHandler.removeCallbacks(shimmerRunnable);
+            shimmerRunnable = null;
+        }
+        if (launchShimmer != null) {
+            launchShimmer.animate().cancel();
+            launchShimmer.setVisibility(View.GONE);
+        }
+    }
+
+    /**
+     * Refreshes the quick-toggle status lines from each feature's own state: the AntEgg sandbox
+     * folder for installed packs, the voice module's running state and route, and the replay
+     * library's clip count. Nothing here is a second source of truth.
+     */
+    private void refreshLaunchToggles() {
+        TextView antEggStatus = findViewById(R.id.launch_antegg_status);
+        if (antEggStatus != null) {
+            int count = countAntEggPacks();
+            antEggStatus.setText(count > 0
+                    ? getString(R.string.launch_antegg_status_ready, count)
+                    : getString(R.string.launch_antegg_status_none));
         }
 
-        // Quick Mods Card
-        View quickModsCard = findViewById(R.id.quick_mods_card);
-        if (quickModsCard != null) {
-            quickModsCard.setOnClickListener(v -> openModsFullscreen());
-            DynamicAnim.applyPressScale(quickModsCard);
+        TextView voiceStatus = findViewById(R.id.launch_voice_status);
+        if (voiceStatus != null) {
+            org.chimeramc.client.core.voice.VoiceChatModule module =
+                    org.chimeramc.client.core.voice.VoiceChatModule.peek();
+            boolean on = module != null && module.isRunning();
+            voiceStatus.setText(on
+                    ? getString(R.string.launch_voice_status_on, getVoiceRouteLabel())
+                    : getString(R.string.launch_voice_status_off));
         }
 
-        // Quick Content Card
-        View quickContentCard = findViewById(R.id.quick_content_card);
-        if (quickContentCard != null) {
-            quickContentCard.setOnClickListener(v -> openContentManagement());
-            DynamicAnim.applyPressScale(quickContentCard);
+        TextView replayStatus = findViewById(R.id.launch_replay_status);
+        if (replayStatus != null) {
+            int clips = countReplayClips();
+            replayStatus.setText(clips > 0
+                    ? getString(R.string.launch_replay_status_count, clips)
+                    : getString(R.string.launch_replay_status_none));
+        }
+    }
+
+    /**
+     * Applies the player's equipped cosmetics to the Launch-tab hero preview, using the same
+     * {@code CosmeticStore} the Cosmetics panel writes, so the hero shows exactly what the game
+     * will render (or the Optifine default cape when Optifine Mode is on).
+     */
+    private void bindLaunchPreviewCosmetics() {
+        if (launchPreview == null) return;
+        try {
+            org.chimeramc.client.core.cosmetics.CosmeticStore store =
+                    new org.chimeramc.client.core.cosmetics.CosmeticStore(this);
+            launchPreview.setCape(store.getEquippedCapeForDisplay());
+            launchPreview.setAccessory(store.getEquippedAccessory());
+            launchPreview.setPet(store.getEquippedPet());
+        } catch (Throwable ignored) {
+            // A preview must never block the Launch tab; the placeholder skin is fine.
+        }
+    }
+
+    private int countAntEggPacks() {
+        try {
+            java.io.File root = getExternalFilesDir(null);
+            if (root == null) return 0;
+            java.io.File sandbox = new java.io.File(root,
+                    org.chimeramc.client.core.antegg.AntEggLoader.SANDBOX_DIR_NAME);
+            java.io.File[] children = sandbox.listFiles();
+            return children == null ? 0 : children.length;
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    private int countReplayClips() {
+        try {
+            return new org.chimeramc.client.core.replay.ReplayClipRepository(this).scan().size();
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    private String getVoiceRouteLabel() {
+        try {
+            InbuiltModManager manager = InbuiltModManager.getInstance(this);
+            String relay = manager.getVoiceRelayAddress();
+            return (relay != null && !relay.isEmpty()) ? "Relay" : "LAN";
+        } catch (Throwable t) {
+            return "LAN";
         }
     }
 
@@ -1495,9 +1672,8 @@ import okhttp3.OkHttpClient;
 
     private void setupSectionHeaders() {
         bindSectionHeader(R.id.section_quick, R.string.quick_actions_title, R.drawable.ic_nav_launch, 0);
-        bindSectionHeader(R.id.section_launch, R.string.home_edition, R.drawable.ic_qa_launch, 0);
         View contentAction = bindSectionHeader(R.id.section_content,
-                R.string.home_content_library, R.string.view_all);
+                R.string.home_content_library, R.drawable.ic_content, R.string.view_all);
         if (contentAction != null) {
             contentAction.setOnClickListener(v -> openContentManagement());
             DynamicAnim.applyPressScale(contentAction);
@@ -1659,7 +1835,8 @@ import okhttp3.OkHttpClient;
     /** Clears the in-flight flag and re-enables the Play button after a launch is abandoned. */
     private void resetLaunchButton() {
         launchInProgress = false;
-        if (binding != null) binding.launchButton.setEnabled(true);
+        if (binding != null) binding.launchDock.launchButton.setEnabled(true);
+        stopLaunchShimmer();
     }
 
     private void performActualLaunch() {
@@ -1668,7 +1845,7 @@ import okhttp3.OkHttpClient;
         // the "duplicate Play" report. One flag guards every entry point.
         if (launchInProgress) return;
         launchInProgress = true;
-        binding.launchButton.setEnabled(false);
+        binding.launchDock.launchButton.setEnabled(false);
         LaunchTrace trace = LaunchTrace.create(null);
         trace.milestone("Launch requested");
 
@@ -1801,9 +1978,9 @@ import okhttp3.OkHttpClient;
         popupView.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
         int popupWidth = popupView.getMeasuredWidth();
-        int anchorWidth = binding.selectVersionButton.getWidth();
+        int anchorWidth = binding.launchDock.selectVersionButton.getWidth();
         int xOffset = anchorWidth - popupWidth;
-        popup.showAsDropDown(binding.selectVersionButton, xOffset, 4);
+        popup.showAsDropDown(binding.launchDock.selectVersionButton, xOffset, 4);
     }
 
     private static class InstancePopupAdapter extends RecyclerView.Adapter<InstancePopupAdapter.VH> {
@@ -1955,13 +2132,13 @@ import okhttp3.OkHttpClient;
     public void setTextMinecraftVersion() {
         if (binding == null) return;
         if (versionManager == null) {
-            binding.textMinecraftVersion.setText(getString(R.string.not_found_version));
+            binding.launchDock.textMinecraftVersion.setText(getString(R.string.not_found_version));
             updateLastPlayedName(null, null);
             return;
         }
         GameVersion selectedVersion = versionManager.getSelectedVersion();
         String instanceName = selectedVersion != null ? getInstanceDisplayName(selectedVersion) : null;
-        binding.textMinecraftVersion.setText(TextUtils.isEmpty(instanceName) ? getString(R.string.not_found_version) : instanceName);
+        binding.launchDock.textMinecraftVersion.setText(TextUtils.isEmpty(instanceName) ? getString(R.string.not_found_version) : instanceName);
         updateLastPlayedName(instanceName, selectedVersion);
         refreshLastPlayedCard();
     }
@@ -2200,6 +2377,10 @@ import okhttp3.OkHttpClient;
 
     @Override
     protected void onDestroy() {
+        if (launchPreview != null) {
+            launchPreview.release();
+            launchPreview = null;
+        }
         unbindStorageMigrationService();
         dismissStorageMigrationDialog(null);
         storageMigrationExecutor.shutdownNow();

@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The docked launch control bar: the active profile/version on the left and the Play button on the
+    right, on one dark translucent Material 3 plate docked at the bottom of the Launch tab. This is
+    what stops the launch controls from floating loose across the page.
+
+    The ids @id/launch_button and @id/select_version_button are kept because the activity binds the
+    launch click, the version-select popup anchor, the card rounding and the glow pass to them.
+-->
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:cardBackgroundColor="@android:color/transparent"
+    app:cardCornerRadius="24dp"
+    app:strokeWidth="0dp"
+    app:cardElevation="0dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_launch_dock"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="14dp">
+
+        <!-- Profile + version picker: tap to open the version list. -->
+        <LinearLayout
+            android:id="@+id/select_version_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="56dp"
+            android:background="@drawable/bg_dock_selector"
+            android:gravity="center_vertical"
+            android:orientation="vertical"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
+
+            <TextView
+                android:id="@+id/dock_profile_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/misans"
+                android:text="@string/dock_profile_default"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="@color/dock_text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/text_minecraft_version"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/misans"
+                    android:text="@string/home_edition_version_placeholder"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:textColor="@color/dock_text_secondary"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="6dp"
+                    android:src="@drawable/ic_arrow_down"
+                    app:tint="@color/dock_text_secondary" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Main launch action. A FrameLayout so the loading shimmer can sit over the button. -->
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_marginStart="14dp"
+            android:layout_weight="1">
+
+            <Button
+                android:id="@+id/launch_button"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_dock_play"
+                android:autoSizeMaxTextSize="17sp"
+                android:autoSizeMinTextSize="12sp"
+                android:autoSizeStepGranularity="1sp"
+                android:autoSizeTextType="uniform"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/home_play"
+                android:textColor="@color/on_primary"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:textAllCaps="true"
+                android:fontFamily="@font/misans"
+                app:icon="@drawable/ic_nav_launch"
+                app:iconGravity="textStart"
+                app:iconPadding="8dp"
+                app:iconTint="@color/on_primary"
+                app:iconSize="24dp" />
+
+            <!-- Sweeping highlight while the launcher prepares; GONE once ready. -->
+            <View
+                android:id="@+id/launch_button_shimmer"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_dock_shimmer"
+                android:visibility="gone" />
+        </FrameLayout>
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/progress_loader"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginBottom="10dp"
+            android:indeterminate="true"
+            android:visibility="gone"
+            android:indeterminateTint="@color/primary" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

@@ -112,4 +112,16 @@
     <color name="brand_primary_87">#DD6236E8</color>
     <color name="brand_indigo_67">#AA6D4AFF</color>
 
+
+    <!-- Launch-tab dock + glass surfaces. The dock is a dark translucent plate (the Material 3
+         glass look); it stays dark in both themes because it sits over the wallpaper. -->
+    <color name="launch_dock_bg">#CC1E1E24</color>
+    <color name="launch_dock_stroke">#33FFFFFF</color>
+    <color name="dock_version_bg">#22FFFFFF</color>
+    <color name="dock_text_primary">#FFFFFF</color>
+    <color name="dock_text_secondary">#B9B2CC</color>
+    <color name="glass_panel_bg">#CC121212</color>
+    <color name="glass_panel_stroke">#33FFFFFF</color>
+    <color name="glass_panel_bg_light">#F2FFFFFF</color>
+    <color name="glass_panel_stroke_light">#22000000</color>
 </resources>

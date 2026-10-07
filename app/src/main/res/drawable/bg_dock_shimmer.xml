@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The sweeping highlight painted over the Play button while the launcher prepares. A soft white
+    band with transparent ends; the launcher slides it across the button so the control reads as
+    "working", not frozen.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:startColor="#00FFFFFF"
+        android:centerColor="#40FFFFFF"
+        android:endColor="#00FFFFFF"
+        android:type="linear" />
+    <corners android:radius="16dp" />
+</shape>

@@ -192,6 +192,8 @@ public class CapePreviewView extends View {
     private long animStartMs;
     private boolean animating;
     private boolean attached;
+    /** When true, idle motion runs even with no cape/pet equipped (the Launch-tab hero). */
+    private boolean alwaysAnimate;
 
     private float lastTouchX;
     private long lastTouchMs;
@@ -233,7 +235,17 @@ public class CapePreviewView extends View {
             };
 
     public CapePreviewView(Context context) {
-        super(context);
+        this(context, null);
+    }
+
+    /**
+     * XML constructor, so the preview can be declared in a layout rather than only built in code.
+     *
+     * <p>The Launch-tab hero panel hosts a preview, and inflating it from XML keeps that layout
+     * declarative; the code path in {@code CosmeticsPanel} keeps the one-argument constructor.
+     */
+    public CapePreviewView(Context context, android.util.AttributeSet attrs) {
+        super(context, attrs);
         setWillNotDraw(false);
         // Textured faces are sampled with bilinear filtering and anti-aliasing set per draw in
         // drawModel; flat accessory quads use `paint`, which is anti-aliased but unfiltered, so a
@@ -378,16 +390,84 @@ public class CapePreviewView extends View {
 
     /**
      * Stops the frame callback. Called when the host panel is hidden so an off-screen preview does
-     * not keep driving Choreographer frames; {@link #syncAnimation()} restarts it when the view is
+     * not keep driving Choreographer frames; {@link #startPreview()} restarts it when the view is
      * shown again.
      */
     public void stopPreview() {
         stopAnimation();
     }
 
+    /**
+     * Restarts the frame callback after {@link #stopPreview()}. A view that was stopped while the
+     * host was paused does not resume by itself, so the host must call this when it returns.
+     */
+    public void startPreview() {
+        syncAnimation();
+    }
+
+    /**
+     * Keeps the idle motion running even with no cosmetic equipped.
+     *
+     * <p>By default the preview only animates while there is a cape or pet to move, which is right
+     * for the Cosmetics editor (nothing equipped means nothing to animate). The Launch-tab hero
+     * wants the character to turn and glance regardless, so it opts in here rather than changing
+     * the editor's behaviour.
+     */
+    public void setAlwaysAnimate(boolean value) {
+        this.alwaysAnimate = value;
+        syncAnimation();
+    }
+
+    /**
+     * Releases every bitmap this view cached and stops its animation.
+     *
+     * <p>Called from the host's {@code onPause}/{@code onDestroy} so switching away from the Launch
+     * tab (or the Mod Menu) cannot leave the face crops, alpha masks, decoded atlases and the 2x
+     * supersample target resident. On a low-end device those are tens of megabytes of ARGB_8888
+     * that the next screen has to compete with, which is the "black box" the report saw: the
+     * allocation failed and {@link #ensureFrame} returned null mid-frame.
+     *
+     * <p>Idempotent and safe to call off the animation: {@code rebuildFaceCrops()} re-derives the
+     * crops from the skin the next time the view is shown, so a released view still draws.
+     */
+    public void release() {
+        stopAnimation();
+        recycle(baseFaceCrops);
+        recycle(overlayFaceCrops);
+        recycle(baseFaceMasks);
+        recycle(overlayFaceMasks);
+        baseFaceCrops = null;
+        overlayFaceCrops = null;
+        baseFaceMasks = null;
+        overlayFaceMasks = null;
+        for (Bitmap mask : meshMaskCache.values()) recycleOne(mask);
+        meshMaskCache.clear();
+        recycleOne(accessoryAtlas);
+        recycleOne(petAtlas);
+        accessoryAtlas = null;
+        petAtlas = null;
+        accessoryAtlasLoaded = false;
+        petAtlasLoaded = false;
+        recycleOne(frame);
+        frame = null;
+        rebuildFaceCrops();
+    }
+
+    private static void recycle(Bitmap[][] grid) {
+        if (grid == null) return;
+        for (Bitmap[] row : grid) {
+            if (row == null) continue;
+            for (Bitmap b : row) recycleOne(b);
+        }
+    }
+
+    private static void recycleOne(Bitmap bitmap) {
+        if (bitmap != null && !bitmap.isRecycled()) bitmap.recycle();
+    }
+
     private void syncAnimation() {
         boolean want = DynamicAnim.areAnimationsEnabled() && getVisibility() == VISIBLE && attached
-                && (pet != null || cape != null);
+                && (alwaysAnimate || pet != null || cape != null);
         if (want && !animating) {
             animating = true;
             lastFrameNanos = 0L;

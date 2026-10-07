@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Maximum width for a top-level page column, so a widescreen tablet or a landscape foldable
+    cannot stretch the Launch tab's content edge to edge. Set on a content column's
+    app:layout_constraintWidth_max; on a phone the column is already narrower, so it is inert.
+-->
+<resources>
+    <dimen name="page_max_width">600dp</dimen>
+    <dimen name="dock_max_width">680dp</dimen>
+</resources>
