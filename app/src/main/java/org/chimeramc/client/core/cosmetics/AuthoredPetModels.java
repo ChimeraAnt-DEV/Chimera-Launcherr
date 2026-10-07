@@ -69,7 +69,10 @@ public final class AuthoredPetModels {
                                         CosmeticCatalog.PetSpecies species) {
         String file = fileFor(species);
         if (assets == null || file == null) return null;
-        return AuthoredGeometry.loadFromAssets(assets, DIR, file, PetGeometry.GEOMETRY_ID);
+        String model = AuthoredGeometry.loadFromAssets(assets, DIR, file, PetGeometry.GEOMETRY_ID);
+        // Retarget the author's bone names onto the vocabulary the gait controller drives, so the
+        // authored mesh animates (walks, runs, flaps) instead of rendering stiff.
+        return model == null ? null : PetBoneRetarget.apply(model);
     }
 
     /**
@@ -78,6 +81,7 @@ public final class AuthoredPetModels {
     public static String loadFromDir(File dir, CosmeticCatalog.PetSpecies species) {
         String file = fileFor(species);
         if (dir == null || file == null) return null;
-        return AuthoredGeometry.loadFromFile(new File(dir, file), PetGeometry.GEOMETRY_ID);
+        String model = AuthoredGeometry.loadFromFile(new File(dir, file), PetGeometry.GEOMETRY_ID);
+        return model == null ? null : PetBoneRetarget.apply(model);
     }
 }
