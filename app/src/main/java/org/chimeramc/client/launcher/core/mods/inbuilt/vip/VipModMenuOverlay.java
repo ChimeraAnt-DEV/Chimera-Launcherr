@@ -641,9 +641,14 @@ public class VipModMenuOverlay {
     }
 
     private void openConfig(UnifiedMod mod) {
-        if (mod.openCustomConfig()) {
-            hide();
-            return;
+        try {
+            if (mod.openCustomConfig()) {
+                hide();
+                return;
+            }
+        } catch (Throwable ignored) {
+            // A custom config surface (a full editor screen) that throws on open must not take the
+            // menu, or the game, down. Fall through to the in-overlay config body.
         }
         if (configTitle != null) configTitle.setText(mod.getName());
         if (configContent != null) {
