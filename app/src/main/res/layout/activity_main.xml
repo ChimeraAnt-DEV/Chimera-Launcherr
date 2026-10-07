@@ -19,7 +19,8 @@
             app:contentScrim="@color/surface_dark"
             app:statusBarScrim="@color/surface_dark">
 
-            <!-- Premium Header Section -->
+            <!-- Launch Tab Header: the account row only. The launcher name and its news button
+                 were removed from this tab by request; the brand is carried by the nav bar. -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -28,64 +29,10 @@
                 android:background="@drawable/gradient_header"
                 app:layout_collapseMode="parallax">
 
-                <!-- App Title & Branding -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <ImageView
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:src="@drawable/ic_minecraft_cube"
-                        android:background="@drawable/icon_circle_bg"
-                        android:padding="8dp" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="12dp"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/minecraftTitleText"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/home_app_title"
-                            android:fontFamily="@font/misans"
-                            android:textColor="@color/on_header_gradient"
-                            android:textSize="24sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/home_subtitle"
-                            android:fontFamily="@font/misans"
-                            android:textColor="@color/on_header_gradient_secondary"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:id="@+id/settings_button"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:src="@drawable/ic_settings"
-                        android:padding="8dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:clickable="true"
-                        android:focusable="true"
-                        app:tint="@color/on_header_gradient" />
-                </LinearLayout>
-
-                <!-- Account Status Bar -->
                 <LinearLayout
                     android:id="@+id/account_status_bar"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
                     android:background="@drawable/glass_card"
                     android:padding="10dp"
                     android:gravity="center_vertical"
@@ -361,30 +308,13 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Quick Actions Grid -->
-            <LinearLayout
-                android:layout_width="wrap_content"
+            <include
+                layout="@layout/include_section_header"
+                android:id="@+id/section_quick"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:layout_marginBottom="12dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <View
-                    android:layout_width="3dp"
-                    android:layout_height="16dp"
-                    android:background="@drawable/section_accent_bar" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="@string/quick_actions_title"
-                    android:fontFamily="@font/misans"
-                    android:textColor="@color/on_surface"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
+                android:layout_marginBottom="12dp" />
 
             <!-- Quick action tiles: equal weights, one uniform 8dp gutter. -->
             <LinearLayout
@@ -488,13 +418,19 @@
 
             </LinearLayout>
 
-            <!-- Main Launch Section -->
+            <include
+                layout="@layout/include_section_header"
+                android:id="@+id/section_launch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:layout_marginBottom="10dp" />
+
             <LinearLayout
                 android:id="@+id/premium_launch_card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/glass_card_elevated"
+                android:background="@drawable/card_launch_gradient"
                 android:orientation="vertical"
                 android:padding="16dp">
 
@@ -605,87 +541,14 @@
                     android:indeterminateTint="@color/primary" />
             </LinearLayout>
 
-            <!-- News & Updates Section -->
-            <LinearLayout
+            <!-- Content Library Section -->
+            <include
+                layout="@layout/include_section_header"
+                android:id="@+id/section_content"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:orientation="vertical">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/news_title"
-                        android:fontFamily="@font/misans"
-                        android:textColor="@color/on_surface"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:drawableStart="@drawable/section_accent_bar"
-                        android:drawablePadding="8dp" />
-
-                    <TextView
-                        android:id="@+id/news_view_all"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/view_all"
-                        android:fontFamily="@font/misans"
-                        android:textColor="@color/primary"
-                        android:textSize="12sp"
-                        android:clickable="true"
-                        android:focusable="true" />
-                </LinearLayout>
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/news_recycler"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:nestedScrollingEnabled="false" />
-            </LinearLayout>
-
-        <!-- Content Library Section -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:orientation="vertical">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/home_content_library"
-                        android:fontFamily="@font/misans"
-                        android:textColor="@color/on_surface"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:drawableStart="@drawable/section_accent_bar"
-                        android:drawablePadding="8dp" />
-
-                    <TextView
-                        android:id="@+id/contentViewAll"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/view_all"
-                        android:fontFamily="@font/misans"
-                        android:textColor="@color/primary"
-                        android:textSize="12sp"
-                        android:clickable="true"
-                        android:focusable="true" />
-                </LinearLayout>
+                android:layout_marginTop="18dp"
+                android:layout_marginBottom="12dp" />
 
                 <LinearLayout
                     android:id="@+id/contentWorldsRow"
@@ -699,6 +562,14 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_marginEnd="12dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_minecraft_cube"
+                        app:tint="@color/primary" />
 
                     <TextView
                         android:layout_width="0dp"
@@ -715,6 +586,16 @@
                         android:layout_height="wrap_content"
                         android:textColor="@color/text_secondary"
                         android:textSize="13sp" />
+                
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="8dp"
+                        android:alpha="0.7"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/text_secondary" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -729,6 +610,14 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_marginEnd="12dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_content"
+                        app:tint="@color/accent_sky" />
 
                     <TextView
                         android:layout_width="0dp"
@@ -745,6 +634,16 @@
                         android:layout_height="wrap_content"
                         android:textColor="@color/text_secondary"
                         android:textSize="13sp" />
+                
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="8dp"
+                        android:alpha="0.7"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/text_secondary" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -759,6 +658,14 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_marginEnd="12dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_behavior"
+                        app:tint="@color/secondary" />
 
                     <TextView
                         android:layout_width="0dp"
@@ -775,25 +682,26 @@
                         android:layout_height="wrap_content"
                         android:textColor="@color/text_secondary"
                         android:textSize="13sp" />
+                
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="8dp"
+                        android:alpha="0.7"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/text_secondary" />
                 </LinearLayout>
-            </LinearLayout>
 
             <!-- More Section -->
-            <LinearLayout
+            <include
+                layout="@layout/include_section_header"
+                android:id="@+id/section_more"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="16dp"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/home_more"
-                    android:fontFamily="@font/misans"
-                    android:textColor="@color/on_surface"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                android:layout_marginTop="18dp"
+                android:layout_marginBottom="12dp" />
 
                 <LinearLayout
                     android:id="@+id/miscCurseforgeRow"
@@ -808,6 +716,14 @@
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground">
 
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_marginEnd="12dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_qa_curseforge"
+                        app:tint="@color/accent_violet" />
+
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -816,6 +732,16 @@
                         android:fontFamily="@font/misans"
                         android:textColor="@color/on_surface"
                         android:textSize="14sp" />
+                
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="8dp"
+                        android:alpha="0.7"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/text_secondary" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -831,6 +757,14 @@
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground">
 
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_marginEnd="12dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_plugin"
+                        app:tint="@color/accent_sky" />
+
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -839,6 +773,16 @@
                         android:fontFamily="@font/misans"
                         android:textColor="@color/on_surface"
                         android:textSize="14sp" />
+                
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="8dp"
+                        android:alpha="0.7"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/text_secondary" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -854,6 +798,14 @@
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground">
 
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_marginEnd="12dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_qa_account"
+                        app:tint="@color/secondary" />
+
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -862,6 +814,16 @@
                         android:fontFamily="@font/misans"
                         android:textColor="@color/on_surface"
                         android:textSize="14sp" />
+                
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="8dp"
+                        android:alpha="0.7"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/text_secondary" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -877,6 +839,14 @@
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground">
 
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_marginEnd="12dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_qa_launch"
+                        app:tint="@color/primary" />
+
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -885,6 +855,16 @@
                         android:fontFamily="@font/misans"
                         android:textColor="@color/on_surface"
                         android:textSize="14sp" />
+                
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="8dp"
+                        android:alpha="0.7"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/text_secondary" />
                 </LinearLayout>
 
                 <TextView
@@ -895,7 +875,6 @@
                     android:gravity="center"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
-            </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

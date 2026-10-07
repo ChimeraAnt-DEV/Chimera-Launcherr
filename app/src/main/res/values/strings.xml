@@ -1526,28 +1526,17 @@ Migration must complete before GlowberryClient can continue.</string>
 
     <!-- Offhand -->
     <string name="inbuilt_mod_offhand">Offhand</string>
-    <string name="inbuilt_mod_offhand_desc">Swap to and use your off-hand item with a button or keybind; works in worlds, Realms and servers</string>
+    <string name="inbuilt_mod_offhand_desc">Open your inventory to fill the off-hand slot, or use the off-hand item with a button or keybind</string>
     <string name="mod_config_offhand_mode">Button action</string>
-    <string name="mod_config_offhand_mode_labels">Swap,Use,Both</string>
-    <string name="mod_config_offhand_swap_key">Swap key</string>
+    <string name="mod_config_offhand_mode_labels">Open inventory,Use,Both</string>
+    <string name="mod_config_offhand_inventory_key">Open-inventory key</string>
+    <string name="mod_config_offhand_swap_key">Open-inventory key</string>
     <string name="mod_config_offhand_use_key">Use key</string>
     <string name="mod_config_offhand_keybind">Hardware keybind</string>
-    <string name="offhand_scope_note">This sends the game\'s own off-hand keys (swap and use). Bedrock decides the swap and use, so it works the same in a local world, a Realm or a large server — nothing is server-specific.</string>
+    <string name="offhand_scope_note">Bedrock has no swap-to-off-hand key. The off-hand slot is filled from your inventory, and only shields, arrows, firework rockets, totems of undying, maps and nautilus shells can go in it. This button opens the inventory for you (or uses the off-hand item), and works the same in a world, a Realm or a server.</string>
     <string name="changelog_title">What’s new</string>
     <string name="changelog_version">GlowberryClient %1$s</string>
     <string name="changelog_continue">Continue</string>
-    <string name="news_title">Launcher news</string>
-    <string name="news_subtitle">Updates, announcements, and important notices from the GlowberryClient team.</string>
-    <string name="news_enable_notifications">Enable notifications</string>
-    <string name="news_refresh">Refresh news</string>
-    <string name="news_empty">No news has been published yet.</string>
-    <string name="news_read_more">Read more</string>
-    <string name="news_important">Important</string>
-    <string name="news_refreshed">News updated</string>
-    <string name="news_refresh_failed">Could not refresh. Showing saved news.</string>
-    <string name="news_unread_description">Launcher news, %1$d unread</string>
-    <string name="news_notification_channel">Launcher news</string>
-    <string name="news_notification_channel_description">New GlowberryClient announcementsand important notices</string>
     <string name="foreground_service_channel">Minecraft</string>
     <string name="foreground_service_notification_title">Minecraft is running</string>
     <string name="foreground_service_notification_text">Keeping the game alive in the background</string>

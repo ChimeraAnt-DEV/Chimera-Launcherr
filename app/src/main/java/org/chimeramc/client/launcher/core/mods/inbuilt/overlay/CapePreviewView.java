@@ -13,6 +13,9 @@ import org.chimeramc.client.core.cosmetics.CapePatterns;
 import org.chimeramc.client.core.cosmetics.CapeSimulator;
 import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
 import org.chimeramc.client.core.cosmetics.CosmeticLayering;
+import org.chimeramc.client.core.cosmetics.AuthoredHatModels;
+import org.chimeramc.client.core.cosmetics.AuthoredGeometry;
+import org.chimeramc.client.core.cosmetics.AuthoredPetModels;
 import org.chimeramc.client.core.cosmetics.PetModel;
 import org.chimeramc.client.core.cosmetics.PetPose;
 import org.chimeramc.client.core.cosmetics.PlayerSkinProvider;
@@ -20,6 +23,9 @@ import org.chimeramc.client.core.cosmetics.PreviewDepthBuffer;
 import org.chimeramc.client.core.cosmetics.PreviewLighting;
 import org.chimeramc.client.core.cosmetics.QuadDepthSorter;
 import org.chimeramc.client.core.cosmetics.SkinModel;
+import org.chimeramc.client.core.cosmetics.geometry.BedrockGeometry;
+import org.chimeramc.client.core.cosmetics.geometry.BedrockGeometryParser;
+import org.chimeramc.client.core.cosmetics.geometry.PreviewMeshModel;
 import org.chimeramc.client.ui.animation.DynamicAnim;
 
 import java.util.ArrayList;
@@ -90,6 +96,50 @@ public class CapePreviewView extends View {
 
     /** Body depth, so the cape is clipped where the skin is in front of it. */
     private final PreviewDepthBuffer depthBuffer = new PreviewDepthBuffer();
+
+    /**
+     * The authored Blockbench mesh for the equipped accessory, resolved once per selection.
+     *
+     * <p>When an accessory has a hand-authored {@code .geo.json} (see {@code AuthoredHatModels}),
+     * the preview draws its real geometry — its bone pivots, per-cube UVs and mirrored faces — rather
+     * than the procedural box stack. The procedural path stays for the many accessories that have no
+     * authored mesh, so nothing regresses.
+     */
+    private List<PreviewMeshModel.Box> accessoryMesh;
+    /** The authored mesh's atlas, decoded lazily; null until the first frame that needs it. */
+    private Bitmap accessoryAtlas;
+    private boolean accessoryAtlasLoaded;
+    /** The authored mesh's identifier, used to pick the atlas file. */
+    private String accessoryMeshTextureFile;
+
+    /**
+     * The authored Blockbench mesh for the equipped pet, resolved once per selection.
+     *
+     * <p>Same pipeline as the accessory mesh ({@code .geo.json} -> {@code BedrockGeometryParser} ->
+     * {@code PreviewMeshModel}), so a pet authored in Blockbench is drawn as its real rig rather than
+     * the procedural body plan. A pet with no authored mesh (or an unreadable asset) leaves this null
+     * and the procedural {@code PetModel} path draws it as before.
+     */
+    private List<PreviewMeshModel.Box> petMesh;
+    private Bitmap petAtlas;
+    private boolean petAtlasLoaded;
+    private String petMeshTextureFile;
+
+    /** Reused projection scratch for the authored-mesh pass, so it allocates nothing per frame. */
+    private final float[] meshCorners = new float[8];
+    private final List<MeshQuad> meshDrawList = new ArrayList<>();
+
+    /** A projected authored-mesh face, held until it is depth-sorted and painted. */
+    private static final class MeshQuad {
+        final float[] verts = new float[8];
+        float groupDepth;
+        float depth;
+        float[] uv;      // source atlas rect {u, v, w, h} in atlas pixels
+        boolean flipH;
+        boolean flipV;
+        float[] normal = {0f, 0f, 1f};
+        float persp = 1f;
+    }
 
     /** Reused cape projections so a swinging cape allocates nothing per frame. */
     private float[] capeXs;
@@ -172,14 +222,78 @@ public class CapePreviewView extends View {
 
     public void setAccessory(CosmeticCatalog.Accessory accessory) {
         this.accessory = accessory;
+        rebuildAccessoryMesh();
         syncAnimation();
         invalidate();
     }
 
+    /**
+     * Resolves the equipped accessory's authored Blockbench mesh, if it has one.
+     *
+     * <p>Runs once per selection, never per frame. The mesh is parsed from the pack assets and the
+     * bone hierarchy is flattened to world-space corners here; the renderer then only projects.
+     * An accessory with no authored model (or an unreadable asset) leaves {@link #accessoryMesh}
+     * null and the procedural path draws it as before, so a broken file cannot blank the preview.
+     */
+    private void rebuildAccessoryMesh() {
+        accessoryMesh = null;
+        accessoryMeshTextureFile = null;
+        if (accessory == null || accessory.modelId == null) return;
+        if (!AuthoredHatModels.hasAuthoredModel(accessory.modelId)) return;
+
+        String json = AuthoredHatModels.loadFromAssets(this::openAsset, accessory.modelId);
+        if (json == null) return;
+        BedrockGeometry geometry = BedrockGeometryParser.parse(json);
+        if (geometry == null) return;
+        List<PreviewMeshModel.Box> boxes = PreviewMeshModel.build(geometry);
+        if (boxes.isEmpty()) return;
+
+        accessoryMesh = boxes;
+        accessoryMeshTextureFile = AuthoredHatModels.textureFor(accessory.modelId);
+        // A new accessory means a new atlas; drop the cached decode so the next frame reloads it.
+        if (accessoryAtlas != null && !accessoryAtlas.isRecycled()) accessoryAtlas.recycle();
+        accessoryAtlas = null;
+        accessoryAtlasLoaded = false;
+    }
+
+    /** Opens a pack asset, matching the {@link AuthoredGeometry.AssetOpener} contract. */
+    private java.io.InputStream openAsset(String path) throws java.io.IOException {
+        return getContext().getAssets().open(path);
+    }
+
     public void setPet(CosmeticCatalog.Pet pet) {
         this.pet = pet;
+        rebuildPetMesh();
         syncAnimation();
         invalidate();
+    }
+
+    /**
+     * Resolves the equipped pet's authored Blockbench mesh, if it has one.
+     *
+     * <p>Runs once per selection, never per frame, mirroring {@link #rebuildAccessoryMesh}. A pet
+     * without an authored model keeps the procedural body plan, so the shipped set of authored pets
+     * is a strict upgrade with no regression for the rest.
+     */
+    private void rebuildPetMesh() {
+        petMesh = null;
+        petMeshTextureFile = null;
+        if (pet == null) return;
+        String petId = pet.modelId != null ? pet.modelId : pet.id;
+        if (!AuthoredPetModels.hasAuthoredModel(petId)) return;
+
+        String json = AuthoredPetModels.loadFromAssets(this::openAsset, petId);
+        if (json == null) return;
+        BedrockGeometry geometry = BedrockGeometryParser.parse(json);
+        if (geometry == null) return;
+        List<PreviewMeshModel.Box> boxes = PreviewMeshModel.build(geometry);
+        if (boxes.isEmpty()) return;
+
+        petMesh = boxes;
+        petMeshTextureFile = AuthoredPetModels.textureFor(petId);
+        if (petAtlas != null && !petAtlas.isRecycled()) petAtlas.recycle();
+        petAtlas = null;
+        petAtlasLoaded = false;
     }
 
     /** The gait the equipped pet is currently animating; the panel offers the ones it supports. */
@@ -409,6 +523,14 @@ public class CapePreviewView extends View {
      */
     private void drawPet(Canvas canvas, float originX, float originY, float scale) {
         if (pet == null) return;
+
+        // An authored Blockbench pet is drawn as its real rig, placed beside the player at the same
+        // ground line. The procedural body plan below is the fallback for pets with no authored mesh.
+        if (petMesh != null && !petMesh.isEmpty()) {
+            drawAuthoredPet(canvas, originX, originY, scale);
+            return;
+        }
+
         float ps = scale * pet.scale;
 
         // The ground line is the projected model origin, since the camera orbits above the feet.
@@ -439,6 +561,52 @@ public class CapePreviewView extends View {
             drawPetModel(canvas, px, py + lift, ps, originX, originY,
                     0f, -petPose.crouchDrop, 0f, false);
         }
+    }
+
+    /**
+     * Draws an authored Blockbench pet beside the player.
+     *
+     * <p>The mesh is centred on its own X/Z (authored pets are symmetric about the origin) and
+     * placed at the same ground line the procedural pet uses, so the two paths look like the same
+     * companion rather than two different toys. A soft contact shadow grounds it, and the gait lift
+     * matches the procedural path so a flying or swimming pet is visibly off the ground.
+     */
+    private void drawAuthoredPet(Canvas canvas, float originX, float originY, float scale) {
+        float ps = scale * pet.scale;
+        camera.project(0f, 0f, 0f, scale, originX, originY, projected);
+        float groundY = projected[1];
+
+        float lift = 0f;
+        if (petLocomotion == CosmeticCatalog.PetLocomotion.FLY) {
+            lift = 5f + petPose.bodyBob * 0.6f;
+        } else if (petLocomotion == CosmeticCatalog.PetLocomotion.SWIM) {
+            lift = 1.5f;
+        }
+
+        // Beside the player, matching the procedural offset, with the mesh centred on its own X/Z.
+        float px = originX + 20f * scale;
+        float offsetX = 20f;
+        float offsetZ = 0f;
+        float offsetY = lift;
+
+        drawPetShadow(canvas, px, groundY + 0.5f * scale, scale, lift);
+        drawAuthoredMeshAt(canvas, petMesh, ensurePetAtlas(),
+                offsetX, offsetY, offsetZ, pet.color, scale, originX, originY);
+    }
+
+    /** The atlas for the current authored pet, decoded once and cached. */
+    private Bitmap ensurePetAtlas() {
+        if (petAtlasLoaded) return petAtlas;
+        petAtlasLoaded = true;
+        petAtlas = null;
+        if (petMeshTextureFile == null) return null;
+        try (java.io.InputStream input = getContext().getAssets()
+                .open(AuthoredPetModels.DIR + "/" + petMeshTextureFile)) {
+            petAtlas = android.graphics.BitmapFactory.decodeStream(input);
+        } catch (java.io.IOException | RuntimeException e) {
+            petAtlas = null;
+        }
+        return petAtlas;
     }
 
     /** A soft contact shadow under the pet, faded by how far it is off the ground. */
@@ -1055,6 +1223,12 @@ public class CapePreviewView extends View {
      */
     private void drawAccessoryFront(Canvas canvas, float originX, float originY, float scale) {
         if (accessory == null || accessory.kind == CosmeticCatalog.AccessoryKind.NONE) return;
+        // An authored Blockbench mesh is the exact model the in-game pack draws, so prefer it over
+        // the procedural box stack whenever the accessory has one.
+        if (accessoryMesh != null) {
+            drawAuthoredMesh(canvas, originX, originY, scale);
+            return;
+        }
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
         switch (accessory.kind) {
@@ -1321,6 +1495,177 @@ public class CapePreviewView extends View {
             default:
                 break;
         }
+    }
+
+    // ---- Authored Blockbench mesh ---------------------------------------------------------
+
+    /**
+     * Draws the equipped accessory's authored {@code .geo.json} mesh, if it has one.
+     *
+     * <p>This is the payoff of the preview pipeline: instead of a procedural box stack the preview
+     * shows the exact authored model — every bone pivot, every cube, every mirrored face UV. The
+     * mesh was resolved to world-space corners in {@link #rebuildAccessoryMesh}; here it is only
+     * projected, depth-sorted and painted.
+     *
+     * <p>Colour comes from the accessory's palette when no atlas is available, and from the decoded
+     * atlas when it is, so a hat authored with a real texture shows that texture and a hat without
+     * one still shows its silhouette.
+     */
+    private void drawAuthoredMesh(Canvas canvas, float originX, float originY, float scale) {
+        if (accessoryMesh == null || accessoryMesh.isEmpty()) return;
+        int fallback = accessory == null ? 0xFFB0B0B0 : accessory.color;
+        drawAuthoredMeshAt(canvas, accessoryMesh, ensureAccessoryAtlas(),
+                0f, 0f, 0f, fallback, scale, originX, originY);
+    }
+
+    /**
+     * Draws an authored mesh at a model-space offset.
+     *
+     * <p>Shared by the accessory (offset zero) and the pet (offset to the player's side), so the two
+     * cannot drift on projection, depth sorting, lighting or UV mirroring. The offset is applied to
+     * each corner before projection, which is the same as translating the mesh in the world without
+     * rebuilding it.
+     */
+    private void drawAuthoredMeshAt(Canvas canvas, List<PreviewMeshModel.Box> mesh, Bitmap atlas,
+                                    float offsetX, float offsetY, float offsetZ, int fallbackColor,
+                                    float scale, float originX, float originY) {
+        if (mesh == null || mesh.isEmpty()) return;
+
+        meshDrawList.clear();
+        for (PreviewMeshModel.Box box : mesh) {
+            // A single centroid depth orders whole cubes; the face's own depth breaks ties within a
+            // cube, exactly the two-level key QuadDepthSorter uses for the character.
+            float groupDepth = centroidDepth(box, offsetX, offsetY, offsetZ, scale, originX, originY);
+            for (int face = 0; face < 6; face++) {
+                float[] normal = faceNormal(box, face);
+                if (!camera.faceVisibleNormal(normal[0], normal[1], normal[2])) continue;
+                int[] indices = PreviewMeshModel.faceCornerIndices(face);
+                MeshQuad quad = new MeshQuad();
+                float depthSum = 0f;
+                for (int i = 0; i < 4; i++) {
+                    float[] corner = box.corners[indices[i]];
+                    projectPoint(corner[0] + offsetX, corner[1] + offsetY, corner[2] + offsetZ,
+                            scale, originX, originY);
+                    quad.verts[i * 2] = projected[0];
+                    quad.verts[i * 2 + 1] = projected[1];
+                    depthSum += projected[2];
+                }
+                quad.groupDepth = groupDepth;
+                quad.depth = depthSum / 4f;
+                PreviewMeshModel.FaceUv uv = box.faceUv[face];
+                if (uv != null) {
+                    quad.uv = new float[]{uv.u, uv.v, uv.w, uv.h};
+                    quad.flipH = uv.flipH;
+                    quad.flipV = uv.flipV;
+                }
+                quad.normal = normal;
+                quad.persp = camera.perspectiveAt(box.corners[indices[0]][0] + offsetX,
+                        box.corners[indices[0]][1] + offsetY,
+                        box.corners[indices[0]][2] + offsetZ);
+                meshDrawList.add(quad);
+            }
+        }
+
+        meshDrawList.sort((a, b) -> QuadDepthSorter.compare(
+                a.groupDepth, a.depth, b.groupDepth, b.depth));
+
+        boolean textured = atlas != null;
+        pixelPaint.setAntiAlias(true);
+        pixelPaint.setFilterBitmap(true);
+        pixelPaint.setDither(true);
+        paint.setShader(null);
+        for (MeshQuad quad : meshDrawList) {
+            if (textured && quad.uv != null && quad.uv[2] > 0.5f && quad.uv[3] > 0.5f) {
+                drawMeshQuadTextured(canvas, atlas, quad);
+            } else {
+                paint.setColor(PreviewLighting.shadeColorForNormal(
+                        fallbackColor, quad.normal[0], quad.normal[1], quad.normal[2]));
+                paint.setAlpha(255);
+                drawQuad(canvas, quad.verts);
+            }
+        }
+    }
+
+    /** Paints one authored-mesh face from the atlas, honouring the face's mirror flags. */
+    private void drawMeshQuadTextured(Canvas canvas, Bitmap atlas, MeshQuad quad) {
+        int u = (int) quad.uv[0];
+        int v = (int) quad.uv[1];
+        int w = (int) quad.uv[2];
+        int h = (int) quad.uv[3];
+        if (u < 0) u = 0;
+        if (v < 0) v = 0;
+        if (u + w > atlas.getWidth()) w = atlas.getWidth() - u;
+        if (v + h > atlas.getHeight()) h = atlas.getHeight() - v;
+        if (w <= 0 || h <= 0) return;
+
+        // Source corners in grid order [TL, TR, BL, BR]. A negative authored uv_size mirrors the
+        // sample, so the left/right or top/bottom source corners swap to match the mesh.
+        float su0 = quad.flipH ? u + w : u;
+        float su1 = quad.flipH ? u : u + w;
+        float sv0 = quad.flipV ? v + h : v;
+        float sv1 = quad.flipV ? v : v + h;
+        float[] src = {su0, sv0, su1, sv0, su0, sv1, su1, sv1};
+
+        android.graphics.Matrix matrix = new android.graphics.Matrix();
+        matrix.setPolyToPoly(src, 0, quad.verts, 0, 4);
+        canvas.save();
+        canvas.clipPath(quadPath(quad.verts));
+        canvas.drawBitmap(atlas, matrix, pixelPaint);
+        canvas.restore();
+    }
+
+    private final Path meshClip = new Path();
+
+    private Path quadPath(float[] v) {
+        meshClip.reset();
+        meshClip.moveTo(v[0], v[1]);
+        meshClip.lineTo(v[2], v[3]);
+        meshClip.lineTo(v[6], v[7]);
+        meshClip.lineTo(v[4], v[5]);
+        meshClip.close();
+        return meshClip;
+    }
+
+    /** The atlas for the current authored mesh, decoded once and cached. */
+    private Bitmap ensureAccessoryAtlas() {
+        if (accessoryAtlasLoaded) return accessoryAtlas;
+        accessoryAtlasLoaded = true;
+        accessoryAtlas = null;
+        if (accessoryMeshTextureFile == null) return null;
+        try (java.io.InputStream input = getContext().getAssets()
+                .open(AuthoredHatModels.DIR + "/" + accessoryMeshTextureFile)) {
+            accessoryAtlas = android.graphics.BitmapFactory.decodeStream(input);
+        } catch (java.io.IOException | RuntimeException e) {
+            accessoryAtlas = null;
+        }
+        return accessoryAtlas;
+    }
+
+    /** A resolved box's centroid depth, the primary painter's key for its faces. */
+    private float centroidDepth(PreviewMeshModel.Box box, float offsetX, float offsetY, float offsetZ,
+                                float scale, float originX, float originY) {
+        float cx = 0f, cy = 0f, cz = 0f;
+        for (float[] corner : box.corners) {
+            cx += corner[0] / 8f;
+            cy += corner[1] / 8f;
+            cz += corner[2] / 8f;
+        }
+        camera.project(cx + offsetX, cy + offsetY, cz + offsetZ, scale, originX, originY, projected);
+        return projected[2];
+    }
+
+    /** A face's outward normal, rotated by the bone chain so the cull and the light agree. */
+    private static float[] faceNormal(PreviewMeshModel.Box box, int face) {
+        float[] base;
+        switch (face) {
+            case 0: base = new float[]{0f, 1f, 0f}; break;   // top
+            case 1: base = new float[]{0f, -1f, 0f}; break;  // bottom
+            case 2: base = new float[]{-1f, 0f, 0f}; break;  // left / west
+            case 3: base = new float[]{1f, 0f, 0f}; break;   // right / east
+            case 4: base = new float[]{0f, 0f, 1f}; break;   // front / south
+            default: base = new float[]{0f, 0f, -1f}; break; // back / north
+        }
+        return PreviewMeshModel.rotateNormal(base, box.rotations);
     }
 
     private void drawBox(Canvas canvas, float cx, float cy, float cz,

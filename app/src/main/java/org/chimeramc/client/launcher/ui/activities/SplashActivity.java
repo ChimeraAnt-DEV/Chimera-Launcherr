@@ -55,6 +55,7 @@ public class SplashActivity extends BaseActivity {
     private long sequenceStart;
 
     private ValueAnimator spinAnimator;
+    private ValueAnimator breatheAnimator;
     private Runnable tick;
     private Runnable holdIdle;
 
@@ -97,6 +98,7 @@ public class SplashActivity extends BaseActivity {
 
     private void cancelAnimators() {
         if (spinAnimator != null) spinAnimator.cancel();
+        if (breatheAnimator != null) breatheAnimator.cancel();
         if (tick != null) binding.getRoot().removeCallbacks(tick);
         if (holdIdle != null) binding.getRoot().removeCallbacks(holdIdle);
     }
@@ -106,6 +108,8 @@ public class SplashActivity extends BaseActivity {
     private void startSplashSequence() {
         sequenceStart = SystemClock.uptimeMillis();
         boolean animate = new PersonalizationManager(this).isShowAnimations();
+
+        binding.splashScene.setAnimationsEnabled(animate);
 
         if (!animate) {
             // Reduced motion: no loader theatre, just warm up and go.
@@ -150,9 +154,34 @@ public class SplashActivity extends BaseActivity {
                     .start();
 
             startBlockSpin();
+            startLogoBreathe();
         }
 
         runInit(animate);
+    }
+
+    /**
+     * A slow scale/alpha breathe on the halo, so the lockup keeps a pulse of life the whole time
+     * the loader is cracking. Without it the mark sits perfectly still after its entrance, which
+     * reads as a frozen frame on a slow warm-up.
+     */
+    private void startLogoBreathe() {
+        breatheAnimator = ValueAnimator.ofFloat(0f, 1f);
+        breatheAnimator.setDuration(2400);
+        breatheAnimator.setRepeatCount(ValueAnimator.INFINITE);
+        breatheAnimator.setRepeatMode(ValueAnimator.REVERSE);
+        breatheAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
+        // Start after the entrance has settled the halo at alpha 1 / scale 1, so the two animators
+        // do not fight over the same properties during the first beat.
+        breatheAnimator.setStartDelay(620);
+        breatheAnimator.addUpdateListener(a -> {
+            float t = (float) a.getAnimatedValue();
+            float scale = 1f + 0.055f * t;
+            binding.logoGlow.setScaleX(scale);
+            binding.logoGlow.setScaleY(scale);
+            binding.logoGlow.setAlpha(0.9f + 0.1f * t);
+        });
+        breatheAnimator.start();
     }
 
     /** A slow, continuous 2D spin; cheap because the view rotates one sprite as a matrix. */
@@ -424,17 +453,19 @@ public class SplashActivity extends BaseActivity {
 
     private void applySplashTheme() {
         int accent = resolveAccentColor();
+        boolean dark = isDarkMode();
         binding.tvAppName.setTextColor(accent);
-        // The Glowberry mark is full-colour art, so it keeps its own palette; only the wordmark
-        // and the halo follow the user's accent.
+        // The Glowberry mark is full-colour art, so it keeps its own palette; only the wordmark,
+        // the halo and the backdrop follow the user's accent.
         binding.imgLeaf.setImageTintList(null);
         binding.logoGlow.setBackground(createRadialGlow(accent));
         binding.tvPreparing.setTextColor(blendColors(
                 getColor(R.color.text_secondary),
                 accent,
-                isDarkMode() ? 0.24f : 0.18f
+                dark ? 0.24f : 0.18f
         ));
-        binding.oreLoader.setColors(accent, isDarkMode());
+        binding.oreLoader.setColors(accent, dark);
+        binding.splashScene.setPalette(accent, dark);
     }
 
     private int resolveAccentColor() {

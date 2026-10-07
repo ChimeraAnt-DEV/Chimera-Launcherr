@@ -19,7 +19,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minHeight="22dp"
-            android:background="@drawable/bg_news_category"
+            android:background="@drawable/bg_changelog_version"
             android:fontFamily="@font/misans"
             android:gravity="center"
             android:paddingHorizontal="10dp"

@@ -14,14 +14,21 @@ import org.chimeramc.pojavcontrols.KeyMapper;
 import org.levimc.launcher.core.mods.inbuilt.nativemod.MoreButtonsMod;
 
 /**
- * The Offhand button: swaps the held item into the off hand and/or uses the off-hand item.
+ * The Offhand button: opens the inventory so an allowed item can go in the off-hand slot, and/or
+ * uses the off-hand item.
  *
- * <p>It injects the game's own off-hand keys (F to swap, V to use) through
- * {@link MoreButtonsMod#sendKey}, which is the same native key-injection path the working
- * on-screen button modules use (Quick Drop, Toggle HUD, Hotbar Slot). A key that only reached
- * {@code Activity.dispatchKeyEvent} is not seen by the game's input loop, which is why an earlier
- * version of this module did nothing at all. The path is key-level, so it behaves identically in a
- * local world, a Realm and on a large server such as The Hive — nothing here is server-specific.
+ * <p><b>Why this opens the inventory rather than "swapping".</b> Bedrock Edition has no swap-to-off-
+ * hand key at all — there is no {@code key.offhand} in the shipped input map, so Java's {@code F}
+ * swap simply does not exist here. The off-hand slot is filled from the inventory screen and accepts
+ * only a handful of items (shields, arrows, firework rockets, totems of undying, maps and nautilus
+ * shells). The working action is therefore to open the inventory ({@code key.inventory}, {@code E})
+ * and let the player place an allowed item, which is what the module's primary key now sends.
+ *
+ * <p>It injects the game's own keys through {@link MoreButtonsMod#sendKey}, the same native
+ * key-injection path the working on-screen button modules use (Quick Drop, Toggle HUD, Hotbar Slot).
+ * A key that only reached {@code Activity.dispatchKeyEvent} is not seen by the game's input loop,
+ * which is why an earlier version of this module did nothing at all. The path is key-level, so it
+ * behaves identically in a local world, a Realm and a large server such as The Hive.
  *
  * <p>The hardware keybind mirrors the button so a keyboard/controller player can trigger the same
  * action without the on-screen control.
@@ -32,10 +39,10 @@ public class OffhandOverlay extends BaseOverlayButton {
      * Re-entrancy guard for the synthetic keys.
      *
      * <p>A synthetic key is dispatched back through the activity, which re-enters the overlay
-     * manager's key handler. If the player bound the hardware key to the same code as the swap or
-     * use key, that would match the bind again and recurse. The guard makes the injected press skip
-     * the bind match and simply reach the game. Dispatch is synchronous on the UI thread, so a plain
-     * static flag is enough.
+     * manager's key handler. If the player bound the hardware key to the same code as the inventory
+     * or use key, that would match the bind again and recurse. The guard makes the injected press
+     * skip the bind match and simply reach the game. Dispatch is synchronous on the UI thread, so a
+     * plain static flag is enough.
      */
     private static boolean injecting;
 
@@ -58,7 +65,7 @@ public class OffhandOverlay extends BaseOverlayButton {
         setPressedIcon(true);
         InbuiltModManager manager = InbuiltModManager.getInstance(activity);
         performAction(activity, manager.getOffhandMode(),
-                manager.getOffhandSwapKey(), manager.getOffhandUseKey());
+                manager.getOffhandInventoryKey(), manager.getOffhandUseKey());
     }
 
     @Override
@@ -80,14 +87,15 @@ public class OffhandOverlay extends BaseOverlayButton {
     /**
      * Sends the configured off-hand key(s) synchronously through the activity's key dispatch.
      *
-     * <p>Mode 0 swaps, 1 uses, 2 does both in order, matching the config dialog's choice. Shared by
-     * the on-screen button and the hardware keybind so both deliver exactly the same keys.
+     * <p>Mode 0 opens the inventory, 1 uses the off-hand item, 2 does both in order, matching the
+     * config dialog's choice. Shared by the on-screen button and the hardware keybind so both
+     * deliver exactly the same keys.
      */
-    static void performAction(Activity activity, int mode, int swapKey, int useKey) {
+    static void performAction(Activity activity, int mode, int inventoryKey, int useKey) {
         if (injecting) return;
         injecting = true;
         try {
-            for (int keyCode : OffhandAction.keysFor(mode, swapKey, useKey)) {
+            for (int keyCode : OffhandAction.keysFor(mode, inventoryKey, useKey)) {
                 dispatchKey(activity, keyCode);
             }
         } finally {

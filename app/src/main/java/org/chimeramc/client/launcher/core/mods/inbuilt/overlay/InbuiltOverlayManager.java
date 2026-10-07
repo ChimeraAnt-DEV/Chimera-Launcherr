@@ -1118,7 +1118,7 @@ public class InbuiltOverlayManager {
             int offhandBind = manager.getOffhandKeybind();
             if (offhandBind != 0 && keyCode == offhandBind) {
                 OffhandOverlay.performAction(activity, manager.getOffhandMode(),
-                        manager.getOffhandSwapKey(), manager.getOffhandUseKey());
+                        manager.getOffhandInventoryKey(), manager.getOffhandUseKey());
                 return true;
             }
         }

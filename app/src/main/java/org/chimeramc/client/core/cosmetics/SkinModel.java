@@ -414,6 +414,20 @@ public final class SkinModel {
             double nz2 = face.ny * sinP + nz1 * cosP;
             return nz2 > 0.0001;
         }
+
+        /**
+         * Whether an arbitrary (already bone-rotated) normal points at the camera.
+         *
+         * <p>Authored Blockbench meshes do not use the six axis-aligned {@link Face} normals — a
+         * rotated bone turns a cube's face away from its base direction. Sharing this transform with
+         * {@link #faceVisible(Face)} keeps the mesh cull and the character cull identical.
+         */
+        public boolean faceVisibleNormal(float nx, float ny, float nz) {
+            double nx1 = nx * cosY + nz * sinY;
+            double nz1 = -nx * sinY + nz * cosY;
+            double nz2 = ny * sinP + nz1 * cosP;
+            return nz2 > 0.0001;
+        }
     }
 
     /** True when the UV lies inside the atlas, so a typo cannot sample out of bounds. */

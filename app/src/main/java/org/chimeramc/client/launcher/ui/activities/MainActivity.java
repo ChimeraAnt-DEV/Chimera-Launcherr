@@ -46,7 +46,7 @@ import org.chimeramc.client.core.minecraft.PlaytimeManager;
 import org.chimeramc.client.core.mods.FileHandler;
 import org.chimeramc.client.core.mods.Mod;
 import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
-import org.chimeramc.client.core.news.ChangelogManager;
+import org.chimeramc.client.core.changelog.ChangelogManager;
 import org.chimeramc.client.core.versions.GameVersion;
 import org.chimeramc.client.core.versions.VersionManager;
 import org.chimeramc.client.databinding.ActivityMainBinding;
@@ -253,7 +253,7 @@ import okhttp3.OkHttpClient;
             if (view == null) continue;
             DynamicAnim.overshootScaleIn(view, i * DynamicAnim.ARRIVAL_STEP_MS);
         }
-        View statsBlock = findViewById(R.id.contentViewAll);
+        View statsBlock = findViewById(R.id.section_content);
         if (statsBlock != null) {
             DynamicAnim.overshootScaleIn(statsBlock, order.length * DynamicAnim.ARRIVAL_STEP_MS);
         }
@@ -1434,8 +1434,8 @@ import okhttp3.OkHttpClient;
         // Setup Account Header
         setupAccountHeader();
 
-        // Setup News Section
-        setupNewsSection();
+        // Setup Launch-tab section headers
+        setupSectionHeaders();
 
         FeatureSettings.init(getApplicationContext());
         showRandomTip();
@@ -1493,24 +1493,40 @@ import okhttp3.OkHttpClient;
         refreshAccountHeaderUI();
     }
 
-    private void setupNewsSection() {
-        TextView newsViewAll = findViewById(R.id.news_view_all);
-        if (newsViewAll != null) {
-            newsViewAll.setOnClickListener(v -> openNewsFull());
-            DynamicAnim.applyPressScale(newsViewAll);
+    private void setupSectionHeaders() {
+        bindSectionHeader(R.id.section_quick, R.string.quick_actions_title, 0);
+        bindSectionHeader(R.id.section_launch, R.string.home_edition, 0);
+        View contentAction = bindSectionHeader(R.id.section_content,
+                R.string.home_content_library, R.string.view_all);
+        if (contentAction != null) {
+            contentAction.setOnClickListener(v -> openContentManagement());
+            DynamicAnim.applyPressScale(contentAction);
         }
-
-        androidx.recyclerview.widget.RecyclerView newsRecycler = findViewById(R.id.news_recycler);
-        if (newsRecycler != null) {
-            newsRecycler.setLayoutManager(new LinearLayoutManager(this));
-            newsRecycler.setHasFixedSize(true);
-            // TODO: Set up news adapter
-        }
+        bindSectionHeader(R.id.section_more, R.string.home_more, 0);
     }
 
-    private void openNewsFull() {
-        Intent intent = new Intent(this, NewsActivity.class);
-        startActivity(intent);
+    /**
+     * Fills one included section header. The header layout carries a shared action view, so a
+     * section with no action leaves it {@code GONE} rather than shipping a second near-identical
+     * header layout that would drift from this one.
+     *
+     * @return the trailing action view when one was shown, so the caller can wire its click;
+     *         {@code null} when the section has no action
+     */
+    private View bindSectionHeader(int includeId, int titleRes, int actionRes) {
+        View include = findViewById(includeId);
+        if (include == null) return null;
+        TextView title = include.findViewById(R.id.section_title);
+        if (title != null) title.setText(titleRes);
+        TextView action = include.findViewById(R.id.section_action);
+        if (action == null) return null;
+        if (actionRes == 0) {
+            action.setVisibility(View.GONE);
+            return null;
+        }
+        action.setText(actionRes);
+        action.setVisibility(View.VISIBLE);
+        return action;
     }
 
     private void showRandomTip() {
@@ -1551,9 +1567,6 @@ import okhttp3.OkHttpClient;
             if (behaviorPacksCountText != null)
                 behaviorPacksCountText.setText(String.valueOf(packs != null ? packs.size() : 0));
         });
-
-        binding.contentViewAll.setOnClickListener(v -> openContentManagement());
-        DynamicAnim.applyPressScale(binding.contentViewAll);
 
         binding.contentWorldsRow.setOnClickListener(v -> openContentList(ContentListActivity.TYPE_WORLDS));
         binding.contentResourcePacksRow.setOnClickListener(v -> openContentList(ContentListActivity.TYPE_RESOURCE_PACKS));

@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.preference.PreferenceManager
 import org.chimeramc.client.core.crash.CrashReporter
-import org.chimeramc.client.core.news.NewsNotificationHelper
 import org.chimeramc.client.settings.FeatureSettings
 import org.chimeramc.client.settings.LowLatencyNetworkManager
 import org.chimeramc.client.settings.ThermalGovernor
@@ -33,7 +32,6 @@ class LauncherApplication : Application() {
         val processName = Application.getProcessName()
         if (processName.endsWith(":crash")) return
 
-        NewsNotificationHelper.initialize(this)
         LogcatOverlayManager.init(this)
         PlaytimeManager.init(applicationContext)
         // The in-game pack changer applies a change by relaunching the running instance; install

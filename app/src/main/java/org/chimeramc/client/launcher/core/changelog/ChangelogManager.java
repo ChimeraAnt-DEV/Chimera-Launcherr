@@ -1,4 +1,4 @@
-package org.chimeramc.client.core.news;
+package org.chimeramc.client.core.changelog;
 
 import android.app.Activity;
 import android.content.Context;

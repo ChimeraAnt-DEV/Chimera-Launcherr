@@ -189,7 +189,26 @@ public class VipModMenuOverlay {
         try {
             showInternal();
         } catch (Exception e) {
+            // showInternal may have failed after addView, leaving a half-built panel attached. Drop
+            // it before the fallback builds a fresh tree, or the fallback's addView would layer a
+            // second copy (and a second set of listeners) on top of the broken one.
+            detachWindowViewQuietly();
             showFallback();
+        }
+    }
+
+    /** Removes [overlayView] from the window manager if it was attached, swallowing any failure. */
+    private void detachWindowViewQuietly() {
+        View view = overlayView;
+        overlayView = null;
+        if (view == null) return;
+        try {
+            if (view.getParent() != null) {
+                windowManager.removeViewImmediate(view);
+            }
+        } catch (Exception ignored) {
+            // The view may never have been added, or the window token may already be gone; either
+            // way the fallback adds its own tree, so a failed detach is not fatal.
         }
     }
 
@@ -286,8 +305,16 @@ public class VipModMenuOverlay {
 
         ImageView logo = overlayView.findViewById(R.id.vip_logo);
         logo.setImageTintList(ColorStateList.valueOf(theme.accent()));
-        ((GradientDrawable) modeBadge.getBackground().mutate()).setStroke(
-                Math.max(1, (int) density()), VipTheme.withAlpha(theme.accent(), 0x88));
+        // Build the badge's border rather than casting whatever drawable the XML set: the badge
+        // uses a <shape> resource today, but a future colour or a re-inflated tree would make the
+        // old cast throw. Owning the drawable keeps the stroke on the accent with no cast to fail.
+        GradientDrawable badgeBg = new GradientDrawable();
+        badgeBg.setShape(GradientDrawable.RECTANGLE);
+        badgeBg.setCornerRadius(10 * density());
+        badgeBg.setColor(0xFF241F38);
+        badgeBg.setStroke(Math.max(1, (int) density()),
+                VipTheme.withAlpha(theme.accent(), 0x88));
+        modeBadge.setBackground(badgeBg);
 
         adapter = new VipModuleAdapter(theme);
         GridLayoutManager layoutManager = new GridLayoutManager(activity, COLUMNS);

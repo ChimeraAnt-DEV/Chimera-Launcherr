@@ -1,9 +1,7 @@
 package org.chimeramc.client.ui.activities;
 
 import android.content.Context;
-import android.content.BroadcastReceiver;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
@@ -31,13 +29,9 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 
 import org.chimeramc.client.R;
 import org.chimeramc.client.core.auth.MsftAccountStore;
-import org.chimeramc.client.core.news.NewsFeed;
-import org.chimeramc.client.core.news.NewsRepository;
-import org.chimeramc.client.core.news.NewsState;
 import org.chimeramc.client.launcher.controller.ControllerConnectionMonitor;
 import org.chimeramc.client.launcher.controller.ControllerToastView;
 import org.chimeramc.client.ui.views.FireworkTouchLayer;
@@ -85,14 +79,6 @@ public class BaseActivity extends AppCompatActivity {
     }
     private final ExecutorService navAccountExecutor = Executors.newSingleThreadExecutor();
     private ActivityResultLauncher<Intent> navAccountLoginLauncher;
-    private boolean newsReceiverRegistered;
-    private final BroadcastReceiver newsReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            refreshNewsBadge();
-            onNewsChanged();
-        }
-    };
 
     @Override
     protected void attachBaseContext(Context newBase) {
@@ -379,16 +365,6 @@ public class BaseActivity extends AppCompatActivity {
             DynamicAnim.applyPressScale(avatarContainer);
         }
 
-        View news = findViewById(R.id.nav_news_container);
-        if (news != null) {
-            news.setOnClickListener(v -> {
-                if (!(this instanceof NewsActivity)) {
-                    startActivity(new Intent(this, NewsActivity.class));
-                }
-            });
-            DynamicAnim.applyPressScale(news);
-        }
-
         // Click the whole row, not the 22dp icon, so the label is part of the hit target.
         findViewById(R.id.nav_tab_launch).setOnClickListener(v -> {
             if (!(this instanceof MainActivity)) {
@@ -424,7 +400,6 @@ public class BaseActivity extends AppCompatActivity {
         });
 
         refreshNavAccountUI();
-        refreshNewsBadge();
     }
 
     /**
@@ -444,28 +419,6 @@ public class BaseActivity extends AppCompatActivity {
             tabs[i] = findViewById(NAV_TAB_IDS[i]);
         }
         org.chimeramc.client.ui.animation.DynamicAnim.staggerArrival(tabs, 60L);
-    }
-
-    private void refreshNewsBadge() {
-        if (!navBarInjected) return;
-        NewsRepository.loadCached(this, (feed, error) -> applyNewsBadge(feed));
-        NewsRepository.refreshIfStale(this, (feed, error) -> applyNewsBadge(feed));
-    }
-
-    private void applyNewsBadge(NewsFeed feed) {
-        if (isFinishing() || isDestroyed()) return;
-        int unread = NewsState.getUnreadCount(this, feed);
-        View badge = findViewById(R.id.nav_news_badge);
-        View container = findViewById(R.id.nav_news_container);
-        if (badge != null) badge.setVisibility(unread > 0 ? View.VISIBLE : View.GONE);
-        if (container != null) {
-            container.setContentDescription(unread > 0
-                    ? getString(R.string.news_unread_description, unread)
-                    : getString(R.string.news_title));
-        }
-    }
-
-    protected void onNewsChanged() {
     }
 
     protected void refreshNavAccountUI() {
@@ -655,15 +608,6 @@ public class BaseActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        if (!newsReceiverRegistered) {
-            ContextCompat.registerReceiver(
-                    this,
-                    newsReceiver,
-                    new IntentFilter(NewsState.ACTION_NEWS_CHANGED),
-                    ContextCompat.RECEIVER_NOT_EXPORTED
-            );
-            newsReceiverRegistered = true;
-        }
         ControllerConnectionMonitor monitor = controllerMonitor();
         monitor.setListener(controllerListener);
         monitor.start();
@@ -703,15 +647,10 @@ public class BaseActivity extends AppCompatActivity {
         getDelegate().applyDayNight();
         hideSystemUI();
         refreshNavAccountUI();
-        refreshNewsBadge();
     }
 
     @Override
     protected void onStop() {
-        if (newsReceiverRegistered) {
-            unregisterReceiver(newsReceiver);
-            newsReceiverRegistered = false;
-        }
         // Detach only this screen's listener. The monitor's device registration is process-wide
         // and deliberately left running: stopping it here unregistered the listener while the
         // incoming screen (or the game) was already in front, so a pad plugged in during a tab

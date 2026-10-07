@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A reusable Launch-tab section header: a gradient "blocker" marker, a title and an optional
+    trailing action ("View all"), set on a soft glass plate so each section reads as its own titled
+    block rather than a label floating over the page.
+
+    The trailing action keeps the id @id/section_action so every include binds the same view and
+    the activity can wire whichever sections need one. A section that does not want the action
+    sets @string/empty_string and the activity hides it, which keeps one layout instead of three
+    near-identical copies that drift.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/section_header_bg"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="9dp">
+
+    <View
+        android:layout_width="14dp"
+        android:layout_height="28dp"
+        android:background="@drawable/section_marker" />
+
+    <TextView
+        android:id="@+id/section_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:fontFamily="@font/misans"
+        android:letterSpacing="0.01"
+        android:textColor="@color/on_surface"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/section_action"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:fontFamily="@font/misans"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="4dp"
+        android:textColor="@color/primary"
+        android:textSize="12sp"
+        android:visibility="gone" />
+</LinearLayout>

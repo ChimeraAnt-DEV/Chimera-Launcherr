@@ -131,9 +131,17 @@
 
 ## Splash screen (ui.activities.SplashActivity + drawable/ic_chimera_ant)
 - The splash mark is the **vector** `ic_chimera_ant`, tinted to the user's accent in `applySplashTheme` (`setImageTintList`). Orbit ring, orbit dot and the halo are `GradientDrawable`s rebuilt per accent, with the static `bg_orbit_ring`/`bg_orbit_dot`/`bg_logo_glow` drawables only as the pre-tint fallback — those fallbacks carry brand tokens now, not the old green/cyan.
+- **The backdrop is a live voxel world, not a flat gradient.** `SplashSceneView` (package `org.chimeramc.client.launcher.ui.splash`) paints a deep sky gradient, twinkling parallax stars with the occasional shooting star, two blocky parallax terrain ridges with lit caps, floating shaded voxel cubes (rotate → perspective divide → back-face cull → far-to-near sort, so they read as solid Minecraft blocks), and rising embers. All motion lives in the pure, unit-tested `SplashWorld`/`SplashParticles`; the view only projects and paints. One `ValueAnimator` drives every frame and self-cancels on detach. Paints, the background `LinearGradient` and the terrain `Path` are cached and only rebuilt on size/palette change — never rebuild a gradient or path per frame.
+- `setPalette(accent, dark)` and `setAnimationsEnabled(animate)` are set from `applySplashTheme`/`startSplashSequence`; under reduced motion the scene paints one static frame instead of going blank.
+- The sequence also runs a slow **halo breathe** (`startLogoBreathe`, a 2.4s reverse scale/alpha ValueAnimator with a start delay so it does not fight the entrance) so the lockup never looks frozen on a slow warm-up.
 - The sequence already animates: glow scale-in, mark scale-in, orbiting dot (`startOrbitAnimation`, 3s loop), halo pulse (`startGlowPulse`), progress tween → `navigateToMain`. Keep new motion on these ValueAnimators rather than swapping in a static PNG.
 - All three tints (`orbitRing`, `orbitDot`, `logoGlow`) are accent-derived; if a colour looks off it is the accent resolver, not the drawable.
 - **The ore loader has no depth buffer, so its geometry is pinned in a pure class.** `OreCrackSprites` draws a faceted gem block and an iron pickaxe as 16x16 char grids; `OreLoaderLayout` owns the two-cell placement and the "pickaxe sits outside the block" invariant. Anchoring the pickaxe at the block's centre (the original code) laid the sprite over the gem, which is the bug the redesign fixed. Draw offsets must stay inside the parentheses exactly as the controller illustration's do. `SplashLoaderTest` pins the grid size, the pickaxe's head/lit-edge/handle, the gem's lit and shaded bevelled cells, and that the two sprites stay inside the view across widths.
+
+## Launch tab layout & news removal
+- **The Launch-tab header is the account row only.** The app name and the news button were removed from `activity_main.xml`; the brand is carried by the nav bar. Do not add an app-name wordmark or a news button back into the launch tab.
+- **The news feature is gone, not hidden.** `NewsActivity`, `NewsAdapter`, `NewsRepository`, `NewsState`, `NewsFeed`, `NewsItem`, `NewsNotificationHelper`, `LauncherNewsMessagingService`, their layouts/drawables, the manifest service, the `Application` init, the `BaseActivity` unread badge/receiver and the `.github/workflows/publish-news.yml` + `scripts/prepare_news_notification.py` were all deleted. `ChangelogManager` survives but moved to `launcher.core.changelog` (it powers the separate "What's new" dialog). `LowLatencyNetworkManager`'s "serve cached news" doc-comment and the `fps_optimizer_desc` string still *mention* news — they are harmless prose, not references to the deleted classes.
+- **Each Launch-tab section is its own titled block.** `include_section_header.xml` renders a gradient "blocker" marker (`section_marker.xml`) + title + optional trailing action on a glass plate (`section_header_bg.xml`), included at `section_quick` / `section_launch` / `section_content` / `section_more`. `MainActivity.setupSectionHeaders` binds each via `bindSectionHeader(includeId, titleRes, actionRes)`; a section with no action passes `0` and the shared `section_action` view is hidden, so there is one header layout rather than several near-identical copies that drift. The marker uses brand tokens (`brand_primary_*`, `accent_violet`, `secondary`) so it follows the wallpaper palette.
 
 ## Mod Hub (org.chimeramc.client.ui.activities.ModHubActivity + core.modrinth + core.downloads)
 - `ModHubActivity` is the single browse screen, reached from three places: the MODS tab via `mod_hub_fullscreen_button` in `activity_mods_fullscreen.xml`, the home "More" list via `miscModHubRow`, and its own manifest entry. Its two tabs are Modrinth search and a local Downloads scanner; `EXTRA_INITIAL_TAB` picks which one opens.
@@ -426,6 +434,31 @@ only, like the other overlays.
 - `ControllerInputProcessor.transformMotionEvent` uses pooled scratch arrays so the hot path allocates nothing. Keep it that way — it runs per controller event on the input-to-photon path.
 - Controller illustration realism comes from **hard-edged moulding**, not soft washes: a domed cap is two concentric circles of decreasing radius, a recess is a directional inner shadow arc, a highlight is one tight off-centre circle. A large translucent oval across the shell reads as a smeared "spilled water" highlight. Never allocate a `Paint` inside a draw method (the old stick/d-pad code did); the view caches one per role.
 
+## Cosmetics preview: authored `.geo.json` pipeline (`core.cosmetics.geometry`)
+- **The preview draws authored Blockbench meshes, not silhouettes.** `resources/cosmetics/models/hats/*.geo.json` and
+  `pets/*.geo.json` (plus their `.png` atlases) are packaged as assets (`build.gradle` adds `rootProject.file('resources')`
+  to `sourceSets.main.assets`). `BedrockGeometryParser` → `BedrockGeometry` → `PreviewMeshModel` flattens each model's bone
+  hierarchy into world-space boxes with per-face UVs, and `CapePreviewView` projects/paints them with the same
+  `PreviewDepthBuffer` + 2× supersampled offscreen target the character uses. No code change is needed to add a mesh — drop
+  the `.geo.json` in and add the id to `AuthoredHatModels.IDS` / the pet equivalent.
+- **The parser is deliberately loose because real Blockbench exports are.** `format_version` is a string in 1.12 files but
+  a number in 1.8 ones, a cube's `size` may be one number or three, `uv` is either an origin+size box UV or a per-face
+  object, `inflate` is optional. A strict data binding would reject a valid file, so it reads the tree by hand and leaves a
+  missing optional field null. It never throws: malformed input returns null and the preview falls back to the procedural
+  mesh (fail-closed, so one bad asset cannot blank the preview). `BedrockGeometryPreviewTest` pins the real assets, the
+  bone-parent rotation, local cube rotation, box-UV unwrap, single-number size broadcast, negative-UV mirror flag, and the
+  malformed-input path.
+- **A negative `uv_size` is a mirror, not an error.** `PreviewMeshModel.FaceUv.flipH`/`flipV` carry it and
+  `CapePreviewView.drawMeshQuadTextured` swaps the source corners accordingly — dropping the flag samples the wrong half of
+  the atlas on mirrored faces.
+- **The authored mesh is resolved once per selection, never per frame.** `rebuildAccessoryMesh`/`rebuildPetMesh` parse the
+  asset and recycle the previous atlas; the renderer only projects (reusing `meshCorners`/`meshDrawList` scratch). Depth is
+  a two-level key (`QuadDepthSorter.compare(groupDepth, depth, ...)`) — the owning box's centroid first, then the face —
+  because a single centroid key lets two boxes' faces interleave and a hidden face paints over a nearer one.
+- **Atlas decode is lazy and keyed by the mesh's texture file.** `accessoryAtlasLoaded`/`petAtlasLoaded` guard a single
+  `BitmapFactory.decodeStream`; a new selection resets them and recycles the old bitmap, so switching cosmetics does not
+  leak atlases.
+
 ## Cosmetics preview scope
 - `CosmeticsPanel` + `CapePreviewView` + `SkinModel` / `PlayerSkinProvider` / `CapeSimulator` (in `core/cosmetics`) render the player's character with their applied skin and the equipped cape, animated. The catalogue and selection are pure and unit-tested.
 - **In-game capes render through the player client entity, not a texture override.** The old pack replaced `textures/entity/cape_invisible.png`, but a cape equipped through Microsoft's Persona cosmetics system is fetched per-account (`PersonaNetworkHandlerDelegate`), so that static file is not what the renderer samples and nothing showed. `CapeResourcePackBuilder` now emits a resource pack that overrides `entity/player.entity.json` and adds a `chimera_cape` texture/geometry/material shortname plus a `controller.render.chimera_cape` render controller that draws the cape on the player's back in third person and the paperdoll. It is unconditional — no vanilla cape needs to be equipped. `CapeInGameInstaller` installs it via `SkinPackActivator` (the launcher's proven path into `resource_packs/` + `minecraftpe/global_resource_packs.json`); do not hand-write a second writer for those two files.
@@ -590,10 +623,31 @@ these are the conclusions.
   protocol and only the local view comes from the game.
 - **A cape feature is not reachable through this.** The in-game cape is a resource pack (see the
   cosmetics section), a supported mechanism rather than a native hook.
+- **The Hitboxes module is *not* greyed out, and must not be.** `HitboxMod.EntitySource` has no provider, so the native
+  entity frame is always null — but `HitboxOverlay.drawPeerBoxes` still draws other players from the proximity-voice feed
+  (`PeerHitboxSource` → `VoiceChatModule.audiblePeers()`), which needs no game hook at all. `ModIds.requiresGameData`
+  therefore **excludes** `HITBOX`; only the options that genuinely need the entity list are disabled, via
+  `ModIds.outputRequiresGameData(modId, configKey)`. Peer boxes need `LocalPlayerFeed.localCamera(...)` for the local view,
+  which is installed unconditionally (independent of the voice module), so a player with voice off still gets boxes for any
+  peer whose position arrived. See the Hitboxes section above for the full contract.
 - Static-analysis caution: RTTI pointers in this PIE binary live in `.data.rel.ro` as
   `R_AARCH64_RELATIVE` relocation addends, so a plain byte scan for the pointer finds **nothing**
   and produces a false "RTTI is absent" conclusion. Read `.rela.dyn` instead. Equally,
   `re.finditer` over a 328 MB `.so` is unusable -- extract `strings` once and work from that.
+- **Re-verified on 1.26.60.30 (2026-10).** `14ClientInstance` resolves with vtable address point `0x15364470`; slot 31
+  (`getLocalPlayer`, `self+0x240` out-param) → `0xb0fbd7c`; the `getX`-style getters at slots 26/27/30 are also
+  `self+0x240`. Slot 150 is `pause_screen` (a `getScreen(name)` thunk), 151 `progress_screen`, 152
+  `world_loading_progress_screen`, 153 `realms_stories_loading_progress_screen`, 154 `death_screen`, 155
+  `third_party_server_screen` — so the menu-screen index this build expects is **150**, and `isShowingMenuVtableIndex: 151`
+  in the bundled 1.26.50 rule is off by one for 1.26.60.x. Every `pauseMenuDtorSig`/`pauseMenuOpenSig`/`hudScreenDtorSig`/
+  `hudScreenOpenSig` byte pattern (and `imageLoaderSig`) matches **zero** places in 1.26.60.30, so those overlay hooks and the
+  cape image-loader seam stay off and the launcher fails safe (no menu overlays, resource-pack cape) — the documented
+  "a byte pattern needs a fresh pattern per build" finding, now confirmed on a third build. Fixing the menu hook for a build
+  means adding a rule with that build's `min` and freshly derived patterns *and* the correct `isShowingMenuVtableIndex`
+  (resolve the `getScreen` thunk whose `adrp/add x1` string is `"pause_screen"`, or scan the slots for it).
+- **`getScreen`-style thunks are how a slot's meaning is identified.** A thunk that calls a common `getScreen(const
+  std::string&)` helper passes the screen name in `x1`; disassemble the thunk, read the `adrp x1, #page` + `add x1, x1,
+  #off`, and read the C string at `page+off`. That is how 150→`pause_screen` was pinned without a symbol table.
 
 ## Select Hit touch ordering
 - **`dispatchTouchEvent` must classify the attack tap before the preloader can consume the event.**
@@ -877,6 +931,19 @@ these are the conclusions.
   bind picker and the VIP keyboard tab, replacing the two separate capture paths that had drifted.
 - `VipTheme` holds the 3-4 tier VIP palette and glass/elevation tokens as named constants; `bg_vip_*` drawables and
   `ic_vip_*` icons are the premium surface. Do not add raw ARGB literals in the VIP layouts — add a token.
+- **The "clicking Modules crashes" bug was a `GradientDrawable` cast on a raw-colour background.** `item_vip_module_card.xml`
+  sets the accent strip's `android:background="#7C5CFF"`, which inflates as a `ColorDrawable`, and
+  `item_vip_group_header.xml` does the same for the group bar. `VipModuleAdapter.bindAccent`/`onBindViewHolder` did
+  `((GradientDrawable) view.getBackground().mutate()).setColor(...)`, so the very first bind threw `ClassCastException`
+  and the grid died the moment the General tab populated. The fix builds a fresh `GradientDrawable` and calls
+  `setBackground(...)` instead of casting whatever the layout happened to set — do not reintroduce the cast.
+- **Availability must be passed into `bindAccent`, not read from `itemView.isEnabled()`.** `isEnabled()` is set *after*
+  `bindAccent` in `onBindViewHolder`, so reading it there painted a recycled card with the previous item's availability
+  (an unavailable module looked available and vice versa). `bindAccent(holder, groupId, isEnabled, isAvailable)` takes it
+  as a parameter.
+- **`show()` detaches a half-built tree before the fallback.** `showInternal` may throw *after* `addView`, so the catch
+  calls `detachWindowViewQuietly()` before `showFallback()`, or the fallback's `addView` layers a second copy (and a
+  second set of listeners) over the broken one.
 
 ## Mod Menu focus highlight (the "50% white overlay")
 - **The white wash is the platform's default focus highlight.** A clickable View is implicitly
@@ -1377,11 +1444,16 @@ these are the conclusions.
   are applied in Java (`GyroOverlay.sendLookDelta`), so it needs no native gyro symbol and works
   wherever the game does. `GyroMod` (the native class) is still pre-resolved at launch but the overlay
   no longer calls it.
-- **The Offhand module sends the game's own off-hand keys** (F swap / V use, configurable) through
-  `activity.dispatchKeyEvent`, so it is world/Realm/server-agnostic. `OffhandOverlay.performAction` is
-  shared by the button and the hardware bind; a static `injecting` guard stops the bind from matching
-  its own injected key and recursing. `OffhandAction.keysFor(mode, swap, use)` is the pure mode rule.
-  Both modules are `ModIds`-registered, available (not greyed), and have config schemas.
+- **The Offhand module opens the inventory, it does not "swap".** Bedrock has no swap-to-off-hand key at all — there is no
+  `key.offhand` in the shipped input map, so Java's `F` swap simply does not exist here. The off-hand slot is filled from the
+  inventory screen and accepts only a handful of items (shields, arrows, firework rockets, totems of undying, maps, nautilus
+  shells), so the module's primary action sends the game's inventory key (`E`) and lets the player place an allowed item;
+  the secondary action uses the off-hand item (`V`). `OffhandAction.MODE_INVENTORY` is 0, `MODE_USE` 1, `MODE_BOTH` 2.
+  `OffhandOverlay.performAction` is shared by the button and the hardware bind; a static `injecting` guard stops the bind
+  from matching its own injected key and recursing. `OffhandAction.keysFor(mode, inventoryKey, useKey)` is the pure mode
+  rule. The manager getter is `getOffhandInventoryKey()` (pref key kept as `offhand_inventory_key`, falling back to the
+  legacy `offhand_swap_key` so a pre-rename profile still reads). Both modules are `ModIds`-registered, available (not
+  greyed), and have config schemas.
 
 ## Launcher UI (nav indicator, hero pulse)
 - `nav_bar.xml` wraps the tab row and a `nav_active_indicator` in a `FrameLayout` (a

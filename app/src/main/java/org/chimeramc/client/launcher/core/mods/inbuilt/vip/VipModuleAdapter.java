@@ -264,8 +264,13 @@ public class VipModuleAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         if (holder instanceof GroupHolder) {
             GroupHolder group = (GroupHolder) holder;
             group.title.setText(item.groupName == null ? "" : item.groupName);
-            ((GradientDrawable) group.bar.getBackground().mutate())
-                    .setColor(theme.groupColor(item.groupId));
+            // A fresh GradientDrawable rather than a cast of the XML background: the layout sets a
+            // raw colour, which inflates as a ColorDrawable, so the old cast threw on the first bind.
+            GradientDrawable bar = new GradientDrawable();
+            bar.setShape(GradientDrawable.RECTANGLE);
+            bar.setCornerRadius(1.5f * group.bar.getResources().getDisplayMetrics().density);
+            bar.setColor(theme.groupColor(item.groupId));
+            group.bar.setBackground(bar);
             return;
         }
         ModHolder modHolder = (ModHolder) holder;
@@ -283,7 +288,7 @@ public class VipModuleAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         modHolder.unavailable.setVisibility(isAvailable ? View.GONE : View.VISIBLE);
         modHolder.icon.setImageResource(iconFor(mod));
         bindStatus(modHolder, isEnabled, isAvailable);
-        bindAccent(modHolder, mod.getGroupId(), isEnabled);
+        bindAccent(modHolder, mod.getGroupId(), isEnabled, isAvailable);
 
         boolean focused = position == focus;
         applyFocus(modHolder, focused);
@@ -342,25 +347,33 @@ public class VipModuleAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
      * colour so a column reads as grouped at a glance. Elevation is zero when the user turned glow
      * effects off, matching every other card in the app.
      */
-    private void bindAccent(ModHolder holder, String groupId, boolean isEnabled) {
+    private void bindAccent(ModHolder holder, String groupId, boolean isEnabled, boolean isAvailable) {
         CardView card = (CardView) holder.itemView;
-        if (!holder.itemView.isEnabled()) {
+        // The strip's fill is replaced with a GradientDrawable we own rather than casting
+        // whatever background the XML happened to set: a raw colour in the layout is a
+        // ColorDrawable, and the old cast threw ClassCastException on the first bind.
+        // Availability is passed in rather than read from itemView.isEnabled(), which is only set
+        // after this call -- a recycled card would otherwise paint with the previous item's state.
+        int stripColor;
+        if (!isAvailable) {
             card.setCardBackgroundColor(0xFF1A1729);
             card.setCardElevation(0f);
-            ((GradientDrawable) holder.accent.getBackground().mutate())
-                    .setColor(0x33FFFFFF);
-            return;
-        }
-        if (isEnabled) {
-            card.setCardBackgroundColor(theme.enabledCardColor());
-            card.setCardElevation(theme.enabledElevation());
+            stripColor = 0x33FFFFFF;
         } else {
-            card.setCardBackgroundColor(theme.disabledCardColor());
-            card.setCardElevation(theme.disabledElevation());
+            if (isEnabled) {
+                card.setCardBackgroundColor(theme.enabledCardColor());
+                card.setCardElevation(theme.enabledElevation());
+            } else {
+                card.setCardBackgroundColor(theme.disabledCardColor());
+                card.setCardElevation(theme.disabledElevation());
+            }
+            int color = theme.groupColor(groupId);
+            stripColor = isEnabled ? color : VipTheme.withAlpha(color, 0x55);
         }
-        int color = theme.groupColor(groupId);
-        ((GradientDrawable) holder.accent.getBackground().mutate())
-                .setColor(isEnabled ? color : VipTheme.withAlpha(color, 0x55));
+        GradientDrawable strip = new GradientDrawable();
+        strip.setShape(GradientDrawable.RECTANGLE);
+        strip.setColor(stripColor);
+        holder.accent.setBackground(strip);
     }
 
     /** Accent ring + lift on the controller-selected card; the platform highlight stays disabled. */

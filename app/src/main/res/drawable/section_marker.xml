@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The section marker ("blocker") that leads every section header on the Launch tab.
+
+    A short rounded bar with a vertical brand gradient over a soft outer glow, plus a bright inner
+    core, so it reads as a lit accent chip at any density rather than a plain divider. The outer
+    layer is the glow wash; the two inner layers give the chip a bevel. Every layer uses brand
+    tokens so the marker follows the wallpaper palette under dynamic color.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="@color/brand_primary_24"
+                android:endColor="@color/brand_primary_10"
+                android:type="linear" />
+            <corners android:radius="7dp" />
+            <size
+                android:width="14dp"
+                android:height="28dp" />
+        </shape>
+    </item>
+    <item
+        android:left="3dp"
+        android:right="4dp"
+        android:top="2dp"
+        android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="@color/accent_violet"
+                android:endColor="@color/secondary"
+                android:type="linear" />
+            <corners android:radius="5dp" />
+        </shape>
+    </item>
+    <!-- A tight bright core so the chip catches light rather than reading as flat paint. -->
+    <item
+        android:left="4dp"
+        android:right="8dp"
+        android:top="4dp"
+        android:bottom="14dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="@color/brand_primary_67"
+                android:endColor="@android:color/transparent"
+                android:type="linear" />
+            <corners android:radius="3dp" />
+        </shape>
+    </item>
+</layer-list>

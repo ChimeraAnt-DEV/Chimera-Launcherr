@@ -40,6 +40,7 @@ public final class InbuiltModuleProvider {
     private static final String CFG_GYRO_DEADZONE = "gyro_deadzone";
     private static final String CFG_HOTBAR_ITEM_ICONS = "hotbar_item_icons";
     private static final String CFG_OFFHAND_MODE = "offhand_mode";
+    private static final String CFG_OFFHAND_INVENTORY_KEY = "offhand_inventory_key";
     private static final String CFG_OFFHAND_SWAP_KEY = "offhand_swap_key";
     private static final String CFG_OFFHAND_USE_KEY = "offhand_use_key";
     private static final String CFG_OFFHAND_KEYBIND = "offhand_keybind";
@@ -483,7 +484,7 @@ public final class InbuiltModuleProvider {
             categories.put(configCategory(context, "keys", R.string.mod_config_category_button));
             categories.put(configCategory(context, "overlay", R.string.mod_config_category_appearance));
             nodes.put(configNode(context, mod, CFG_OFFHAND_MODE, "action"));
-            nodes.put(configNode(context, mod, CFG_OFFHAND_SWAP_KEY, "keys"));
+            nodes.put(configNode(context, mod, CFG_OFFHAND_INVENTORY_KEY, "keys"));
             nodes.put(configNode(context, mod, CFG_OFFHAND_USE_KEY, "keys"));
             nodes.put(configNode(context, mod, CFG_OFFHAND_KEYBIND, "keys"));
             nodes.put(configNode(context, mod, CFG_OVERLAY_SIZE, "overlay"));
@@ -709,11 +710,11 @@ public final class InbuiltModuleProvider {
                     UnifiedMod.ConfigType.RADIO,
                     context.getString(R.string.mod_config_offhand_mode_labels), "", "",
                     String.valueOf(manager.getOffhandMode())));
-            configs.add(config(CFG_OFFHAND_SWAP_KEY,
-                    context.getString(R.string.mod_config_offhand_swap_key),
+            configs.add(config(CFG_OFFHAND_INVENTORY_KEY,
+                    context.getString(R.string.mod_config_offhand_inventory_key),
                     UnifiedMod.ConfigType.KEYBIND,
                     "", "", "",
-                    String.valueOf(manager.getOffhandSwapKey())));
+                    String.valueOf(manager.getOffhandInventoryKey())));
             configs.add(config(CFG_OFFHAND_USE_KEY,
                     context.getString(R.string.mod_config_offhand_use_key),
                     UnifiedMod.ConfigType.KEYBIND,
@@ -1096,8 +1097,12 @@ public final class InbuiltModuleProvider {
             case CFG_OFFHAND_MODE:
                 manager.setOffhandMode(parseInt(value, manager.getOffhandMode()));
                 break;
+            case CFG_OFFHAND_INVENTORY_KEY:
+                manager.setOffhandInventoryKey(parseInt(value, manager.getOffhandInventoryKey()));
+                break;
             case CFG_OFFHAND_SWAP_KEY:
-                manager.setOffhandSwapKey(parseInt(value, manager.getOffhandSwapKey()));
+                // Legacy key kept so a profile saved before the rename still applies.
+                manager.setOffhandInventoryKey(parseInt(value, manager.getOffhandInventoryKey()));
                 break;
             case CFG_OFFHAND_USE_KEY:
                 manager.setOffhandUseKey(parseInt(value, manager.getOffhandUseKey()));

@@ -38,6 +38,7 @@ public class InbuiltModManager {
     private static final String KEY_GYRO_INVERT_Y = "gyro_invert_y";
     private static final String KEY_GYRO_DEADZONE = "gyro_deadzone";
     private static final String KEY_OFFHAND_MODE = "offhand_mode";
+    private static final String KEY_OFFHAND_INVENTORY_KEY = "offhand_inventory_key";
     private static final String KEY_OFFHAND_SWAP_KEY = "offhand_swap_key";
     private static final String KEY_OFFHAND_USE_KEY = "offhand_use_key";
     private static final String KEY_OFFHAND_KEYBIND = "offhand_keybind";
@@ -450,15 +451,20 @@ public class InbuiltModManager {
     }
 
     // --- Offhand module --------------------------------------------------------------------
-    // The Bedrock offhand keys: F swaps the held item into the off hand, V uses the off-hand item.
-    // Stored as Android key codes so the bind editor works like every other keybind.
+    // Bedrock has no "swap to off hand" keybinding: the off-hand slot is filled from the inventory
+    // screen, and only shields, arrows, firework rockets, totems, maps and nautilus shells are
+    // accepted. So the module's primary key opens the inventory (E), and the secondary key uses the
+    // off-hand item. The stored key names keep their historical "swap" spelling so an existing
+    // profile's value is not stranded; the getter names say what the key now does.
 
-    public int getOffhandSwapKey() {
-        return prefs.getInt(KEY_OFFHAND_SWAP_KEY, KeyEvent.KEYCODE_F);
+    public int getOffhandInventoryKey() {
+        // Falls back to the legacy key name so a profile written before the rename still reads.
+        return prefs.getInt(KEY_OFFHAND_INVENTORY_KEY,
+                prefs.getInt(KEY_OFFHAND_SWAP_KEY, KeyEvent.KEYCODE_E));
     }
 
-    public void setOffhandSwapKey(int keyCode) {
-        prefs.edit().putInt(KEY_OFFHAND_SWAP_KEY, keyCode).apply();
+    public void setOffhandInventoryKey(int keyCode) {
+        prefs.edit().putInt(KEY_OFFHAND_INVENTORY_KEY, keyCode).apply();
     }
 
     public int getOffhandUseKey() {
@@ -468,9 +474,8 @@ public class InbuiltModManager {
     public void setOffhandUseKey(int keyCode) {
         prefs.edit().putInt(KEY_OFFHAND_USE_KEY, keyCode).apply();
     }
-
     /**
-     * The on-screen button's behaviour: 0 = swap (F), 1 = use (V), 2 = both.
+     * The on-screen button's behaviour: 0 = open inventory, 1 = use off hand, 2 = both.
      * Stored as an int so the config RADIO can present the labels.
      */
     public int getOffhandMode() {

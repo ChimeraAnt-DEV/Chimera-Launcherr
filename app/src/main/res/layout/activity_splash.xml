@@ -13,6 +13,13 @@
     android:background="@color/background"
     tools:context=".launcher.ui.activities.SplashActivity">
 
+    <!-- Live backdrop: deep gradient, drifting accent glows and rising embers. It paints the
+         whole background itself, so the root above is only a fallback for the first frame. -->
+    <org.chimeramc.client.launcher.ui.splash.SplashSceneView
+        android:id="@+id/splash_scene"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
     <LinearLayout
         android:id="@+id/splash_lockup"
         android:layout_width="wrap_content"
