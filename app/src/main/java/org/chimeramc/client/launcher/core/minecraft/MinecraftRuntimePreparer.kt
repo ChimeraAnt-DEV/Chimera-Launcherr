@@ -189,6 +189,16 @@ val modsDir = modManager.currentVersion?.modsDir?.absolutePath
             val cape = store.equippedCapeForDisplay
             val accessory = store.equippedAccessory
             val pet = store.equippedPet
+            // Feed the native cosmetics registry as well as the pack: the native skin/cape and
+            // texture hooks read these tables, so a build where a substitution slot resolves can
+            // render the cosmetic directly. Fail-closed — without the library these are no-ops.
+            try {
+                org.chimeramc.client.core.cosmetics.NativeCosmeticsBridge.publishLocal(
+                    cape, accessory, pet
+                )
+            } catch (error: Throwable) {
+                trace.error("Native cosmetics publish failed", error.javaClass.simpleName)
+            }
             val stagingRoot = File(context.filesDir, "cape")
             if (cape != null || accessory != null || pet != null) {
                 CapeInGameInstaller.installQuietly(

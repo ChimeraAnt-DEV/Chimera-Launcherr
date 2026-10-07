@@ -246,6 +246,16 @@ final class CosmeticsPanel {
      * playing) no longer needs it.
      */
     private void onCosmeticChanged() {
+        // Refresh the native registry so a build with a live substitution slot sees the swap
+        // immediately; on a build without one this is a no-op and the pack path carries it.
+        try {
+            org.chimeramc.client.core.cosmetics.NativeCosmeticsBridge.publishLocal(
+                    store.getEquippedCapeForDisplay(),
+                    store.getEquippedAccessory(),
+                    store.getEquippedPet());
+        } catch (Throwable ignored) {
+            // Fail-closed: the pack path is unaffected.
+        }
         CosmeticSyncModule.requestAnnounce();
         applyInGameQuietly();
         refreshSyncStatus();

@@ -94,6 +94,38 @@ public class PreloaderInput {
     /** The HUD update count the OreUI-stripping hook has observed. */
     public static native long nativeOptifineHudUpdateCount();
 
+    // --- Native cosmetics registry ---------------------------------------------------------
+    // The launcher fills these; the native skin/cape and texture hooks read the same tables. Every
+    // call is guarded by the caller via the try/catch wrappers below, so a build without the
+    // library degrades to the resource-pack path rather than throwing.
+
+    /** Registers a cape override (raw RGBA) for a player id. */
+    public static native void nativeSetCapeOverride(long playerKey, byte[] rgba, int width, int height);
+
+    /** Clears every cape override. */
+    public static native void nativeClearCapeOverrides();
+
+    /** Number of cape overrides currently registered. */
+    public static native int nativeCapeOverrideCount();
+
+    /** Registers a texture override (raw RGBA) for a texture id. */
+    public static native void nativeSetTextureOverride(long textureId, byte[] rgba, int width, int height);
+
+    /** Clears every texture override. */
+    public static native void nativeClearTextureOverrides();
+
+    /** Number of texture overrides currently registered. */
+    public static native int nativeTextureOverrideCount();
+
+    /** Publishes the geometry blob the render hook should draw for the local player. */
+    public static native void nativeSetRenderGeometry(byte[] data);
+
+    /** True once the native cosmetics skin/cape or texture hook has fired this session. */
+    public static native boolean nativeIsCosmeticsHookLive();
+
+    /** Reads {skinCapeCalls (-1 when unavailable), textureCalls, capeOverrides, textureOverrides}. */
+    public static native int[] nativeReadCosmeticsStats();
+
     public static void configureOptifineMode(String blob) {
         try {
             nativeConfigureOptifineMode(blob == null ? "" : blob);
@@ -278,6 +310,78 @@ public class PreloaderInput {
     public static int[] readPlayerRenderStats() {
         try {
             int[] value = nativeReadPlayerRenderStats();
+            return value != null && value.length >= 4 ? value : null;
+        } catch (UnsatisfiedLinkError e) {
+            return null;
+        }
+    }
+
+    // --- Guarded cosmetics registry wrappers -----------------------------------------------
+    // Each returns a safe default on a build whose native library lacks the symbol, so the
+    // cosmetics path degrades to the resource pack rather than throwing into the UI.
+
+    public static void setCapeOverride(long playerKey, byte[] rgba, int width, int height) {
+        try {
+            nativeSetCapeOverride(playerKey, rgba, width, height);
+        } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    public static void clearCapeOverrides() {
+        try {
+            nativeClearCapeOverrides();
+        } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    public static int capeOverrideCount() {
+        try {
+            return nativeCapeOverrideCount();
+        } catch (UnsatisfiedLinkError e) {
+            return 0;
+        }
+    }
+
+    public static void setTextureOverride(long textureId, byte[] rgba, int width, int height) {
+        try {
+            nativeSetTextureOverride(textureId, rgba, width, height);
+        } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    public static void clearTextureOverrides() {
+        try {
+            nativeClearTextureOverrides();
+        } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    public static int textureOverrideCount() {
+        try {
+            return nativeTextureOverrideCount();
+        } catch (UnsatisfiedLinkError e) {
+            return 0;
+        }
+    }
+
+    public static void setRenderGeometry(byte[] data) {
+        try {
+            nativeSetRenderGeometry(data);
+        } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    public static boolean isCosmeticsHookLive() {
+        try {
+            return nativeIsCosmeticsHookLive();
+        } catch (UnsatisfiedLinkError e) {
+            return false;
+        }
+    }
+
+    public static int[] readCosmeticsStats() {
+        try {
+            int[] value = nativeReadCosmeticsStats();
             return value != null && value.length >= 4 ? value : null;
         } catch (UnsatisfiedLinkError e) {
             return null;
