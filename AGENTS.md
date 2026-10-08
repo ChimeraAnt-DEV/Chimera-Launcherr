@@ -1661,3 +1661,24 @@ This is a **Bedrock Edition** launcher (`namespace`/`applicationId` `org.chimera
 cannot compile or run. `MinecraftActivity` extends the game's `com.mojang.minecraftpe.MainActivity`.
 Cosmetics reach Bedrock through the generated resource pack plus the native seams documented above,
 not through an entity-layer renderer.
+
+## Native cosmetics pipeline (preloader `pl::cosmetics` + `pl::hooks`)
+
+The cosmetic system moves beyond the resource-pack fallback toward a direct native runtime pipeline
+inside the preloader (`app/src/main/cpp/preloader`), delivered in four Tasks.
+
+### Task 1 — native `.geo.json` parser + mesh builder (`pl::cosmetics::geometry`)
+- `include/pl/cosmetics/geometry/BedrockGeometry.hpp` + `src/pl/cosmetics/geometry/BedrockModelParser.cpp`.
+  Parses Bedrock `.geo.json` (format versions **1.12.0** and **1.21.0**, plus legacy 1.8.0) into
+  bones/cubes/UVs and builds interleaved vertex/index buffers, **with no resource pack and no
+  `PlayerSkinProvider`** — the geometry is a raw JSON string from memory.
+- **The rules mirror the Java preview pipeline (`core.cosmetics.geometry`) exactly** so a model that
+  looks right in the preview and one the native seam attaches are the same geometry: rotation order
+  Z→Y→X, chain resolution innermost-first, box-UV unwrap (`2*(w+d)` × `d+h`), per-face UVs, and the
+  negative-`uv_size` mirror folded into increasing texture coordinates. Face order is Top/Bottom/
+  Left/Right/Front/Back with corner indices in grid order (`ix|iy<<1|iz<<2`).
+- Pure C++ (no Android types), so it is **host-unit-tested** — `tests/cosmetics/BedrockModelParserTest.cpp`
+  (52 checks: hat 1.12, wing 1.21 with per-face UV, a six-bone pet, malformed inputs, box-UV layout;
+  run `tests/cosmetics/run_tests.sh`). `summarize()` provides the one-line Logcat confirmation line
+  without adding a logging dependency to the parser.
+
