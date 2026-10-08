@@ -94,6 +94,52 @@ public final class NativeCosmeticsBridge {
         publishCape(cape);
         publishAccessory(accessory);
         publishPet(pet);
+        publishGeometry(cape, accessory, pet);
+    }
+
+    /**
+     * Publishes the equipped pieces' geometry to the native renderer as one blob, so its player
+     * render hook can draw the cape chain, the worn hat and the pet directly instead of relying on a
+     * resource pack.
+     *
+     * <p>The blob is a simple length-prefixed framing — for each present piece a 4-byte big-endian
+     * id length, the id as UTF-8, a 4-byte big-endian JSON length, then the geometry JSON — so the
+     * native side parses it deterministically. The cape is always included (the chain is what the
+     * render hook draws for the local player); an unequipped hat or pet contributes an empty mesh
+     * from {@link AccessoryGeometry#emptyGeometryJson()} / {@link PetGeometry#emptyGeometryJson()},
+     * so a named geometry always resolves.
+     *
+     * <p>Fail-closed: without the native library the upload is a no-op.
+     */
+    public static void publishGeometry(CosmeticCatalog.Cape cape,
+                                       CosmeticCatalog.Accessory accessory,
+                                       CosmeticCatalog.Pet pet) {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(4096);
+        appendGeometry(out, CapeGeometry.GEOMETRY_ID, CapeGeometry.modelJson(CapeGeometry.GEOMETRY_ID));
+        String hatJson = accessory == null || accessory.kind == CosmeticCatalog.AccessoryKind.NONE
+                ? AccessoryGeometry.emptyGeometryJson()
+                : AccessoryGeometry.geometryJson(accessory.kind);
+        appendGeometry(out, AccessoryGeometry.GEOMETRY_ID, hatJson);
+        String petJson = pet == null ? PetGeometry.emptyGeometryJson() : PetGeometry.geometryJson(pet);
+        appendGeometry(out, PetGeometry.GEOMETRY_ID, petJson);
+        setRenderGeometry(out.toByteArray());
+    }
+
+    private static void appendGeometry(java.io.ByteArrayOutputStream out, String id, String json) {
+        byte[] idBytes = id.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] jsonBytes = (json == null ? "" : json)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        appendInt(out, idBytes.length);
+        out.write(idBytes, 0, idBytes.length);
+        appendInt(out, jsonBytes.length);
+        out.write(jsonBytes, 0, jsonBytes.length);
+    }
+
+    private static void appendInt(java.io.ByteArrayOutputStream out, int value) {
+        out.write((value >>> 24) & 0xFF);
+        out.write((value >>> 16) & 0xFF);
+        out.write((value >>> 8) & 0xFF);
+        out.write(value & 0xFF);
     }
 
     /** Uploads a cape's texture to the native registry (or clears it) keyed by its id. */
@@ -127,6 +173,49 @@ public final class NativeCosmeticsBridge {
                 PetGeometry.UV_ACCENT_Y, pet.color ^ (pet.species.ordinal() * 131));
         Bitmap image = decode(png);
         if (image != null) setTextureFor(pet.id, image);
+    }
+
+    /**
+     * Publishes a <em>peer's</em> advertised cosmetics into the native registry, keyed by their
+     * player id, so the renderer can draw their cape/accessory/pet.
+     *
+     * <p>This is the render half of cosmetic sync: {@code CosmeticSyncModule} resolves the peer's
+     * advertised catalogue ids locally and calls this on every received advertisement, so a peer's
+     * cosmetic appears the moment their payload arrives with no resource reload. The cape pixels are
+     * keyed by the peer's id directly; the accessory and pet are keyed by a player-scoped texture id
+     * so two peers wearing the same hat do not overwrite each other. A null/absent piece clears that
+     * peer's entry, so a peer who removes a cosmetic stops wearing it.
+     *
+     * <p>Fail-closed: without the native library every upload is a no-op.
+     */
+    public static void publishPeer(String playerId, CosmeticCatalog.Cape cape,
+                                   CosmeticCatalog.Accessory accessory, CosmeticCatalog.Pet pet) {
+        if (playerId == null || playerId.isEmpty()) return;
+        // Cape: keyed by the peer id, matching the local player's cape key convention.
+        if (cape == null) {
+            setCapeFor(playerId, null);
+        } else {
+            Bitmap image = decode(CapeTexturePainter.paint(cape.color, cape.trimColor,
+                    cape.accentColor, cape.pattern, cape.branded));
+            if (image != null) setCapeFor(playerId, image);
+        }
+        // Accessory: a player-scoped texture id so peers do not collide.
+        if (accessory == null) {
+            setTextureFor(playerId + "/hat", null);
+        } else {
+            Bitmap image = decode(AccessoryTexturePainter.paint(accessory.color,
+                    accessory.accentColor));
+            if (image != null) setTextureFor(playerId + "/hat", image);
+        }
+        // Pet: likewise player-scoped.
+        if (pet == null) {
+            setTextureFor(playerId + "/pet", null);
+        } else {
+            Bitmap image = decode(PaintedAtlas.paint(pet.color, pet.accentColor,
+                    PetGeometry.TEXTURE_WIDTH, PetGeometry.TEXTURE_HEIGHT,
+                    PetGeometry.UV_ACCENT_Y, pet.color ^ (pet.species.ordinal() * 131)));
+            if (image != null) setTextureFor(playerId + "/pet", image);
+        }
     }
 
     /** Decodes PNG bytes to a bitmap, or null when the bytes are not a decodable image. */

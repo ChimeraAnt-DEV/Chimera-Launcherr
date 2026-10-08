@@ -97,4 +97,29 @@ public class PreviewLightingTest {
             assertTrue("channels in range", (shaded & 0xFF) <= 0xCC);
         }
     }
+
+    /**
+     * A textured face is shaded with a grey MULTIPLY factor on the bitmap, so a transparent texel
+     * stays transparent and a hat overlay never darkens the head beneath it. The grey must be in
+     * range, actually darker on a face turned away from the light (or a hat reads as a flat paper
+     * cut-out), and the overlay layer must be softer than the base so hair and eyes stay readable.
+     */
+    @Test
+    public void aTexturedFaceGetsAUsableShadeGrey() {
+        int lit = PreviewLighting.shadeGreyFor(SkinModel.Face.FRONT, 1f);
+        int shadowed = PreviewLighting.shadeGreyFor(SkinModel.Face.BACK, 1f);
+        assertTrue("grey in range", lit >= 0 && lit <= 255);
+        assertTrue("grey in range", shadowed >= 0 && shadowed <= 255);
+        assertTrue("a shadowed face is darker", shadowed < lit);
+        // The overlay layer is softened toward white, so it is never darker than the base.
+        assertTrue("overlay softer",
+                PreviewLighting.shadeGreyForOverlayLayer(SkinModel.Face.BACK, 1f)
+                        >= PreviewLighting.shadeGreyFor(SkinModel.Face.BACK, 1f));
+        // An arbitrary (bone-rotated) normal must also produce a usable grey.
+        int normalLit = PreviewLighting.shadeGreyForNormal(0, 1, 0, 1f);
+        int normalShadowed = PreviewLighting.shadeGreyForNormal(0, -1, 0, 1f);
+        assertTrue("normal grey in range", normalLit >= 0 && normalLit <= 255);
+        assertTrue("normal grey in range", normalShadowed >= 0 && normalShadowed <= 255);
+        assertTrue("a shadowed normal is darker", normalShadowed < normalLit);
+    }
 }

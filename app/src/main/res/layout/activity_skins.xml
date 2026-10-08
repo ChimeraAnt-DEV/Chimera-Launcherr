@@ -86,16 +86,6 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
 
-            <Button
-                android:id="@+id/skins_cosmetics_status_button"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minHeight="40dp"
-                android:text="@string/cosmetics_status_title"
-                android:textColor="@color/primary"
-                android:textSize="12sp"
-                android:textAllCaps="false" />
         </LinearLayout>
 
         <FrameLayout

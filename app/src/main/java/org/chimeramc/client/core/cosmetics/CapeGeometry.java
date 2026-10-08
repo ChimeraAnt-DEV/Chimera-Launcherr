@@ -54,6 +54,14 @@ public final class CapeGeometry {
     /** The 180-degree turn that points each segment's face away from the player. */
     private static final double FACING_YAW = 180.0;
 
+    /**
+     * The cape geometry's identifier.
+     *
+     * <p>It used to live on the deleted resource-pack builder; the native cosmetics renderer is now
+     * the only consumer, so the id belongs with the geometry it names.
+     */
+    public static final String GEOMETRY_ID = "geometry.chimera_cape";
+
     private CapeGeometry() {
     }
 

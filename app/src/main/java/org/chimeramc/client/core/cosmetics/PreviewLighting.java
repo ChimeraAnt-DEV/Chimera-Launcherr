@@ -66,6 +66,38 @@ public final class PreviewLighting {
         return (int) Math.round(overlayAlphaFor(face, perspective) * OVERLAY_SHARE);
     }
 
+    /**
+     * A grey multiplier (0..255) for a textured face, applied as a {@code MULTIPLY} colour filter on
+     * the bitmap.
+     *
+     * <p>Multiplying the texture keeps a transparent texel transparent, so a hat overlay's holes
+     * never darken the head beneath it — unlike a black overlay drawn over the whole quad, which
+     * films the holes. The value is the same ramp as {@link #shadeColor}'s factor, expressed as an
+     * 8-bit grey.
+     */
+    public static int shadeGreyFor(SkinModel.Face face, float perspective) {
+        double intensity = intensityFor(face, perspective);
+        double factor = 0.60 + 0.40 * intensity;
+        return (int) Math.round(clamp(factor, 0.0, 1.0) * 255.0);
+    }
+
+    /** The softer grey for a skin's second layer, so hats and eyes stay readable. */
+    public static int shadeGreyForOverlayLayer(SkinModel.Face face, float perspective) {
+        int base = shadeGreyFor(face, perspective);
+        // Blend toward full white by OVERLAY_SHARE, matching the overlay alpha softening.
+        return (int) Math.round(255 - (255 - base) * OVERLAY_SHARE);
+    }
+
+    /** The grey multiplier for an arbitrary (bone-rotated) normal, for an authored mesh face. */
+    public static int shadeGreyForNormal(double nx, double ny, double nz, float perspective) {
+        double intensity = intensityForNormal(nx, ny, nz);
+        double p = clamp(perspective, 0.8, 1.25);
+        intensity *= 0.92 + 0.08 * ((p - 0.8) / 0.45);
+        intensity = clamp(intensity, 0.25, 1.0);
+        double factor = 0.60 + 0.40 * intensity;
+        return (int) Math.round(clamp(factor, 0.0, 1.0) * 255.0);
+    }
+
     /** A flat quad's colour, multiplied toward black by the face's shadow. */
     public static int shadeColor(int color, SkinModel.Face face, float perspective) {
         double intensity = intensityFor(face, perspective);

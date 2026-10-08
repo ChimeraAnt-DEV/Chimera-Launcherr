@@ -206,6 +206,44 @@ public class BedrockGeometryPreviewTest {
         assertEquals(4f, maxX, 0.001f);
     }
 
+    /**
+     * Every resolved cube carries its bone's world-space pivot.
+     *
+     * <p>The preview animates an authored pet by swinging each cube about this point, so a leg
+     * swings from its hip rather than its own centre. A pivot left at the origin would rotate every
+     * cube about the model's feet, which is the difference between an animated pet and a mesh that
+     * collapses when a gait is applied.
+     */
+    @Test
+    public void everyCubeCarriesItsBonePivot() {
+        String json = "{"
+                + "\"format_version\": \"1.8.0\","
+                + "\"minecraft:geometry\": [{"
+                + "  \"description\": {\"identifier\": \"geometry.test\"},"
+                + "  \"bones\": ["
+                + "    {\"name\": \"pet\", \"pivot\": [0, 0, 0], \"cubes\": ["
+                + "      {\"origin\": [-2, 0, -2], \"size\": [4, 4, 4], \"uv\": [0, 0]}]},"
+                + "    {\"name\": \"leg_a\", \"parent\": \"pet\", \"pivot\": [-1, 3, 0], \"cubes\": ["
+                + "      {\"origin\": [-2, -2, -1], \"size\": [2, 3, 2], \"uv\": [0, 0]}]}"
+                + "  ]"
+                + "}]}";
+        BedrockGeometry geometry = BedrockGeometryParser.parse(json);
+        List<PreviewMeshModel.Box> boxes = PreviewMeshModel.build(geometry);
+        assertEquals(2, boxes.size());
+        for (PreviewMeshModel.Box box : boxes) {
+            assertNotNull(box.pivot);
+            assertEquals(3, box.pivot.length);
+        }
+        // The leg's pivot is its own bone pivot (its parent is unrotated), not the model origin.
+        PreviewMeshModel.Box leg = null;
+        for (PreviewMeshModel.Box box : boxes) {
+            if ("leg_a".equals(box.bone)) leg = box;
+        }
+        assertNotNull(leg);
+        assertEquals(-1f, leg.pivot[0], 0.001f);
+        assertEquals(3f, leg.pivot[1], 0.001f);
+    }
+
     private static BedrockGeometry parseFile(File file) {
         try {
             return BedrockGeometryParser.parse(read(file));

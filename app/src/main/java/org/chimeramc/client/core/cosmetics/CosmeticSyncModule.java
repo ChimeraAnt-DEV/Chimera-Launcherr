@@ -118,6 +118,26 @@ public final class CosmeticSyncModule {
      */
     private static volatile CosmeticSyncModule instance;
 
+    /**
+     * Notified for every peer advertisement that arrives, on the receiving thread.
+     *
+     * <p>This is the seam that turns a received payload into a rendered cosmetic: the listener
+     * resolves the advertised ids against the catalogue and hands the resulting pixels to the
+     * native registry, so a peer's cape/accessory/pet appears without any resource reload. It is a
+     * single static sink (there is one renderer) and a throwing listener is swallowed so a bad
+     * payload cannot stop the receive loop.
+     */
+    public interface AdvertListener {
+        void onAdvert(CosmeticSyncProtocol.Advert advert);
+    }
+
+    private static volatile AdvertListener advertListener;
+
+    /** Installs the sink that renders a received advertisement. Null clears it. */
+    public static void setAdvertListener(AdvertListener listener) {
+        advertListener = listener;
+    }
+
     public CosmeticSyncModule(Context context, String peerId, String displayName) {
         this(context, peerId, displayName, CosmeticSyncConfig.resolve(true, false, "", "",
                 "world", ""));
@@ -452,6 +472,18 @@ public final class CosmeticSyncModule {
         // Persist the raw advertisement so this peer shows instantly on the next session, before
         // the first network round trip. Only on a real (non-request) advert.
         if (cache != null) cache.put(advert, data);
+        // Render the peer's cosmetics natively: resolve their advertised ids against our catalogue
+        // and hand the pixels to the registry. This is what makes a peer's cape/accessory/pet appear
+        // the moment the payload arrives, with no resource reload. A throwing sink must not kill the
+        // receive loop, so it is guarded.
+        AdvertListener listener = advertListener;
+        if (listener != null) {
+            try {
+                listener.onAdvert(advert);
+            } catch (Throwable t) {
+                Log.w(TAG, "Advert listener failed", t);
+            }
+        }
         if (firstSight) requestAll();
     }
 

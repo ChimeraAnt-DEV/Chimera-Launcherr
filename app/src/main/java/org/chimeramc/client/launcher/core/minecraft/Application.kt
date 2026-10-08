@@ -42,6 +42,11 @@ class LauncherApplication : Application() {
         // sees the running state; init here so it exists before any Mod Menu screen asks for it.
         org.chimeramc.client.core.replay.ReplayManager.init(applicationContext)
 
+        // Boot the native cosmetics system once: publish the equipped set into the native registry
+        // and install the sink that renders a peer's advertised cosmetics. There is no resource pack
+        // path any more, so this is the single initialisation point.
+        org.chimeramc.client.core.cosmetics.NativeCosmeticsRuntime.init(applicationContext)
+
         preferences = PreferenceManager.getDefaultSharedPreferences(this)
     }
 

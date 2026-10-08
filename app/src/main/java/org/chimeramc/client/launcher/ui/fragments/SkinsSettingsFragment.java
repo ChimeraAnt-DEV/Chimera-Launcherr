@@ -101,12 +101,6 @@ public class SkinsSettingsFragment extends Fragment {
         importButton.setOnClickListener(v -> startImport());
         emptyImportButton.setOnClickListener(v -> startImport());
         if (resetButton != null) resetButton.setOnClickListener(v -> resetToDefaultSkin());
-        Button cosmeticsStatusButton = view.findViewById(R.id.skins_cosmetics_status_button);
-        if (cosmeticsStatusButton != null) {
-            cosmeticsStatusButton.setOnClickListener(v ->
-                    startActivity(new android.content.Intent(requireContext(),
-                            org.chimeramc.client.ui.activities.CosmeticsStatusActivity.class)));
-        }
 
         versionManager = VersionManager.get(requireContext());
         adapter = new SkinsAdapter();

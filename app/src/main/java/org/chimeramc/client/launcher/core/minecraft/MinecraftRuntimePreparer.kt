@@ -10,9 +10,6 @@ import org.chimeramc.client.core.mods.ModManager
 import org.chimeramc.client.core.mods.ModNativeLoader
 import org.chimeramc.client.core.mods.ModSafeMode
 import org.chimeramc.client.core.minecraft.MinecraftLauncher
-import org.chimeramc.client.core.content.CapeInGameInstaller
-import org.chimeramc.client.core.cosmetics.CosmeticCatalog
-import org.chimeramc.client.core.cosmetics.CosmeticStore
 import org.chimeramc.client.core.versions.GameVersion
 import io.bambosan.mbloader.launcherUtils.LibBindings
 import org.chimeramc.client.preloader.PreloaderInput
@@ -173,43 +170,16 @@ val modsDir = modManager.currentVersion?.modsDir?.absolutePath
             throw RuntimeException("Failed to prepare bundled native-mod packs", error)
         }
 
-        // The equipped cape and worn accessory are written to the pack list before every launch,
-        // so entering a world shows them immediately. Applying them mid-session needs the game to
-        // refresh or relaunch, so syncing here is what lets the player equip a cosmetic and just
-        // play. A failure is logged, never fatal: a cosmetic must not block the launch.
+        // Publish the equipped set into the native cosmetics registry before every launch, so the
+        // preloader's player-render hook has the cape/accessory/pet ready the moment the game
+        // starts. getEquippedCapeForDisplay applies the Optifine default, so an Optifine user with
+        // no cape chosen is not left bare. There is no resource pack to write and nothing to reload.
+        // A failure is logged, never fatal: a cosmetic must not block the launch.
         try {
-            val profileId = MinecraftLauncher.getStorageProfileId(version)
-            val candidateRoots = LauncherStorage.getCandidateGameDataDirs(
-                context, profileId, version.versionIsolation
-            )
-            val store = CosmeticStore(context)
-            // getEquippedCapeForDisplay applies the Optifine default: with Optifine Mode on and no
-            // cape chosen, the classic all-black Optifine cape is installed so the character is not
-            // left bare. An explicit choice always wins.
-            val cape = store.equippedCapeForDisplay
-            val accessory = store.equippedAccessory
-            val pet = store.equippedPet
-            // Feed the native cosmetics registry as well as the pack: the native skin/cape and
-            // texture hooks read these tables, so a build where a substitution slot resolves can
-            // render the cosmetic directly. Fail-closed — without the library these are no-ops.
-            try {
-                org.chimeramc.client.core.cosmetics.NativeCosmeticsBridge.publishLocal(
-                    cape, accessory, pet
-                )
-            } catch (error: Throwable) {
-                trace.error("Native cosmetics publish failed", error.javaClass.simpleName)
-            }
-            val stagingRoot = File(context.filesDir, "cape")
-            if (cape != null || accessory != null || pet != null) {
-                CapeInGameInstaller.installQuietly(
-                    stagingRoot, candidateRoots, cape, accessory, pet
-                ) { path -> context.assets.open(path) }
-                fileListener.onLog("Prepared in-game cosmetics")
-            } else {
-                CapeInGameInstaller.uninstallQuietly(candidateRoots)
-            }
-        } catch (error: Exception) {
-            trace.error("Cosmetic pack synchronization failed", error.message ?: error.javaClass.simpleName)
+            org.chimeramc.client.core.cosmetics.NativeCosmeticsRuntime.syncEquipped(context)
+            fileListener.onLog("Published native cosmetics")
+        } catch (error: Throwable) {
+            trace.error("Native cosmetics publish failed", error.javaClass.simpleName)
         }
 
         fileListener.onProgress(100,"Runtime ready", "Entering Minecraft")

@@ -1332,6 +1332,66 @@ Do not re-run this RE from scratch; these are the conclusions.
   running world keeps its cached pack stack and the supported apply path relaunches the instance
   (`MinecraftSessionRestarter`). Do not promise a live recolour.
 
+## Cosmetics are native-only — the resource-pack route is deleted
+- **The legacy cosmetic resource pack is gone, not hidden.** `CapeResourcePackBuilder`,
+  `CapeInGameInstaller`, `CosmeticsDiagnostics`, `CosmeticsStatusActivity`,
+  `activity_cosmetics_status.xml` and their tests were deleted. The only route a cosmetic reaches
+  the game is the native registry + the preloader's player-render hook. Do not reintroduce a pack
+  builder or an "Apply in game" button. (Skin packs are a **separate** feature — `SkinPackActivator`
+  / `SkinPackBuilder` / `SkinsSettingsFragment` stay.)
+- **`NativeCosmeticsRuntime` is the single initialisation point.** `LauncherApplication.onCreate`
+  calls `NativeCosmeticsRuntime.init(context)`, which publishes the equipped set and installs the
+  peer-advert sink; `MinecraftRuntimePreparer` calls `syncEquipped(context)` before every launch;
+  `InbuiltOverlayManager.showEnabledOverlays` calls `init` again so a session that starts without
+  the Application having run still has the system wired. Adding a second init path is how the two
+  drift.
+- **`NativeCosmeticsBridge.publishLocal` now also publishes geometry.** After the cape/accessory/pet
+  textures it frames the three geometry blobs (`CapeGeometry` chain, `AccessoryGeometry` hat,
+  `PetGeometry` pet) into one length-prefixed byte blob and hands it to
+  `PreloaderInput.setRenderGeometry`. Build the blob with a `ByteArrayOutputStream`, never a
+  `StringBuilder` — a `String` round-trip corrupts the binary length prefixes.
+- **`CosmeticSyncModule` renders a received advert through a static `AdvertListener`.** The module
+  owns the socket; `NativeCosmeticsRuntime.renderPeerAdvert` resolves the peer's advertised ids
+  against the local catalogue and calls `NativeCosmeticsBridge.publishPeer`, keyed by the peer id
+  (cape) or a player-scoped texture id (`<id>/hat`, `<id>/pet`). A throwing listener is swallowed so
+  a bad payload cannot stop the receive loop.
+- **The Cosmetics panel has no Apply/Remove any more.** `refreshGameStatus` reports
+  `NativeCosmeticsFeed.isNativeRenderLive()` as `cosmetics_native_active` / `_inactive`; equipping a
+  cosmetic calls `publishLocal` directly, so it appears with no reload. `cosmetics_apply_*`,
+  `cosmetics_status_*` and the pack-only strings were removed.
+- **`CosmeticEffects` (pack particle effects) was deleted with the pack.** `CapeGeometry` survives
+  because it is the cape chain the native renderer draws; its identifier constant moved to
+  `CapeGeometry.GEOMETRY_ID` (it used to live on the deleted builder).
+
+## Preview fixes: transparency, hat shading, hat attachment, pet animation
+- **Never shade a textured face by drawing a black quad over it and then cutting it with a `DST_IN`
+  mask.** The `DST_IN` pass multiplies the destination alpha wherever the mask is transparent, so a
+  hat/hair/jacket overlay's transparent texels punched holes through the base face already painted
+  under them — the character turned see-through and the sides of the head vanished at side/front
+  angles. The alpha test is now **baked into the face crop** (`crop()` quantises alpha to 0/255 into
+  a standalone copy) and the authored atlas is baked the same way in `buildCutout()`. Shading a
+  textured face is a **`PorterDuffColorFilter(MULTIPLY)` on the bitmap** (`shadeFilter(grey)`),
+  which keeps a transparent texel transparent so it never darkens what is behind it. There is no
+  `maskPaint`, no `applyAlphaCutout`, no `meshMaskCache`, no `baseFaceMasks`/`overlayFaceMasks`.
+- **`crop()` must return a standalone copy, never `Bitmap.createBitmap(atlas, ...)`.** The shared
+  atlas must not be recycled; `release()` recycles every face crop.
+- **`PreviewLighting.shadeGreyFor*` is the textured-face ramp** (a grey multiplier), distinct from
+  `shadeColor*` (the flat fallback) and `overlayAlphaFor*` (only the flat fallback uses the alpha
+  overlay now). `shadeGreyForOverlayLayer` is softer than the base so hair/eyes stay readable.
+- **`PreviewMeshModel.Box.pivot` is the bone's world-space hinge.** `resolveCube` runs the bone's
+  pivot through its ancestor chain so a renderer can swing a cube about it. The preview's
+  `drawAuthoredPetMesh` (via `drawAuthoredMeshAt(..., animatePet=true)`) rotates each authored-pet
+  cube about this pivot by `petBoneRotation(bone)` (the `PetPose` rotation for `head`/`tail`/
+  `wing_l`/`wing_r`/`leg_a-c`), plus a whole-body `bodyBob`/`crouchDrop` offset — that is what makes
+  every authored pet animated instead of a static mesh. A cube on an unnamed bone keeps its authored
+  pose.
+- **A hat is attached to the head by rotating it about the neck pivot**, `HeadLookTransform.PIVOT_Y
+  = 24`, with the same angles the head box uses. The authored hat mesh (`orig_witch` etc.) is
+  authored with `pivot: [0, 32, 0]` / origins around the head, so a neck-pivot rotation is a close
+  approximation that keeps the hat on the head while the look turns. `AccessoryKind.followsHead()`
+  decides which kinds track the head (hats/glasses/veils/antlers yes; scarf/backpack/wings/bowtie/
+  beard no).
+
 ## Cosmetics architecture pivot: native player-render hook
 - **The resource-pack route has four structural limits** and is now treated as a *fallback*, not the
   destination: (1) no per-bone cloth physics (a pack has no physics driver, only Molang queries),

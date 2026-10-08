@@ -96,6 +96,11 @@ public class InbuiltOverlayManager {
         // previous session cannot carry over into this one.
         ReplayTriggerFeed.reset();
 
+        // Re-publish the equipped cosmetics into the native registry and (re)install the sink that
+        // renders a peer's advertised cosmetics, so a session that starts without the Application
+        // having run this process still has the native system wired.
+        org.chimeramc.client.core.cosmetics.NativeCosmeticsRuntime.init(activity);
+
         // Cosmetic sync is independent of voice: it advertises the equipped cape/accessory/pet to
         // other Chimera users in the world so they can see it, on its own socket and its own pref.
         startCosmeticSync(manager);

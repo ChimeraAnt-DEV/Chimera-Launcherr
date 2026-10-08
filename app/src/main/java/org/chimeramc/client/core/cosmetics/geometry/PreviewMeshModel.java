@@ -53,6 +53,15 @@ public final class PreviewMeshModel {
         public final String bone;
         /** Eight corners in model space, indexed by {@code ix | iy<<1 | iz<<2}. */
         public final float[][] corners = new float[8][3];
+        /**
+         * The owning bone's pivot in world space, the point its rotation turns about.
+         *
+         * <p>Retained so a renderer can animate the resolved mesh on top of its authored pose: a
+         * bone's own rotation leaves its pivot fixed, so applying the full chain to the pivot gives
+         * the point to rotate a cube about (a leg swings from its hip, not its centre). The preview
+         * uses this to animate authored pets; without it the mesh is static.
+         */
+        public final float[] pivot = new float[3];
         /** Per-face source UV, indexed by {@code SkinModel.Face.ordinal()} order below. */
         public final FaceUv[] faceUv = new FaceUv[6];
         /** Cumulative bone rotation (own first, then each ancestor), degrees, for shading. */
@@ -150,6 +159,19 @@ public final class PreviewMeshModel {
         for (Transform transform : chain) {
             box.rotations.add(transform.rotation);
         }
+        // The bone's pivot is a bone-space point; run it through the ancestor chain (excluding the
+        // bone's own rotation, which leaves its pivot fixed) to get the world-space hinge a renderer
+        // can swing this cube about.
+        float[] pivot = {0f, 0f, 0f};
+        if (bone.pivot != null) {
+            pivot = new float[]{bone.pivot[0], bone.pivot[1], bone.pivot[2]};
+        }
+        for (int i = 1; i < chain.size(); i++) {
+            pivot = rotateAbout(pivot, chain.get(i).pivot, chain.get(i).rotation);
+        }
+        box.pivot[0] = pivot[0];
+        box.pivot[1] = pivot[1];
+        box.pivot[2] = pivot[2];
 
         // Cube-local rotation (rare) is folded into the corner transform about the cube pivot.
         float[] localRot = cube.rotation == null ? new float[]{0f, 0f, 0f} : cube.rotation;

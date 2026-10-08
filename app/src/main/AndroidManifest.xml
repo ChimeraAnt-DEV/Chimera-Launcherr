@@ -173,13 +173,6 @@
             tools:ignore="DiscouragedApi"
             android:label="@string/nav_customize" />
 
-        <activity
-            android:name="org.chimeramc.client.ui.activities.CosmeticsStatusActivity"
-            android:exported="false"
-            android:screenOrientation="sensorLandscape"
-            android:configChanges="fontScale|density|smallestScreenSize|screenSize|uiMode|screenLayout|orientation|navigation|keyboardHidden|keyboard|touchscreen|locale|mnc|mcc"
-            tools:ignore="DiscouragedApi"
-            android:label="@string/cosmetics_status_title" />
 
         <activity
             android:name="org.chimeramc.client.ui.activities.VoiceChatActivity"

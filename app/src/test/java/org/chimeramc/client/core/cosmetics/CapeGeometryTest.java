@@ -26,7 +26,7 @@ public class CapeGeometryTest {
 
     private static JsonArray bones() {
         JsonObject model = JsonParser.parseString(
-                CapeGeometry.modelJson(CapeResourcePackBuilder.CAPE_GEOMETRY_ID)).getAsJsonObject();
+                CapeGeometry.modelJson(CapeGeometry.GEOMETRY_ID)).getAsJsonObject();
         return model.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
                 .getAsJsonArray("bones");
     }
@@ -149,7 +149,7 @@ public class CapeGeometryTest {
         // chain that still reaches the hem. This is the FPS fallback path.
         int total = CapeGeometry.FALLBACK_SEGMENT_COUNT;
         JsonObject model = JsonParser.parseString(
-                CapeGeometry.modelJson(CapeResourcePackBuilder.CAPE_GEOMETRY_ID, total))
+                CapeGeometry.modelJson(CapeGeometry.GEOMETRY_ID, total))
                 .getAsJsonObject();
         JsonArray bones = model.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
                 .getAsJsonArray("bones");
@@ -180,9 +180,9 @@ public class CapeGeometryTest {
     @Test
     public void theGeometryIsValidJsonWithTheRequestedIdentifier() {
         JsonObject model = JsonParser.parseString(
-                CapeGeometry.modelJson(CapeResourcePackBuilder.CAPE_GEOMETRY_ID)).getAsJsonObject();
+                CapeGeometry.modelJson(CapeGeometry.GEOMETRY_ID)).getAsJsonObject();
         JsonObject geo = model.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
-        assertEquals(CapeResourcePackBuilder.CAPE_GEOMETRY_ID,
+        assertEquals(CapeGeometry.GEOMETRY_ID,
                 geo.getAsJsonObject("description").get("identifier").getAsString());
         // 2 skeleton bones + the segments.
         assertEquals(CapeGeometry.SEGMENT_COUNT + 2, bones().size());

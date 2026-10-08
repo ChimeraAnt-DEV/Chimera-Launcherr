@@ -17,24 +17,17 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.chimeramc.client.R;
-import org.chimeramc.client.core.content.CapeInGameInstaller;
-import org.chimeramc.client.core.content.InGamePackChanger;
-import org.chimeramc.client.core.content.SkinPackActivator;
 import org.chimeramc.client.core.cosmetics.CosmeticCatalog;
 import org.chimeramc.client.core.cosmetics.CosmeticStore;
 import org.chimeramc.client.core.cosmetics.CosmeticSyncModule;
 import org.chimeramc.client.core.cosmetics.CosmeticSyncProtocol;
-import org.chimeramc.client.core.versions.GameVersion;
-import org.chimeramc.client.core.versions.VersionManager;
+import org.chimeramc.client.core.cosmetics.NativeCosmeticsBridge;
+import org.chimeramc.client.core.cosmetics.NativeCosmeticsFeed;
 import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
 import org.chimeramc.client.ui.animation.DynamicAnim;
-import org.chimeramc.client.util.LauncherStorage;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * The Cosmetics section of the in-game Mod Menu: the player's character wearing the equipped
@@ -46,8 +39,10 @@ import java.util.concurrent.Executors;
  * The equipped selection persists through {@link CosmeticStore}, so it survives closing the menu
  * and relaunching the game.
  *
- * <p>Selecting a cape also offers to put it on the character in-game, which is done by installing
- * a resource pack that adds a cape model to the player entity. See {@link CapeInGameInstaller}.
+ * <p>Selecting a cape publishes it to the native cosmetics registry
+ * ({@link NativeCosmeticsBridge}), which the preloader's player-render hook reads directly. There is
+ * no resource pack: the native path is the only route a cosmetic reaches the game, and
+ * {@link NativeCosmeticsFeed} reports whether it is live this session.
  */
 final class CosmeticsPanel {
 
@@ -107,19 +102,6 @@ final class CosmeticsPanel {
      * floating over whatever comes next. {@link #dismissDropdowns()} collapses every one of them.
      */
     private final List<DismissibleSpinner> dropdowns = new ArrayList<>();
-
-    /**
-     * Serialises pack writes off the UI thread. Every dropdown pick re-applies the pack, and a
-     * write copies the pack into {@code resource_packs/} and rewrites the world pack lists — too
-     * much to do inside a click handler. One process-wide thread keeps the writes ordered (so a
-     * fast run of picks lands in the order the player made them) and daemon so it never holds the
-     * process open.
-     */
-    private static final ExecutorService WRITE_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "cosmetics-pack-writer");
-        t.setDaemon(true);
-        return t;
-    });
 
     CosmeticsPanel(Activity activity, boolean compact) {
         this.activity = activity;
@@ -207,7 +189,7 @@ final class CosmeticsPanel {
 
         // Cosmetic sync: whether the equipped set is being advertised to other Chimera users in the
         // world, and how many have been heard. This is the cross-player half of "cosmetic sync",
-        // distinct from applying the pack to the running game above.
+        // distinct from the native renderer status above.
         syncStatus = new TextView(activity);
         syncStatus.setTextSize(compact ? 10f : 11f);
         syncStatus.setTextColor(0xFF8F979F);
@@ -253,69 +235,33 @@ final class CosmeticsPanel {
         }));
         column.addView(manualPeerRow);
 
-        LinearLayout actions = new LinearLayout(activity);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setPadding(0, dp(6), 0, 0);
-        actions.addView(gameButton(R.string.cosmetics_apply_in_game, true, v -> applyInGame()));
-        actions.addView(gameButton(R.string.cosmetics_remove_in_game, false, v -> removeInGame()));
-        column.addView(actions);
+        // There is no Apply/Remove button any more: a cosmetic reaches the game through the native
+        // renderer the instant it is equipped, so the only thing left to show is whether that
+        // native path is live this session. A fallback build still shows the equipped preview.
         refreshGameStatus();
         refreshSyncStatus();
     }
 
     /**
-     * Tells the running sync module to re-advertise now, so a peer sees a cape/accessory/pet swap
-     * without waiting for the slow timer, and refreshes the peer count line.
+     * Publishes the newly equipped set to the native registry and tells the running sync module to
+     * re-advertise now, so a peer sees a cape/accessory/pet swap without waiting for the slow timer.
      *
-     * <p>It also re-applies the pack to any installed instance <em>quietly</em>, so a swap shows
-     * up without the player closing the instance or leaving their world. The explicit Apply button
-     * is still there for a full reload/restart, but the common case (changing a cosmetic while
-     * playing) no longer needs it.
+     * <p>The publish is what makes the swap appear in-game instantly: the preloader's render hook
+     * reads the registry, so there is no pack to write and no world reload to wait for. A build
+     * whose native hook is not live simply shows the equipped preview until it is.
      */
     private void onCosmeticChanged() {
-        // Refresh the native registry so a build with a live substitution slot sees the swap
-        // immediately; on a build without one this is a no-op and the pack path carries it.
         try {
-            org.chimeramc.client.core.cosmetics.NativeCosmeticsBridge.publishLocal(
+            NativeCosmeticsBridge.publishLocal(
                     store.getEquippedCapeForDisplay(),
                     store.getEquippedAccessory(),
                     store.getEquippedPet());
         } catch (Throwable ignored) {
-            // Fail-closed: the pack path is unaffected.
+            // Fail-closed: the preview and the equipped selection are unaffected.
         }
         CosmeticSyncModule.requestAnnounce();
-        applyInGameQuietly();
+        refreshGameStatus();
         refreshSyncStatus();
-    }
-
-    /**
-     * Writes the equipped cosmetics into every installed instance without asking a session to
-     * reload. It writes the pack folder, the global list and every running world's own pack list
-     * (the file the loaded world reads), so a swap lands without the player closing the instance or
-     * leaving their world. On a build that caches its pack stack the change still needs a world
-     * reload to be sampled, which is the documented limit of the mechanism. Runs off the UI thread
-     * (a pack write is a directory copy plus several file rewrites) and is silent on failure (there
-     * may simply be no instance installed yet) — the Apply button reports errors.
-     */
-    private void applyInGameQuietly() {
-        final List<File> gameDataDirs = resolveGameDataDirs();
-        if (gameDataDirs.isEmpty()) return;
-        final CosmeticCatalog.Cape cape = store.getEquippedCapeForDisplay();
-        final CosmeticCatalog.Accessory accessory = store.getEquippedAccessory();
-        final CosmeticCatalog.Pet pet = store.getEquippedPet();
-        final Activity target = activity;
-        WRITE_EXECUTOR.execute(() -> {
-            if (cape == null && accessory == null && pet == null) {
-                // Nothing equipped: drop the pack rather than installing a blank one, so the
-                // player's own packs are left clean.
-                CapeInGameInstaller.uninstallQuietly(gameDataDirs);
-            } else {
-                CapeInGameInstaller.installQuietly(new File(target.getFilesDir(), "cape"),
-                        gameDataDirs, cape, accessory, pet,
-                        path -> target.getAssets().open(path));
-            }
-            target.runOnUiThread(this::refreshGameStatus);
-        });
     }
 
     private void refreshSyncStatus() {
@@ -606,90 +552,24 @@ final class CosmeticsPanel {
         return bg;
     }
 
-    // ---- In-game application -------------------------------------------------------------
+    // ---- Native application status -------------------------------------------------------
 
     /**
-     * Installs the equipped cape as a resource pack on the selected instance.
+     * Reports whether the native cosmetics renderer is live this session.
      *
-     * <p>This is the step that makes the cape appear on the character in-game, so it reports
-     * plainly when there is nothing to apply or no instance to apply it to rather than appearing
-     * to succeed.
+     * <p>There is no pack to install or remove any more: the equipped set is published to the
+     * native registry and the preloader's player-render hook draws it directly. This line is the
+     * honest status of that route, so a player on a build whose hook has not resolved is told the
+     * cosmetic is preview-only rather than left wondering why it does not show.
      */
-    private void applyInGame() {
-        List<File> gameDataDirs = resolveGameDataDirs();
-        if (gameDataDirs.isEmpty()) {
-            toast(R.string.cosmetics_no_instance);
-            return;
-        }
-        CosmeticCatalog.Cape cape = store.getEquippedCapeForDisplay();
-        CosmeticCatalog.Accessory accessory = store.getEquippedAccessory();
-        CosmeticCatalog.Pet pet = store.getEquippedPet();
-        if (cape == null && accessory == null && pet == null) {
-            toast(R.string.cosmetics_no_cape_selected);
-            return;
-        }
-        InGamePackChanger.ApplyOutcome outcome = CapeInGameInstaller.install(
-                new File(activity.getFilesDir(), "cape"), gameDataDirs, cape, accessory, pet,
-                path -> activity.getAssets().open(path));
-        switch (outcome) {
-            case RELOADED:
-                toast(R.string.cosmetics_applied_live);
-                break;
-            case RESTARTING:
-                toast(R.string.cosmetics_applied_restarting);
-                break;
-            case NEXT_LOAD:
-                toast(R.string.cosmetics_applied_next_load);
-                break;
-            default:
-                toast(R.string.cosmetics_apply_failed);
-                break;
-        }
-        refreshGameStatus();
-    }
-
-    private void removeInGame() {
-        List<File> gameDataDirs = resolveGameDataDirs();
-        if (gameDataDirs.isEmpty()) {
-            toast(R.string.cosmetics_no_instance);
-            return;
-        }
-        SkinPackActivator.Result result = CapeInGameInstaller.uninstall(gameDataDirs);
-        toast(result.success ? R.string.cosmetics_removed_in_game : R.string.cosmetics_remove_failed);
-        refreshGameStatus();
-    }
-
     private void refreshGameStatus() {
         if (gameStatus == null) return;
-        List<File> gameDataDirs = resolveGameDataDirs();
-        if (gameDataDirs.isEmpty()) {
-            gameStatus.setText(R.string.cosmetics_no_instance);
-            return;
-        }
-        gameStatus.setText(CapeInGameInstaller.isInstalled(gameDataDirs)
-                ? R.string.cosmetics_in_game_installed
-                : R.string.cosmetics_in_game_not_installed);
-    }
-
-    /**
-     * The selected instance's candidate game data roots, empty when no instance is selected.
-     *
-     * <p>Resolved through {@link LauncherStorage#getCandidateGameDataDirs} rather than a
-     * hardcoded {@code getProfileGameDataDir(..., true)}: the game reads its packs from wherever
-     * its storage resolves to, so installing into one fixed path made the cape apply
-     * "successfully" to a directory the running game never loaded — the cape was written but
-     * never appeared. Writing to every candidate root is the same defence the bundled-pack
-     * installer uses.
-     */
-    private List<File> resolveGameDataDirs() {
         try {
-            VersionManager versionManager = VersionManager.get(activity);
-            GameVersion version = versionManager.getSelectedVersion();
-            if (version == null) return java.util.Collections.emptyList();
-            return LauncherStorage.getCandidateGameDataDirs(
-                    activity, version.getStorageProfileId(), version.versionIsolation);
+            gameStatus.setText(NativeCosmeticsFeed.isNativeRenderLive()
+                    ? R.string.cosmetics_native_active
+                    : R.string.cosmetics_native_inactive);
         } catch (Throwable t) {
-            return java.util.Collections.emptyList();
+            gameStatus.setText(R.string.cosmetics_native_inactive);
         }
     }
 

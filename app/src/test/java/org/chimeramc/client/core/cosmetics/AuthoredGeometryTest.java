@@ -10,7 +10,6 @@ import org.junit.Test;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -94,35 +93,6 @@ public class AuthoredGeometryTest {
                 AuthoredGeometry.HAT_FILE, AccessoryGeometry.GEOMETRY_ID);
         assertNotNull(loaded);
         assertTrue(loaded.contains(AccessoryGeometry.GEOMETRY_ID));
-    }
-
-    @Test
-    public void anAuthoredModelReplacesTheProceduralMeshInTheBuiltPack() throws Exception {
-        File dir = Files.createTempDirectory("authored-pack").toFile();
-        AuthoredGeometry.AssetOpener opener = path -> {
-            if (path.endsWith(AuthoredGeometry.HAT_FILE)) {
-                return new ByteArrayInputStream(BLOCKBENCH_MODEL.getBytes(StandardCharsets.UTF_8));
-            }
-            throw new java.io.FileNotFoundException(path);
-        };
-        CapeResourcePackBuilder.build(dir, CosmeticCatalog.cape("chimera"),
-                CosmeticCatalog.accessory("crown"), null, opener);
-        File hatModel = new File(dir, CapeResourcePackBuilder.HAT_MODEL_PATH);
-        assertTrue("hat model written", hatModel.isFile());
-        String written = new String(Files.readAllBytes(hatModel.toPath()), StandardCharsets.UTF_8);
-        assertTrue("authored model wins", written.contains("geometry.my_hat") == false);
-        assertTrue("retargeted to the pack id", written.contains(AccessoryGeometry.GEOMETRY_ID));
-    }
-
-    @Test
-    public void withNoAssetsTheProceduralGeometryIsStillWritten() throws Exception {
-        File dir = Files.createTempDirectory("procedural-pack").toFile();
-        CapeResourcePackBuilder.build(dir, CosmeticCatalog.cape("chimera"),
-                CosmeticCatalog.accessory("crown"), null, null);
-        File hatModel = new File(dir, CapeResourcePackBuilder.HAT_MODEL_PATH);
-        assertTrue("hat model written", hatModel.isFile());
-        String written = new String(Files.readAllBytes(hatModel.toPath()), StandardCharsets.UTF_8);
-        assertTrue("procedural id", written.contains(AccessoryGeometry.GEOMETRY_ID));
     }
 
     @Test
