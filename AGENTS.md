@@ -1560,11 +1560,19 @@ references (the same method `Vtable.cpp` uses). These are pinned in
   (identified by `"AddPlayerPacket: NaN position sent by server"`). The `PlayerListPacketPayload::
   AddEntry` / `RemoveEntry` handlers sit at `0xb8007d0` / `0xb8007ec` and peers but their exact
   slot mapping is unconfirmed, so no index is set from them.
-- `GamePlayerRender` (existing) and `GameCosmetics` (new) both target the `LivePlayerRenderer`
-  slot; the cosmetics module owns the registry (per-player cape pixels, per-texture-id pixels, the
-  render-geometry blob + hash) and the JNI surface. All detours are **pure passthroughs** — they
-  forward the full argument register set and dereference nothing, so an unverified slot cannot fault
-  the render thread; the texture-bind seam has no verified slot and stays fail-closed.
+- `GamePlayerRender` (existing), `pl::cosmetics::NativeRenderHook` (Task 2) and `GameCosmetics`
+  (new) all target the `LivePlayerRenderer` slot; the cosmetics module owns the registry (per-player
+  cape pixels, per-texture-id pixels, the render-geometry blob + hash) and the JNI surface. All
+  detours are **pure passthroughs** — they forward the full argument register set and dereference
+  nothing, so an unverified slot cannot fault the render thread; the texture-bind seam has no
+  verified slot and stays fail-closed.
+  - **The Task 2 interception is installed from `GameHooks.cpp`, beside `InitPlayerRenderSource`
+    and on the same slot.** `pl::memory::hook` *chains* onto an already-hooked target, so the two
+    detours both run (the render feed records frame ticks, `NativeRenderHook` owns the bone-matrix
+    anchor) without either trampoline stomping the other. Installing the cosmetics hook alone
+    (which the first cut did — it was built but never called, so the interception was dead) would
+    have replaced the render feed's detour instead of sitting alongside it. If a third consumer of
+    the slot is added, add it the same way; do not "own" the slot with a second `GlossHook`.
 - **Still not implemented:** the pixel substitution itself (writing the override into the cape
   buffer / binding a swapped texture). The seams, registry and JNI are real and build; substituting
   needs each function's argument layout, which the stripped binary does not expose. The game-hook
