@@ -221,6 +221,81 @@ public final class NativeCosmeticsBridge {
                 || PreloaderInput.textureOverrideCount() > 0;
     }
 
+    // --- The mce::Image pipeline (engine-owned pixel substitution) ---------------------------
+    //
+    // The loader seam is the one place a launcher-built pixel buffer is safe: the engine receives
+    // the RGBA through its own `loadImageFromMemory`, allocates and owns the backing store, and
+    // a substitution is a *content-addressed* rule ("whenever the engine loads these exact bytes,
+    // build the image from this RGBA instead"), so the lifecycle never involves a launcher `malloc`
+    // the game could free. The launcher registers the cosmetic's PNG bytes and its painted RGBA;
+    // the native hook performs the swap at upload time. Fail-closed throughout: without a resolved
+    // loader address none of this is live and the pack path is unchanged.
+
+    /**
+     * Registers a content-addressed substitution: when the engine loads {@code sourceBytes} (the
+     * bytes the vanilla skin/cape texture ships as), it gets {@code rgba} instead.
+     *
+     * @return true when the rule was handed to the native registry (which is always, even on a
+     *         build without a live loader — the rule simply never fires there).
+     */
+    public static boolean registerSubstitution(byte[] sourceBytes, Bitmap replacement) {
+        if (sourceBytes == null || sourceBytes.length == 0) return false;
+        if (replacement == null) {
+            PreloaderInput.setContentSubstitution(sourceBytes, null, 0, 0);
+            return true;
+        }
+        byte[] rgba = toRgba(replacement);
+        if (rgba == null) return false;
+        PreloaderInput.setContentSubstitution(sourceBytes, rgba,
+                replacement.getWidth(), replacement.getHeight());
+        return true;
+    }
+
+    /** Clears every content-addressed substitution. */
+    public static void clearSubstitutions() {
+        PreloaderInput.clearContentSubstitutions();
+    }
+
+    /** Number of registered content substitutions. */
+    public static int substitutionCount() {
+        return PreloaderInput.substitutionCount();
+    }
+
+    /**
+     * Arms the one-shot override: the very next image the engine builds is replaced with {@code
+     * rgba}. Used when the launcher itself triggers one known upload.
+     */
+    public static boolean armNextImageOverride(Bitmap replacement) {
+        if (replacement == null) {
+            PreloaderInput.clearNextImageOverride();
+            return true;
+        }
+        byte[] rgba = toRgba(replacement);
+        if (rgba == null) return false;
+        PreloaderInput.armNextImageOverride(rgba, replacement.getWidth(), replacement.getHeight());
+        return true;
+    }
+
+    /** True once the engine image-pipeline hook has run this session. */
+    public static boolean isImagePipelineLive() {
+        return PreloaderInput.isMceImageHookLive();
+    }
+
+    /** True when the init probe confirmed the engine image loader on this build. */
+    public static boolean isImagePathVerified() {
+        return PreloaderInput.isImagePathVerified();
+    }
+
+    /** {hookCalls, substitutions, overrides, bufferBytesSeen}, or null when unavailable. */
+    public static int[] imagePipelineStats() {
+        return PreloaderInput.readMceImageHookStats();
+    }
+
+    /** True when a proven texture-cache flusher is available post-substitution. */
+    public static boolean isTextureFlushAvailable() {
+        return PreloaderInput.isTextureCacheFlushAvailable();
+    }
+
     /**
      * A bitmap's pixels as tightly packed RGBA, row-major, top-left origin — the layout the native
      * registry documents. A zero-size or null bitmap yields null.

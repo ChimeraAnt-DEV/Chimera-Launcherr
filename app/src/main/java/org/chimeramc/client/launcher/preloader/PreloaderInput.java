@@ -467,6 +467,122 @@ public class PreloaderInput {
         }
     }
 
+    // --- The mce::Image pipeline (image-buffer substitution) --------------------------------
+    // These drive the engine-owned pixel substitution: the launcher registers "whenever the
+    // engine loads these exact source bytes, build the image from this RGBA instead", so a
+    // custom cape is handed to the engine at upload time and the engine still owns the lifetime.
+    // Each call is guarded, so a build without the native library degrades to the pack path.
+
+    /** Native declaration: registers a source-bytes → replacement-RGBA substitution. */
+    public static native void nativeSetContentSubstitution(byte[] sourceBytes, byte[] rgba,
+                                                           int width, int height);
+
+    /** Native declaration: clears every content-addressed substitution. */
+    public static native void nativeClearContentSubstitutions();
+
+    /** Native declaration: number of registered content substitutions. */
+    public static native int nativeSubstitutionCount();
+
+    /** Native declaration: arms the one-shot override for the very next engine image build. */
+    public static native void nativeArmNextImageOverride(byte[] rgba, int width, int height);
+
+    /** Native declaration: disarms the one-shot override. */
+    public static native void nativeClearNextImageOverride();
+
+    /** Native declaration: true once the mce::Image pipeline hook has run this session. */
+    public static native boolean nativeIsMceImageHookLive();
+
+    /** Native declaration: true when the init probe verified the engine image loader. */
+    public static native boolean nativeIsImagePathVerified();
+
+    /** Native declaration: {hookCalls, substitutions, overrides, bufferBytesSeen}. */
+    public static native int[] nativeReadMceImageHookStats();
+
+    /** Native declaration: true when a proven texture-cache flusher is installed. */
+    public static native boolean nativeIsTextureCacheFlushAvailable();
+
+    /** Native declaration: requests a texture-cache refresh; true when a flusher ran. */
+    public static native boolean nativeRequestTextureCacheFlush();
+
+    /** Registers a source → replacement substitution, or clears it when rgba is null. */
+    public static void setContentSubstitution(byte[] sourceBytes, byte[] rgba,
+                                              int width, int height) {
+        try {
+            nativeSetContentSubstitution(sourceBytes, rgba, width, height);
+        } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    public static void clearContentSubstitutions() {
+        try {
+            nativeClearContentSubstitutions();
+        } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    public static int substitutionCount() {
+        try {
+            return nativeSubstitutionCount();
+        } catch (UnsatisfiedLinkError e) {
+            return 0;
+        }
+    }
+
+    public static void armNextImageOverride(byte[] rgba, int width, int height) {
+        try {
+            nativeArmNextImageOverride(rgba, width, height);
+        } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    public static void clearNextImageOverride() {
+        try {
+            nativeClearNextImageOverride();
+        } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    public static boolean isMceImageHookLive() {
+        try {
+            return nativeIsMceImageHookLive();
+        } catch (UnsatisfiedLinkError e) {
+            return false;
+        }
+    }
+
+    public static boolean isImagePathVerified() {
+        try {
+            return nativeIsImagePathVerified();
+        } catch (UnsatisfiedLinkError e) {
+            return false;
+        }
+    }
+
+    public static int[] readMceImageHookStats() {
+        try {
+            int[] value = nativeReadMceImageHookStats();
+            return value != null && value.length >= 4 ? value : null;
+        } catch (UnsatisfiedLinkError e) {
+            return null;
+        }
+    }
+
+    public static boolean isTextureCacheFlushAvailable() {
+        try {
+            return nativeIsTextureCacheFlushAvailable();
+        } catch (UnsatisfiedLinkError e) {
+            return false;
+        }
+    }
+
+    public static boolean requestTextureCacheFlush() {
+        try {
+            return nativeRequestTextureCacheFlush();
+        } catch (UnsatisfiedLinkError e) {
+            return false;
+        }
+    }
+
     public static boolean onTouch(int action, int pointerId, float x, float y) {
         try {
             return nativeOnTouch(action, pointerId, x, y);

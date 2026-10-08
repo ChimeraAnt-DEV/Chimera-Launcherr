@@ -108,4 +108,31 @@ public final class NativeCosmeticsFeed {
         return "Native renderer: active (" + status.renderTick + " ticks) — cape and pet motion "
                 + "is driven by the game's own render tick.";
     }
+
+    /**
+     * A one-line description of the native *image pipeline* route (the engine-owned
+     * texture-substitution seam).
+     *
+     * <p>This is the seam that replaces a loaded cape texture with the engine's own loader, so a
+     * substitution is live only when the init probe verified the loader address AND the pipeline
+     * hook has run this session. It is additive to the pack path, so "not active" is information,
+     * not a failure. Never fabricates a claim: without the verified loader, the report says the
+     * pipeline is not installed.
+     */
+    public static String describeImagePipeline() {
+        if (!NativeCosmeticsBridge.isImagePathVerified()) {
+            return "Native image pipeline: not installed this session — the engine image loader "
+                    + "was not verified (or the library is absent), so cape textures load vanilla.";
+        }
+        int[] stats = NativeCosmeticsBridge.imagePipelineStats();
+        if (!NativeCosmeticsBridge.isImagePipelineLive()) {
+            return "Native image pipeline: loader verified but no texture upload observed yet — "
+                    + "substitutions will fire on the next skin/cape bind.";
+        }
+        long substitutions = stats != null && stats.length >= 2 ? stats[1] : 0L;
+        long overrides = stats != null && stats.length >= 3 ? stats[2] : 0L;
+        return "Native image pipeline: active (" + substitutions + " substitution(s), "
+                + overrides + " rule(s) registered) — loaded cape textures are replaced by the "
+                + "engine's own loader.";
+    }
 }

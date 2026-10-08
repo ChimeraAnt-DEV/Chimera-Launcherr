@@ -41,4 +41,21 @@ public class NativeCosmeticsTest {
         assertFalse("no native library means no overrides reported",
                 NativeCosmeticsBridge.hasOverrides());
     }
+
+    @Test
+    public void substitutionsStayEmptyAndListedWithoutTheLibrary() {
+        // The pipeline glue must be usable (no throw) and honest (no registered rule, no live hook)
+        // when the native library is absent.
+        assertTrue(NativeCosmeticsBridge.registerSubstitution(new byte[]{1, 2, 3}, null));
+        NativeCosmeticsBridge.clearSubstitutions();
+        assertEquals(0, NativeCosmeticsBridge.substitutionCount());
+        assertFalse(NativeCosmeticsBridge.isImagePipelineLive());
+        assertFalse(NativeCosmeticsBridge.isTextureFlushAvailable());
+    }
+
+    @Test
+    public void anImageRuleRequiresNonNullSourceBytes() {
+        assertFalse(NativeCosmeticsBridge.registerSubstitution(null, null));
+        assertFalse(NativeCosmeticsBridge.registerSubstitution(new byte[0], null));
+    }
 }
