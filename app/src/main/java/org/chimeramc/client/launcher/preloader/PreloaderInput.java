@@ -150,6 +150,19 @@ public class PreloaderInput {
             double moveSpeed, boolean jumping, double verticalSpeed,
             double distanceMoved, double capeFlap, double bodyYawDegrees, int segments);
 
+    /** Encodes a cosmetic-sync advertisement datagram (byte-compatible with the Java protocol). */
+    public static native byte[] nativeEncodeCosmeticAdvert(
+            String peerId, String name, String capeId, String accessoryId, String petId);
+
+    /**
+     * Decodes a cosmetic-sync datagram into {@code {type, peerId, name, capeId, accessoryId, petId}},
+     * or null when it is not a cosmetic packet.
+     */
+    public static native String[] nativeDecodeCosmeticAdvert(byte[] data);
+
+    /** The cosmetic-sync datagram magic bytes. */
+    public static native byte[] nativeCosmeticSyncMagic();
+
     public static void configureOptifineMode(String blob) {
         try {
             nativeConfigureOptifineMode(blob == null ? "" : blob);

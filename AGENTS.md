@@ -1729,3 +1729,24 @@ inside the preloader (`app/src/main/cpp/preloader`), delivered in four Tasks.
   the key, step holds, shares sum to 1, walking/jumping lean, cloth settles below the anchor but does
   not fall away, the anchored row follows the shoulder, malformed rejected).
 
+
+### Task 4 — out-of-band cosmetic sync (`pl::cosmetics::network`)
+- `include/pl/cosmetics/network/CosmeticSocketProtocol.hpp` + `.cpp` is the **native encoder/decoder
+  for the existing `CosmeticSyncProtocol` datagram**, byte-for-byte compatible with the Java class:
+  magic `CS`, version `1`, a type byte (advertise 1 / request 2), then five 2-byte-big-endian
+  length-prefixed UTF-8 strings (`peerId`, `name`, `capeId`, `accessoryId`, `petId`, each clipped to
+  64 bytes). The peer identity is `peerId`; the cosmetic id set is the three ids. Only catalogue ids
+  travel, so a datagram stays under 200 bytes. A missing trailing id reads as `none`, so a future
+  version degrades to "wearing nothing" rather than failing to parse.
+- `CosmeticSocketClient` is the LAN UDP transport on the same multicast group the launcher uses
+  (`239.255.42.100:47902`); `open`/`close`, `send`, and a non-blocking `receive` with a select
+  timeout, so it can be polled from a frame tick without stalling the render thread. Fail-closed: a
+  failed `open` leaves it closed and no packets flow.
+- `CosmeticSyncJni.cpp` exposes `nativeEncodeCosmeticAdvert` / `nativeDecodeCosmeticAdvert` /
+  `nativeCosmeticSyncMagic` (via `PreloaderInput`), so the launcher can use the native codec and the
+  two implementations cannot drift.
+- **A separate protocol from voice, on purpose** (voice is pinned cross-language by golden vectors);
+  the differing magic means each module ignores the other's packets.
+- Host test `tests/cosmetics/CosmeticSocketProtocolTest.cpp` (21 checks: the exact byte layout,
+  round-trip, missing ids → none, over-long id clamped, magic/version/type rejection).
+
