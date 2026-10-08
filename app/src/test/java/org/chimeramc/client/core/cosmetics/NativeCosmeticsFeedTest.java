@@ -71,4 +71,20 @@ public class NativeCosmeticsFeedTest {
                                                         int renderTick, int calls, int ms) {
         return new NativeCosmeticsFeed.Status(mode, renderTick, calls, ms);
     }
+
+    @Test
+    public void absentImagePipelineDescribesThePackRoute() {
+        // No libpreloader in a JVM test, so the verified-loader probe is false and the report must
+        // say the image pipeline is not installed rather than claiming a substitution.
+        String text = NativeCosmeticsFeed.describeImagePipeline().toLowerCase();
+        assertTrue(text.contains("not installed"));
+        assertTrue(text.contains("loader"));
+    }
+
+    @Test
+    public void imagePipelineStatusNeverReadsAsLiveWithoutTheLibrary() {
+        assertFalse(NativeCosmeticsBridge.isImagePathVerified());
+        assertFalse(NativeCosmeticsBridge.isImagePipelineLive());
+        assertEquals(0, NativeCosmeticsBridge.substitutionCount());
+    }
 }

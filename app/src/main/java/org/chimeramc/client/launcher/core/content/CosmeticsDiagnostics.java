@@ -184,11 +184,12 @@ public final class CosmeticsDiagnostics {
                         + "If it never appears, this RenderDragon build ignores entity overrides and "
                         + "no resource-pack route can work."));
 
-        // The native route, reported separately: it is additive, so "not active" is information
-        // (the pack path is in use) rather than a failure.
-        NativeCosmeticsFeed.Status nativeStatus = NativeCosmeticsFeed.read();
-        checks.add(new Check("Native renderer hook", Status.MANUAL,
-                NativeCosmeticsFeed.describe(nativeStatus)));
+        // The native image-pipeline route, reported separately: it replaces a loaded cape texture
+        // with the engine's own loader, so a substitution is live only when the init probe verified
+        // the loader AND the pipeline hook has run this session. It is additive to the pack path,
+        // so "not active" is information (the pack or struct-swap path is in use), not a failure.
+        checks.add(new Check("Native image pipeline", Status.MANUAL,
+                NativeCosmeticsFeed.describeImagePipeline()));
         return checks;
     }
 
