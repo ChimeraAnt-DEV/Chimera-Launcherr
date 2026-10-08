@@ -141,6 +141,28 @@ public class PreloaderInput {
     /** Reads {skinCapeCalls (-1 when unavailable), textureCalls, capeOverrides, textureOverrides}. */
     public static native int[] nativeReadCosmeticsStats();
 
+    /**
+     * Samples the native cape chain: {@code {lean1, sway1, lean2, sway2, ...}} in degrees for
+     * {@code segments} segments, or empty when unavailable. Lets the preview and the native render
+     * share one motion curve instead of each carrying its own amplitudes.
+     */
+    public static native float[] nativeSampleCapeChain(
+            double moveSpeed, boolean jumping, double verticalSpeed,
+            double distanceMoved, double capeFlap, double bodyYawDegrees, int segments);
+
+    /** Encodes a cosmetic-sync advertisement datagram (byte-compatible with the Java protocol). */
+    public static native byte[] nativeEncodeCosmeticAdvert(
+            String peerId, String name, String capeId, String accessoryId, String petId);
+
+    /**
+     * Decodes a cosmetic-sync datagram into {@code {type, peerId, name, capeId, accessoryId, petId}},
+     * or null when it is not a cosmetic packet.
+     */
+    public static native String[] nativeDecodeCosmeticAdvert(byte[] data);
+
+    /** The cosmetic-sync datagram magic bytes. */
+    public static native byte[] nativeCosmeticSyncMagic();
+
     public static void configureOptifineMode(String blob) {
         try {
             nativeConfigureOptifineMode(blob == null ? "" : blob);
@@ -326,6 +348,24 @@ public class PreloaderInput {
         try {
             int[] value = nativeReadPlayerRenderStats();
             return value != null && value.length >= 4 ? value : null;
+        } catch (UnsatisfiedLinkError e) {
+            return null;
+        }
+    }
+
+    /**
+     * Samples the native cape chain, or null when the native library is unavailable.
+     *
+     * <p>The preview and the native render share one motion curve through this call, so the two
+     * cannot disagree about how far the cloth leans.
+     */
+    public static float[] sampleCapeChain(double moveSpeed, boolean jumping, double verticalSpeed,
+                                          double distanceMoved, double capeFlap,
+                                          double bodyYawDegrees, int segments) {
+        try {
+            float[] value = nativeSampleCapeChain(moveSpeed, jumping, verticalSpeed, distanceMoved,
+                    capeFlap, bodyYawDegrees, segments);
+            return value != null && value.length >= 2 ? value : null;
         } catch (UnsatisfiedLinkError e) {
             return null;
         }

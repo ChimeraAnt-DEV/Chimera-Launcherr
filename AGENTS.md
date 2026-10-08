@@ -33,6 +33,7 @@
 ## Rebrand: Chimera Launcher → Chimera Client (org.chimeramc.launcher → org.chimeramc.client)
 - The Java/Kotlin package, `namespace` and `applicationId` are `org.chimeramc.client`. `git grep org\.chimeramc\.launcher` should stay empty. Note the directory `app/src/main/java/org/chimeramc/client/launcher/...` still exists — `launcher` there is a **subpackage name**, not the old root, so path-style greps for `org/chimeramc/launcher` are false positives only if they match the whole prefix; the root is `org/chimeramc/client`.
 - **The preloader submodule's JNI symbols were renamed to match** (`Java_org_chimeramc_client_*`) and the parent pins that commit. If the submodule is ever rolled back to an older commit while the Java classes stay in `org.chimeramc.client`, every native input/mod call fails with `UnsatisfiedLinkError`. Verify with `llvm-nm -D --defined-only <built libpreloader.so> | grep Java_org_chimeramc_client` (expect ~35, and zero `..._launcher_`).
+- **The JNI symbol suffix is the *fully-qualified* Java class, so a class in `preloader` must not export a `launcher_preloader` symbol.** `PreloaderInput` is `org.chimeramc.client.**preloader**.PreloaderInput` (file sits under `.../launcher/preloader/`, but the package declaration is `preloader` — the directory segment is not part of the mangled name). The cosmetic-sync codec and cape-chain sampler (`nativeEncodeCosmeticAdvert` / `nativeDecodeCosmeticAdvert` / `nativeCosmeticSyncMagic` / `nativeSampleCapeChain`) were once exported as `Java_org_chimeramc_client_**launcher_preloader**_PreloaderInput_*`, so every call threw `UnsatisfiedLinkError` while the other 38 natives resolved — cosmetic sync and the native cape animation were silently dead. The wrappers swallow the error (fail-closed) so nothing crashed, it just did nothing. Guard: extract the APK's `lib/arm64-v8a/libpreloader.so`, run `llvm-nm -D --defined-only`, and diff the mangled `Java_` names against the class-declared native methods; the `launcher_preloader` prefix must have **zero** hits. Other classes whose package is not the directory are known-good: `core.mods.ModManager` and `MoreButtonsSvgBridge`/`ExternalModBridge` (package `core.mods[.inbuilt]`) under `.../launcher/core/mods/`.
 - **`org.levimc.*` classes are still load-bearing and must not be "finished off".** The prebuilt `libgxcore.so` / `libinbuiltmods.so` are arm64-only binaries with no source in this repo and still export `Java_org_levimc_*`, so `NativeBridgeHelper`, `MinecraftRuntimePreparer` and `core.mods.inbuilt.nativemod.*` stay in `org.levimc` on purpose.
 - **Renaming `applicationId` changes app identity.** Android will not offer an in-place update and the old package's private `SharedPreferences` (settings, personalization, controller profiles, accounts) are unreachable from the new app. Game data under `Android/media/<packageId>` and legacy `games/org.chimeramc` still migrate via `StorageMigrationManager`. The supported settings path is `LauncherSettingsBackup` export/import; say so in release notes rather than implying a seamless upgrade.
 - **Prefs keys and storage roots are not package paths.** `org.chimeramc.xal.crypto` (prefs key) and `games/org.chimeramc` (legacy root) were deliberately left alone — renaming them would strand existing data. Same for `chimeralauncher_instance_backup` (backup `FORMAT_ID`, validated on import) and the `chimeralauncher_*` managed-pack/skin state filenames.
@@ -1560,11 +1561,19 @@ references (the same method `Vtable.cpp` uses). These are pinned in
   (identified by `"AddPlayerPacket: NaN position sent by server"`). The `PlayerListPacketPayload::
   AddEntry` / `RemoveEntry` handlers sit at `0xb8007d0` / `0xb8007ec` and peers but their exact
   slot mapping is unconfirmed, so no index is set from them.
-- `GamePlayerRender` (existing) and `GameCosmetics` (new) both target the `LivePlayerRenderer`
-  slot; the cosmetics module owns the registry (per-player cape pixels, per-texture-id pixels, the
-  render-geometry blob + hash) and the JNI surface. All detours are **pure passthroughs** — they
-  forward the full argument register set and dereference nothing, so an unverified slot cannot fault
-  the render thread; the texture-bind seam has no verified slot and stays fail-closed.
+- `GamePlayerRender` (existing), `pl::cosmetics::NativeRenderHook` (Task 2) and `GameCosmetics`
+  (new) all target the `LivePlayerRenderer` slot; the cosmetics module owns the registry (per-player
+  cape pixels, per-texture-id pixels, the render-geometry blob + hash) and the JNI surface. All
+  detours are **pure passthroughs** — they forward the full argument register set and dereference
+  nothing, so an unverified slot cannot fault the render thread; the texture-bind seam has no
+  verified slot and stays fail-closed.
+  - **The Task 2 interception is installed from `GameHooks.cpp`, beside `InitPlayerRenderSource`
+    and on the same slot.** `pl::memory::hook` *chains* onto an already-hooked target, so the two
+    detours both run (the render feed records frame ticks, `NativeRenderHook` owns the bone-matrix
+    anchor) without either trampoline stomping the other. Installing the cosmetics hook alone
+    (which the first cut did — it was built but never called, so the interception was dead) would
+    have replaced the render feed's detour instead of sitting alongside it. If a third consumer of
+    the slot is added, add it the same way; do not "own" the slot with a second `GlossHook`.
 - **Still not implemented:** the pixel substitution itself (writing the override into the cape
   buffer / binding a swapped texture). The seams, registry and JNI are real and build; substituting
   needs each function's argument layout, which the stripped binary does not expose. The game-hook
@@ -1603,6 +1612,30 @@ path: PNG → engine image → swap at `SerializedSkinRef + 0xa8`. Fail-closed e
 bad PNG, or a null skin address leaves the vanilla cape alone, and an unmatched signature keeps the
 resource pack.
 
+- **The loader call was previously declared with the WRONG ABI, and that was the crash/black-texture
+  cause. Fixed in `mce_image_hook.cpp` (preloader).** The real convention, read from the disassembly
+  at `0x14df7ce4`, is: the return aggregate goes through **`x8`** (`mov x19, x8` in the prologue,
+  payload byte written at `[x19, #0x10]`), and the arguments are **`x0 = out image`, `x1 =
+  ImageFormat`, `x2 = data`, `x3 = size`, `x4 = bool`**. The old `using LoadImageFn =
+  void(*)(void* sret, void* out, u32 format, const u8* data, size_t size, bool)` mapped `x0 = sret,
+  x1 = out, x2 = format, ...` and never supplied `x8` at all — so it passed the out-struct where the
+  format belongs and returned the wrong way. The fix is a *type* fix: declare the return type as a
+  struct >16 bytes (`LoaderReturn`) and Clang emits the `x8` sret ABI itself (verified in the built
+  object: `add x8, sp, #0x8` before the `blr`, flag read from `sret+0x10`). Do not reintroduce a
+  hand-written `void(...)` signature.
+- **`ImageFormat` values the loader accepts are `{0, 1, 3, 4}`** (from the dispatch in the same
+  routine). `0` is auto-detect → `stb_image`, which decodes PNG (the cape/hat texture route); `4` is
+  RGBA8 (a memcpy). `renoir::ThirdParty::stbi_*` is present in the binary, confirming the PNG path.
+- **The detour is gated on a live probe, not a version list.** `InitMceImageHook` builds a real 1×1
+  PNG through the loader first; success proves both the address and the ABI, and only then is the
+  `loadImageFromMemory` detour installed (it forwards the same `x8` return pointer, so it is
+  transparent). A failed probe refuses the detour and keeps the already-proven `SerializedSkinRef`
+  struct-swap at `+0xa8`, so the feature does not regress. Substitutions are keyed by the FNV-1a of
+  the incoming bytes (`SetContentSubstitution`) plus a one-shot `ArmNextImageOverride`, because the
+  loader seam carries no player/texture id. The texture-cache flush is a caller-proven callback
+  (`SetTextureCacheFlusher`), not fabricated — `mce::TextureGroup`/`SkinRepository` are not
+  RTTI-resolvable. See `preloader/docs/mce-image-pipeline.md`.
+
 - **The `SerializedSkinRef` accessor-name strings do NOT survive 1.26.60.30.** Only `getImageData`
   (1 hit) and `loadImageFromMemory` (1 hit) are still present in `.rodata`; `getCapeImageData`,
   `getCapeImageDataCereal`, `getAnimatedImageData`, `getGeometryData`, `getAnimationData`,
@@ -1637,3 +1670,92 @@ This is a **Bedrock Edition** launcher (`namespace`/`applicationId` `org.chimera
 cannot compile or run. `MinecraftActivity` extends the game's `com.mojang.minecraftpe.MainActivity`.
 Cosmetics reach Bedrock through the generated resource pack plus the native seams documented above,
 not through an entity-layer renderer.
+
+## Native cosmetics pipeline (preloader `pl::cosmetics` + `pl::hooks`)
+
+The cosmetic system moves beyond the resource-pack fallback toward a direct native runtime pipeline
+inside the preloader (`app/src/main/cpp/preloader`), delivered in four Tasks.
+
+### Task 1 — native `.geo.json` parser + mesh builder (`pl::cosmetics::geometry`)
+- `include/pl/cosmetics/geometry/BedrockGeometry.hpp` + `src/pl/cosmetics/geometry/BedrockModelParser.cpp`.
+  Parses Bedrock `.geo.json` (format versions **1.12.0** and **1.21.0**, plus legacy 1.8.0) into
+  bones/cubes/UVs and builds interleaved vertex/index buffers, **with no resource pack and no
+  `PlayerSkinProvider`** — the geometry is a raw JSON string from memory.
+- **The rules mirror the Java preview pipeline (`core.cosmetics.geometry`) exactly** so a model that
+  looks right in the preview and one the native seam attaches are the same geometry: rotation order
+  Z→Y→X, chain resolution innermost-first, box-UV unwrap (`2*(w+d)` × `d+h`), per-face UVs, and the
+  negative-`uv_size` mirror folded into increasing texture coordinates. Face order is Top/Bottom/
+  Left/Right/Front/Back with corner indices in grid order (`ix|iy<<1|iz<<2`).
+- Pure C++ (no Android types), so it is **host-unit-tested** — `tests/cosmetics/BedrockModelParserTest.cpp`
+  (52 checks: hat 1.12, wing 1.21 with per-face UV, a six-bone pet, malformed inputs, box-UV layout;
+  run `tests/cosmetics/run_tests.sh`). `summarize()` provides the one-line Logcat confirmation line
+  without adding a logging dependency to the parser.
+
+
+### Task 2 — hook manager + render interception (`pl::hooks`, `pl::cosmetics`)
+- `include/pl/hooks/DobbyHookManager.hpp` + `src/pl/hooks/DobbyHookManager.cpp`: a Dobby-shaped API —
+  `resolve(module, symbol)`, `resolveOffset(module, offset)` (load bias + offset), `hook(target,
+  detour, &original, name)`, `unhook`, plus `DobbySymbolResolver`/`DobbyHook`/`DobbyUnhook`
+  free-function aliases so ARM64 instrumentation code reads like the Dobby pattern.
+- **The backend is the repo-vendored GlossHook (`pl::memory::hook`), not an upstream Dobby build.**
+  Dobby's own `master` at every reachable commit fails to build for Android arm64: its
+  `closure_bridge_arm64.asm` uses Apple `@PAGE/@PAGEOFF` the ELF assembler rejects, and its
+  runtime C++-assembler fallback and `PlatformUtil` are a half-finished refactor (missing
+  `core/arch/Cpu.h`, `RuntimeModule::load_address` removed while callers remain). GlossHook is the
+  same in-place trampoline primitive, linked arm64 already, and already the engine hook backend — so
+  the named manager wraps the proven one. Vendoring a fresh Dobby later is additive (only this file
+  changes).
+- `include/pl/cosmetics/NativeModelMatrix.hpp`: column-major `Mat4` and `composeCosmeticMatrix`,
+  `M_final = world * player_bone * cosmetic_offset`. Rotation about a pivot applies Z→Y→X, matching
+  the geometry builder so a bone's authored rotation and its anchoring matrix agree.
+- `include/pl/cosmetics/NativeRenderHook.hpp` + `.cpp`: intercepts `LivePlayerRenderer::render`
+  (slot 17) through `DobbyHookManager`; the detour is a **register-preserving passthrough** (forwards
+  x0–x7, dereferences nothing), so an unknown ABI cannot fault the render thread. Publishes a frame
+  tick and call count. `BoneMatrixSource` is the game-data seam: with no provider
+  `BuildCosmeticMatrix` returns false and nothing is drawn — never an invented matrix. The hook
+  installs only inside the verified version range (1.26.60.00–1.26.61.00), the same guard the
+  player-render feed uses.
+- Host test `tests/cosmetics/NativeModelMatrixTest.cpp` (12 checks: identity/translation, the three
+  axes, pivot fixed point, composition order, NaN guard).
+
+
+### Task 3 — keyframe animation + cloth solver (`pl::cosmetics::animation`)
+- `include/pl/cosmetics/animation/AnimationSolver.hpp` + `src/pl/cosmetics/animation/AnimationSolver.cpp`:
+  - `AnimationSolver` parses Bedrock animation JSON and samples tracks at a time, honouring
+    per-key interpolation (step, linear, Catmull-Rom — the "smooth" curve Blockbench emits). A
+    malformed document returns false; a time outside the keys returns the nearest key's value.
+  - `CapeMotion` mirrors the launcher's Java `CapeAnimationCurve` constants and formulas **exactly**
+    (walk 28°, flap 42°, jump 12°, vertical 10°, flutter 13°/60, sway 10°/44, phase lag 0.022, turn
+    sway 4°), so the preview and the native chain lean by the same amount. Segment shares sum to 1,
+    so segmenting redistributes the bend instead of changing how far the cape leans.
+  - `ClothSolver` is a Verlet cape/tail solver (9×11; gravity 14, damping 0.22, stiffness 52, max
+    stretch 1.35, breeze 12/1.4) mirroring the Java `CapeSimulator`. The game's Molang cape has no
+    physics driver, so the native path solves real folds instead.
+- `AnimationJni.cpp` exposes `nativeSampleCapeChain(...)` (via `PreloaderInput.sampleCapeChain`) so
+  the launcher preview and the native render share one motion curve rather than duplicating the
+  amplitudes.
+- Host test `tests/cosmetics/AnimationSolverTest.cpp` (27 checks: keyframe parse, Catmull-Rom hits
+  the key, step holds, shares sum to 1, walking/jumping lean, cloth settles below the anchor but does
+  not fall away, the anchored row follows the shoulder, malformed rejected).
+
+
+### Task 4 — out-of-band cosmetic sync (`pl::cosmetics::network`)
+- `include/pl/cosmetics/network/CosmeticSocketProtocol.hpp` + `.cpp` is the **native encoder/decoder
+  for the existing `CosmeticSyncProtocol` datagram**, byte-for-byte compatible with the Java class:
+  magic `CS`, version `1`, a type byte (advertise 1 / request 2), then five 2-byte-big-endian
+  length-prefixed UTF-8 strings (`peerId`, `name`, `capeId`, `accessoryId`, `petId`, each clipped to
+  64 bytes). The peer identity is `peerId`; the cosmetic id set is the three ids. Only catalogue ids
+  travel, so a datagram stays under 200 bytes. A missing trailing id reads as `none`, so a future
+  version degrades to "wearing nothing" rather than failing to parse.
+- `CosmeticSocketClient` is the LAN UDP transport on the same multicast group the launcher uses
+  (`239.255.42.100:47902`); `open`/`close`, `send`, and a non-blocking `receive` with a select
+  timeout, so it can be polled from a frame tick without stalling the render thread. Fail-closed: a
+  failed `open` leaves it closed and no packets flow.
+- `CosmeticSyncJni.cpp` exposes `nativeEncodeCosmeticAdvert` / `nativeDecodeCosmeticAdvert` /
+  `nativeCosmeticSyncMagic` (via `PreloaderInput`), so the launcher can use the native codec and the
+  two implementations cannot drift.
+- **A separate protocol from voice, on purpose** (voice is pinned cross-language by golden vectors);
+  the differing magic means each module ignores the other's packets.
+- Host test `tests/cosmetics/CosmeticSocketProtocolTest.cpp` (21 checks: the exact byte layout,
+  round-trip, missing ids → none, over-long id clamped, magic/version/type rejection).
+

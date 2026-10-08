@@ -188,12 +188,18 @@ public class VipModMenuOverlay {
         if (isShowing || activity.isFinishing() || activity.isDestroyed()) return;
         try {
             showInternal();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             // showInternal may have failed after addView, leaving a half-built panel attached. Drop
             // it before the fallback builds a fresh tree, or the fallback's addView would layer a
-            // second copy (and a second set of listeners) on top of the broken one.
+            // second copy (and a second set of listeners) on top of the broken one. Catch Throwable,
+            // not Exception: a class-init or link failure while inflating a section surfaces as an
+            // Error, and that must still degrade to the simple fallback rather than kill the game.
             detachWindowViewQuietly();
-            showFallback();
+            try {
+                showFallback();
+            } catch (Throwable ignored) {
+                // Both trees failed; leave the game untouched rather than crashing over it.
+            }
         }
     }
 
@@ -376,10 +382,10 @@ public class VipModMenuOverlay {
             });
         }
 
-        tabGeneral.setOnClickListener(v -> selectTab(VipTab.GENERAL));
-        tabReplay.setOnClickListener(v -> selectTab(VipTab.REPLAY));
-        tabController.setOnClickListener(v -> selectTab(VipTab.CONTROLLER));
-        tabKeyboard.setOnClickListener(v -> selectTab(VipTab.KEYBOARD));
+        tabGeneral.setOnClickListener(v -> selectTabSafe(VipTab.GENERAL));
+        tabReplay.setOnClickListener(v -> selectTabSafe(VipTab.REPLAY));
+        tabController.setOnClickListener(v -> selectTabSafe(VipTab.CONTROLLER));
+        tabKeyboard.setOnClickListener(v -> selectTabSafe(VipTab.KEYBOARD));
         ImageButton close = overlayView.findViewById(R.id.vip_close);
         close.setOnClickListener(v -> hide());
 
@@ -552,9 +558,30 @@ public class VipModMenuOverlay {
         modeBadge.setCompoundDrawablesRelativeWithIntrinsicBounds(
                 controller ? R.drawable.ic_controller : R.drawable.ic_keyboard, 0, 0, 0);
 
-        selectTab(VipTab.defaultFor(inputMode));
-        refreshControllerSection();
-        refreshKeyboardSection();
+        // Opening a section is where the Modules tab used to die: the Controller and Keyboard
+        // builders run here and a single bad profile/illustration lookup would propagate out of
+        // show() and crash the game. Each is isolated so the module grid -- the tab's real content
+        // -- always comes up even if one sub-mode cannot be built.
+        selectTabSafe(VipTab.defaultFor(inputMode));
+        try {
+            refreshControllerSection();
+        } catch (Throwable ignored) {
+        }
+        try {
+            refreshKeyboardSection();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** Runs {@link #selectTab} without letting a section-build failure escape into the game. */
+    private void selectTabSafe(VipTab tab) {
+        try {
+            selectTab(tab);
+        } catch (Throwable ignored) {
+            // The tab indicator or a section host failed; fall back to making the General (module)
+            // section visible directly, since that is the one surface a controller user needs.
+            if (generalView != null) generalView.setVisibility(View.VISIBLE);
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -594,20 +621,25 @@ public class VipModMenuOverlay {
     }
 
     private void applySearch() {
-        String query = searchInput == null ? "" : searchInput.getText().toString().trim();
-        InbuiltModManager manager = InbuiltModManager.getInstance(activity);
-        Set<String> favorites = manager != null
-                ? manager.getFavoriteModKeys() : Collections.<String>emptySet();
+        // The whole rebuild is guarded: a malformed module name or a diff that throws must leave
+        // the previous grid on screen rather than propagate to the main looper over a live game.
+        try {
+            String query = searchInput == null ? "" : searchInput.getText().toString().trim();
+            InbuiltModManager manager = InbuiltModManager.getInstance(activity);
+            Set<String> favorites = manager != null
+                    ? manager.getFavoriteModKeys() : Collections.<String>emptySet();
 
-        visibleMods.clear();
-        for (UnifiedMod mod : allMods) {
-            if (query.isEmpty() || matches(mod, query)) {
-                visibleMods.add(mod);
+            visibleMods.clear();
+            for (UnifiedMod mod : allMods) {
+                if (query.isEmpty() || matches(mod, query)) {
+                    visibleMods.add(mod);
+                }
             }
+            if (adapter != null) adapter.submit(visibleMods, favorites);
+            updateCounts();
+            updateEmptyState(query);
+        } catch (Throwable ignored) {
         }
-        if (adapter != null) adapter.submit(visibleMods, favorites);
-        updateCounts();
-        updateEmptyState(query);
     }
 
     private boolean matches(UnifiedMod mod, String query) {

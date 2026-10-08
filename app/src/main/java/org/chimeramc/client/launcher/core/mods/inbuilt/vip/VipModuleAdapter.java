@@ -275,6 +275,19 @@ public class VipModuleAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         }
         ModHolder modHolder = (ModHolder) holder;
         UnifiedMod mod = item.mod;
+        try {
+            bindMod(modHolder, item, mod, position);
+        } catch (Throwable t) {
+            // One card that cannot bind must not take the whole grid -- and therefore the running
+            // game session -- down with it. The grid is opened over a live game, so a RecyclerView
+            // bind that throws propagates to the main looper and kills the process. Degrade to a
+            // safe placeholder for that single card and keep the menu usable.
+            showBrokenCard(modHolder, mod);
+        }
+    }
+
+    /** Fills one module card; any failure here is caught by {@link #onBindViewHolder}. */
+    private void bindMod(ModHolder modHolder, Item item, UnifiedMod mod, int position) {
         boolean isEnabled = enabled.getOrDefault(mod.getStableKey(), false);
         boolean isAvailable = ModAvailability.isInteractive(mod.getId());
 
@@ -321,6 +334,32 @@ public class VipModuleAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         super.onViewRecycled(holder);
         if (holder instanceof ModHolder) {
             ((ModHolder) holder).itemView.setForeground(null);
+        }
+    }
+
+    /**
+     * A minimal, non-interactive card used when a module's normal bind threw.
+     *
+     * <p>It is deliberately the simplest possible paint -- no drawables, no theme lookups, no
+     * listeners -- so it cannot itself fail. The card stays visible (the module is discoverable)
+     * but cannot be toggled, so a card whose metadata is broken cannot take the grid down again.
+     */
+    private void showBrokenCard(ModHolder holder, UnifiedMod mod) {
+        try {
+            holder.name.setText(mod != null && mod.getName() != null ? mod.getName() : "");
+            holder.group.setVisibility(View.GONE);
+            holder.unavailable.setVisibility(View.VISIBLE);
+            holder.status.setVisibility(View.GONE);
+            holder.config.setVisibility(View.GONE);
+            holder.itemView.setForeground(null);
+            holder.itemView.setTranslationZ(0f);
+            holder.itemView.setAlpha(0.6f);
+            holder.itemView.setEnabled(false);
+            holder.itemView.setClickable(false);
+            holder.itemView.setOnClickListener(null);
+            holder.itemView.setOnLongClickListener(null);
+        } catch (Throwable ignored) {
+            // Even the placeholder must not throw; there is nothing further to degrade to.
         }
     }
 
