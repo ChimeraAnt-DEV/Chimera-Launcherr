@@ -1682,3 +1682,50 @@ inside the preloader (`app/src/main/cpp/preloader`), delivered in four Tasks.
   run `tests/cosmetics/run_tests.sh`). `summarize()` provides the one-line Logcat confirmation line
   without adding a logging dependency to the parser.
 
+
+### Task 2 — hook manager + render interception (`pl::hooks`, `pl::cosmetics`)
+- `include/pl/hooks/DobbyHookManager.hpp` + `src/pl/hooks/DobbyHookManager.cpp`: a Dobby-shaped API —
+  `resolve(module, symbol)`, `resolveOffset(module, offset)` (load bias + offset), `hook(target,
+  detour, &original, name)`, `unhook`, plus `DobbySymbolResolver`/`DobbyHook`/`DobbyUnhook`
+  free-function aliases so ARM64 instrumentation code reads like the Dobby pattern.
+- **The backend is the repo-vendored GlossHook (`pl::memory::hook`), not an upstream Dobby build.**
+  Dobby's own `master` at every reachable commit fails to build for Android arm64: its
+  `closure_bridge_arm64.asm` uses Apple `@PAGE/@PAGEOFF` the ELF assembler rejects, and its
+  runtime C++-assembler fallback and `PlatformUtil` are a half-finished refactor (missing
+  `core/arch/Cpu.h`, `RuntimeModule::load_address` removed while callers remain). GlossHook is the
+  same in-place trampoline primitive, linked arm64 already, and already the engine hook backend — so
+  the named manager wraps the proven one. Vendoring a fresh Dobby later is additive (only this file
+  changes).
+- `include/pl/cosmetics/NativeModelMatrix.hpp`: column-major `Mat4` and `composeCosmeticMatrix`,
+  `M_final = world * player_bone * cosmetic_offset`. Rotation about a pivot applies Z→Y→X, matching
+  the geometry builder so a bone's authored rotation and its anchoring matrix agree.
+- `include/pl/cosmetics/NativeRenderHook.hpp` + `.cpp`: intercepts `LivePlayerRenderer::render`
+  (slot 17) through `DobbyHookManager`; the detour is a **register-preserving passthrough** (forwards
+  x0–x7, dereferences nothing), so an unknown ABI cannot fault the render thread. Publishes a frame
+  tick and call count. `BoneMatrixSource` is the game-data seam: with no provider
+  `BuildCosmeticMatrix` returns false and nothing is drawn — never an invented matrix. The hook
+  installs only inside the verified version range (1.26.60.00–1.26.61.00), the same guard the
+  player-render feed uses.
+- Host test `tests/cosmetics/NativeModelMatrixTest.cpp` (12 checks: identity/translation, the three
+  axes, pivot fixed point, composition order, NaN guard).
+
+
+### Task 3 — keyframe animation + cloth solver (`pl::cosmetics::animation`)
+- `include/pl/cosmetics/animation/AnimationSolver.hpp` + `src/pl/cosmetics/animation/AnimationSolver.cpp`:
+  - `AnimationSolver` parses Bedrock animation JSON and samples tracks at a time, honouring
+    per-key interpolation (step, linear, Catmull-Rom — the "smooth" curve Blockbench emits). A
+    malformed document returns false; a time outside the keys returns the nearest key's value.
+  - `CapeMotion` mirrors the launcher's Java `CapeAnimationCurve` constants and formulas **exactly**
+    (walk 28°, flap 42°, jump 12°, vertical 10°, flutter 13°/60, sway 10°/44, phase lag 0.022, turn
+    sway 4°), so the preview and the native chain lean by the same amount. Segment shares sum to 1,
+    so segmenting redistributes the bend instead of changing how far the cape leans.
+  - `ClothSolver` is a Verlet cape/tail solver (9×11; gravity 14, damping 0.22, stiffness 52, max
+    stretch 1.35, breeze 12/1.4) mirroring the Java `CapeSimulator`. The game's Molang cape has no
+    physics driver, so the native path solves real folds instead.
+- `AnimationJni.cpp` exposes `nativeSampleCapeChain(...)` (via `PreloaderInput.sampleCapeChain`) so
+  the launcher preview and the native render share one motion curve rather than duplicating the
+  amplitudes.
+- Host test `tests/cosmetics/AnimationSolverTest.cpp` (27 checks: keyframe parse, Catmull-Rom hits
+  the key, step holds, shares sum to 1, walking/jumping lean, cloth settles below the anchor but does
+  not fall away, the anchored row follows the shoulder, malformed rejected).
+

@@ -141,6 +141,15 @@ public class PreloaderInput {
     /** Reads {skinCapeCalls (-1 when unavailable), textureCalls, capeOverrides, textureOverrides}. */
     public static native int[] nativeReadCosmeticsStats();
 
+    /**
+     * Samples the native cape chain: {@code {lean1, sway1, lean2, sway2, ...}} in degrees for
+     * {@code segments} segments, or empty when unavailable. Lets the preview and the native render
+     * share one motion curve instead of each carrying its own amplitudes.
+     */
+    public static native float[] nativeSampleCapeChain(
+            double moveSpeed, boolean jumping, double verticalSpeed,
+            double distanceMoved, double capeFlap, double bodyYawDegrees, int segments);
+
     public static void configureOptifineMode(String blob) {
         try {
             nativeConfigureOptifineMode(blob == null ? "" : blob);
@@ -326,6 +335,24 @@ public class PreloaderInput {
         try {
             int[] value = nativeReadPlayerRenderStats();
             return value != null && value.length >= 4 ? value : null;
+        } catch (UnsatisfiedLinkError e) {
+            return null;
+        }
+    }
+
+    /**
+     * Samples the native cape chain, or null when the native library is unavailable.
+     *
+     * <p>The preview and the native render share one motion curve through this call, so the two
+     * cannot disagree about how far the cloth leans.
+     */
+    public static float[] sampleCapeChain(double moveSpeed, boolean jumping, double verticalSpeed,
+                                          double distanceMoved, double capeFlap,
+                                          double bodyYawDegrees, int segments) {
+        try {
+            float[] value = nativeSampleCapeChain(moveSpeed, jumping, verticalSpeed, distanceMoved,
+                    capeFlap, bodyYawDegrees, segments);
+            return value != null && value.length >= 2 ? value : null;
         } catch (UnsatisfiedLinkError e) {
             return null;
         }
