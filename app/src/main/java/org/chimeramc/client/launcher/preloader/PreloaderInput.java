@@ -121,6 +121,13 @@ public class PreloaderInput {
     public static native void nativeSetRenderGeometry(byte[] data);
 
     /**
+     * Pushes one frame of cosmetic transform data (the {@code CosmeticFrame} wire layout) to the
+     * native render hook. Called every game frame; the native side stores it and the render hook
+     * reads it while drawing the player. Fail-closed: an absent symbol is a no-op.
+     */
+    public static native void nativePushCosmeticFrame(byte[] frame);
+
+    /**
      * Replaces the cape image inside a {@code SerializedSkinRef} at a raw address. The image must
      * be the engine's own 0x30-byte {@code mce::Image} struct (built by its loader), not raw RGBA.
      */
@@ -422,6 +429,14 @@ public class PreloaderInput {
     public static void setRenderGeometry(byte[] data) {
         try {
             nativeSetRenderGeometry(data);
+        } catch (UnsatisfiedLinkError e) {
+        }
+    }
+
+    /** Pushes one cosmetic frame; a no-op on a build without the native symbol. */
+    public static void pushCosmeticFrame(byte[] frame) {
+        try {
+            nativePushCosmeticFrame(frame);
         } catch (UnsatisfiedLinkError e) {
         }
     }

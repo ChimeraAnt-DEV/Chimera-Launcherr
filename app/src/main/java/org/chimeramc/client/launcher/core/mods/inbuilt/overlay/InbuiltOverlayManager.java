@@ -1540,6 +1540,10 @@ public class InbuiltOverlayManager {
         // death feed. Both are no-ops when their module is off.
         HitPredictionMod.tick(frameNow);
         KillEffectsMod.tick(frameNow);
+        // The cosmetics transform pipeline: compute the cape chain, pet pose and head look in Java
+        // and push them to the native render hook every frame, so the hook draws them directly with
+        // no resource pack. A no-op when nothing is equipped or the native symbol is absent.
+        org.chimeramc.client.core.cosmetics.NativeCosmeticsRuntime.tickFrame(activity, frameNow);
         // The Replay highlight triggers read the same local signals (health for death, the landed
         // hit for a combo, the credited kill for a streak) on the game's own frame tick. Without
         // this the trigger system was built but never called, so clips only saved on a manual

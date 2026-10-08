@@ -23,6 +23,7 @@ import org.chimeramc.client.core.cosmetics.CosmeticSyncModule;
 import org.chimeramc.client.core.cosmetics.CosmeticSyncProtocol;
 import org.chimeramc.client.core.cosmetics.NativeCosmeticsBridge;
 import org.chimeramc.client.core.cosmetics.NativeCosmeticsFeed;
+import org.chimeramc.client.core.cosmetics.NativeCosmeticsRuntime;
 import org.chimeramc.client.core.mods.inbuilt.manager.InbuiltModManager;
 import org.chimeramc.client.ui.animation.DynamicAnim;
 
@@ -256,6 +257,8 @@ final class CosmeticsPanel {
                     store.getEquippedCapeForDisplay(),
                     store.getEquippedAccessory(),
                     store.getEquippedPet());
+            // The in-game pet animates with the gait the preview is showing, so the two agree.
+            NativeCosmeticsRuntime.setFrameGait(preview.getPetLocomotion());
         } catch (Throwable ignored) {
             // Fail-closed: the preview and the equipped selection are unaffected.
         }

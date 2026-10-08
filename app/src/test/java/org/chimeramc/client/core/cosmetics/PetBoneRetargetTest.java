@@ -2,6 +2,7 @@ package org.chimeramc.client.core.cosmetics;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.gson.JsonArray;
@@ -89,16 +90,31 @@ public class PetBoneRetargetTest {
     }
 
     @Test
-    public void everyNonRootBoneHangsOffTheRoot() {
-        JsonArray out = bones(PetBoneRetarget.apply(model("pet", "HEAD", "tail", "unknownthing")));
+    public void theAuthoredHierarchyIsPreservedWhenRenaming() {
+        // A real Blockbench rig nests its bones; the retarget must rename without flattening.
+        String json = "{\"format_version\":\"1.12.0\",\"minecraft:geometry\":[{\"description\":{"
+                + "\"identifier\":\"geometry.chimera_pet\"},\"bones\":["
+                + "{\"name\":\"pet\",\"pivot\":[0,0,0],\"cubes\":[{\"origin\":[0,0,0],\"size\":[1,1,1],\"uv\":[0,0]}]},"
+                + "{\"name\":\"body\",\"parent\":\"pet\",\"pivot\":[0,1,0],\"cubes\":[{\"origin\":[0,0,0],\"size\":[1,1,1],\"uv\":[0,0]}]},"
+                + "{\"name\":\"HEAD\",\"parent\":\"body\",\"pivot\":[0,2,0],\"cubes\":[{\"origin\":[0,0,0],\"size\":[1,1,1],\"uv\":[0,0]}]},"
+                + "{\"name\":\"cola0\",\"parent\":\"body\",\"pivot\":[0,1,0],\"cubes\":[{\"origin\":[0,0,0],\"size\":[1,1,1],\"uv\":[0,0]}]},"
+                + "{\"name\":\"cola1\",\"parent\":\"cola0\",\"pivot\":[0,1,0],\"cubes\":[{\"origin\":[0,0,0],\"size\":[1,1,1],\"uv\":[0,0]}]}"
+                + "]}]}";
+        JsonArray out = bones(PetBoneRetarget.apply(json));
+        java.util.Map<String, String> parent = new java.util.HashMap<>();
         for (int i = 0; i < out.size(); i++) {
             JsonObject b = out.get(i).getAsJsonObject();
-            if ("pet".equals(b.get("name").getAsString())) {
-                assertFalse("the root has no parent", b.has("parent"));
-            } else {
-                assertEquals("pet", b.get("parent").getAsString());
-            }
+            parent.put(b.get("name").getAsString(),
+                    b.has("parent") ? b.get("parent").getAsString() : null);
         }
+        // The head is renamed but still hangs off body. The first tail-classified bone (cola0)
+        // becomes "tail"; the rest keep their names and their parent chain, so the tail is a chain
+        // (tail -> cola1), not a set of root-hung cubes.
+        assertEquals("body", parent.get("head"));
+        assertEquals("body", parent.get("tail"));
+        assertEquals("tail", parent.get("cola1"));
+        assertEquals("pet", parent.get("body"));
+        assertNull(parent.get("pet"));
     }
 
     @Test

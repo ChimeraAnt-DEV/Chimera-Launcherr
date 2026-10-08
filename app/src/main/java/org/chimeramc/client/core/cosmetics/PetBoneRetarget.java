@@ -58,62 +58,74 @@ public final class PetBoneRetarget {
         JsonArray bones = geo.getAsJsonArray("bones");
         if (bones == null || bones.size() == 0) return modelJson;
 
-        // Names already in use, so a kept name cannot collide with a renamed one.
+        // The authored hierarchy is preserved. An earlier version re-parented every non-root bone
+        // directly to the pet root, which is catastrophic for a real Blockbench rig: a dragon's tail
+        // is a chain (body -> cola0 -> cola1 -> ...) and its legs are nested, so hanging each bone
+        // off the root makes every pivot absolute to the root and the mesh collapses into a knot of
+        // detached cubes — the "cursed" pet. Renaming is the whole job; the parent edges must not be
+        // touched beyond following a renamed parent.
+        String[] original = new String[bones.size()];
+        String[] assigned = new String[bones.size()];
         Set<String> used = new HashSet<>();
-        used.add(ROOT);
+        // Guarantee a root: an authored model with no bone named "pet" gets its first bone promoted
+        // (and its children follow the rename), so the controller always has a root to drive.
         int rootIndex = -1;
         for (int i = 0; i < bones.size(); i++) {
-            String name = nameOf(bones.get(i).getAsJsonObject());
-            if (ROOT.equals(name)) {
+            if (ROOT.equals(nameOf(bones.get(i).getAsJsonObject()))) {
                 rootIndex = i;
-            } else if (!name.isEmpty()) {
-                used.add(name);
+                break;
             }
         }
-        // Guarantee a root: with none, the first bone becomes it (and keeps its cubes).
-        if (rootIndex < 0) {
-            rootIndex = 0;
-            bones.get(0).getAsJsonObject().addProperty("name", ROOT);
-            bones.get(0).getAsJsonObject().remove("parent");
-        }
-        JsonObject root = bones.get(rootIndex).getAsJsonObject();
-        root.remove("parent");
+        if (rootIndex < 0) rootIndex = 0;
+        used.add(ROOT);
+        assigned[rootIndex] = ROOT;
+        original[rootIndex] = nameOf(bones.get(rootIndex).getAsJsonObject());
 
         int headSlot = 0, tailSlot = 0, wingSlot = 0, legSlot = 0;
         for (int i = 0; i < bones.size(); i++) {
             if (i == rootIndex) continue;
-            JsonObject bone = bones.get(i).getAsJsonObject();
-            String original = nameOf(bone);
+            String name = nameOf(bones.get(i).getAsJsonObject());
+            original[i] = name;
             String slot = null;
-            if (headSlot == 0 && isHead(original)) {
+            if (headSlot == 0 && isHead(name)) {
                 slot = "head";
                 headSlot = 1;
-            } else if (tailSlot == 0 && isTail(original)) {
+            } else if (tailSlot == 0 && isTail(name)) {
                 slot = "tail";
                 tailSlot = 1;
-            } else if (wingSlot < 2 && isWing(original)) {
-                // Left/right by name hint, else first free slot; a mirrored pair stays mirrored.
-                boolean left = original.toLowerCase().contains("left")
-                        || original.toLowerCase().endsWith("l");
+            } else if (wingSlot < 2 && isWing(name)) {
+                boolean left = name.toLowerCase().contains("left")
+                        || name.toLowerCase().endsWith("l");
                 if (left && !used.contains("wing_l")) slot = "wing_l";
                 else if (!left && !used.contains("wing_r")) slot = "wing_r";
                 else slot = used.contains("wing_l") ? "wing_r" : "wing_l";
                 wingSlot++;
-            } else if (legSlot < LEG_SLOTS.length && isLeg(original)) {
+            } else if (legSlot < LEG_SLOTS.length && isLeg(name)) {
                 slot = LEG_SLOTS[legSlot++];
             }
-
             if (slot != null && !used.contains(slot)) {
-                bone.addProperty("name", slot);
-                used.add(slot);
-                bone.addProperty("parent", ROOT);
-            } else if (!ROOT.equals(original)) {
-                // Keep the name (uniquely) and hang it off the root so it still renders and
-                // follows the body; the controller simply does not drive it.
-                String unique = unique(original, used);
-                bone.addProperty("name", unique);
-                used.add(unique);
-                bone.addProperty("parent", ROOT);
+                assigned[i] = slot;
+            } else {
+                assigned[i] = unique(name, used);
+            }
+            used.add(assigned[i]);
+        }
+
+        // Old name -> new name, first occurrence wins, so a child's parent reference follows.
+        java.util.Map<String, String> rename = new java.util.HashMap<>();
+        for (int i = 0; i < bones.size(); i++) {
+            if (original[i] != null && !original[i].isEmpty() && !rename.containsKey(original[i])) {
+                rename.put(original[i], assigned[i]);
+            }
+        }
+
+        for (int i = 0; i < bones.size(); i++) {
+            JsonObject bone = bones.get(i).getAsJsonObject();
+            bone.addProperty("name", assigned[i]);
+            if (bone.has("parent") && !bone.get("parent").isJsonNull()) {
+                String parent = bone.get("parent").getAsString();
+                String renamed = rename.get(parent);
+                if (renamed != null) bone.addProperty("parent", renamed);
             }
         }
         return model.toString();
