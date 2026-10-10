@@ -1,53 +1,107 @@
 {
   "schemaVersion": 1,
-  "headline": "Introducing GlowberryClient",
-  "summary": "The launcher is now GlowberryClient, with a rebuilt interface, a new Installations tab for one-tap Bedrock installs, and three PvP combat modules.",
+  "headline": "GlowberryClient — Cosmetics & Identity Overhaul",
+  "summary": "Cosmetics move onto the game's native renderer with 100+ capes, 256 accessories and 18 animated pets, plus Bedrock Optifine Mode, proximity voice chat and a hardened VIP Mod Menu.",
   "sections": [
     {
-      "title": "Rebrand",
+      "title": "Cosmetics, Rebuilt Natively",
       "items": [
         {
-          "text": "Chimera Launcher is now GlowberryClient, with a new name, package and app identity.",
-          "url": "https://github.com/ChimeraAnt-DEV/ChimeraLauncher/commit/c2ceda5ff78b0798df468d66654599dad99b6532"
+          "text": "Cosmetics now render through the game's own player-render hook, and the old resource-pack route is gone.",
+          "url": ""
+        },
+        {
+          "text": "The cape is a 16-segment bone chain with real cloth fold driven by movement, jumping and turning.",
+          "url": ""
+        },
+        {
+          "text": "100+ capes, 256 accessories and 18 animated 3D pets, built from authored models.",
+          "url": ""
+        },
+        {
+          "text": "Cape artwork is swapped onto the real skin texture through the engine's own image loader.",
+          "url": ""
+        },
+        {
+          "text": "The preview is sharper: alpha cutout, depth-correct occlusion and 2x supersampling.",
+          "url": ""
+        },
+        {
+          "text": "Share your cape, hat and pet with other GlowberryClient users over LAN, the relay, or a manual peer.",
+          "url": ""
         }
       ]
     },
     {
-      "title": "Installations",
+      "title": "Bedrock Optifine Mode",
       "items": [
         {
-          "text": "A new Installations tab lists the Bedrock versions a mirror publishes and installs a chosen one as its own instance.",
-          "url": "https://github.com/ChimeraAnt-DEV/ChimeraLauncher/commit/1e3717baa1bed235dab1d9f69c48e34103c44621"
+          "text": "A new Settings card with per-item toggles and launch wiring.",
+          "url": ""
         },
         {
-          "text": "A failed install keeps the downloaded package so you can retry without downloading it again.",
-          "url": "https://github.com/ChimeraAnt-DEV/ChimeraLauncher/commit/1e3717baa1bed235dab1d9f69c48e34103c44621"
+          "text": "A classic black Optifine cape with the \"OF\" monogram is applied by default.",
+          "url": ""
         }
       ]
     },
     {
-      "title": "PvP Modules",
+      "title": "Proximity Voice Chat",
       "items": [
         {
-          "text": "The Mod Menu gains a PvP tab that groups Aim Settings, CPS Display and Snaplook together.",
-          "url": "https://github.com/ChimeraAnt-DEV/ChimeraLauncher/commit/7622b61526a546fb438bf7891b3d4a030aa4ac6f"
+          "text": "Voice works on your LAN and over a standalone relay server for internet play.",
+          "url": ""
         },
         {
-          "text": "Armor HUD shows durability and enchantments for you and your target; Crystal Optimizer highlights the best crystal placement; Hit Registration smooths your look input.",
-          "url": "https://github.com/ChimeraAnt-DEV/ChimeraLauncher/commit/5b5fc035ec7f5fd282a2dd32dc0606a8c50a4214"
+          "text": "Public and private channels with shareable join codes, a live directory and a pixel mic meter.",
+          "url": ""
+        },
+        {
+          "text": "Opus codec, jitter buffer, token auth and IP/device bans.",
+          "url": ""
         }
       ]
     },
     {
-      "title": "Interface",
+      "title": "VIP Mod Menu & Replay",
       "items": [
         {
-          "text": "A new violet brand palette, a shared card style, a refreshed splash screen and a new app icon.",
-          "url": "https://github.com/ChimeraAnt-DEV/ChimeraLauncher/commit/14c44a2ccf9a63e068ccbeebb712bd6f85d9259c"
+          "text": "A bind-driven VIP Mod Menu with controller and keyboard layouts, hardened against crashes.",
+          "url": ""
         },
         {
-          "text": "The original top navigation bar is back, so all six tabs stay reachable.",
-          "url": "https://github.com/ChimeraAnt-DEV/ChimeraLauncher/commit/a94388eef8c7ed26fff164253d59117a34b7f7c5"
+          "text": "Record, review, trim, stitch and share clips without leaving your world.",
+          "url": ""
+        }
+      ]
+    },
+    {
+      "title": "Fixes & Hardening",
+      "items": [
+        {
+          "text": "Fixed the GlossHook linker-init crash that could take down the app.",
+          "url": ""
+        },
+        {
+          "text": "Fixed dead cosmetics JNI exports so native cosmetics actually load.",
+          "url": ""
+        },
+        {
+          "text": "Fixed the Enter-in-chat crash.",
+          "url": ""
+        },
+        {
+          "text": "Fixed preloader load order and missing signature rules.",
+          "url": ""
+        }
+      ]
+    },
+    {
+      "title": "Housekeeping",
+      "items": [
+        {
+          "text": "Removed the news feature and reworked the Launch tab with docked controls and a live hero preview.",
+          "url": ""
         }
       ]
     }
